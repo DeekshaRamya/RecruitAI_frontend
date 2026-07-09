@@ -14,7 +14,7 @@ const MicrosoftIcon = () => (
   </svg>
 );
 
-const LoginCard = ({ role, setRole }) => {
+const LoginCard = ({ role, setRole, onRecruiterLogin, onLogin }) => {
   // Navigation mode for Candidate UI ('login' or 'register')
   const [candidateMode, setCandidateMode] = useState('login');
 
@@ -38,7 +38,11 @@ const LoginCard = ({ role, setRole }) => {
   const handleLoginSubmit = (e) => {
     e.preventDefault();
     console.log(`Signing in as ${role}:`, { email, password, rememberMe });
-    alert(`Signing in as ${role === 'recruiter' ? 'Recruiter' : 'Candidate'} with email: ${email}`);
+    if (onLogin) {
+      onLogin();
+    } else if (onRecruiterLogin) {
+      onRecruiterLogin();
+    }
   };
 
   const handleRegisterSubmit = (e) => {
@@ -60,7 +64,13 @@ const LoginCard = ({ role, setRole }) => {
 
   const handleMicrosoftLogin = () => {
     console.log('Microsoft login clicked');
-    alert('Microsoft Entra ID corporate login initiated.');
+    if (onLogin) {
+      onLogin();
+    } else if (onRecruiterLogin) {
+      onRecruiterLogin();
+    } else {
+      alert('Microsoft Entra ID corporate login initiated.');
+    }
   };
 
   // Dynamic Header contents
@@ -87,11 +97,10 @@ const LoginCard = ({ role, setRole }) => {
 
   return (
     <motion.div
-      className={`w-full max-w-[460px] relative z-[50] transition-all duration-500 ${
-        isRecruiter 
-          ? 'bg-recruiter-card-bg border border-recruiter-card-border rounded-2xl p-8 md:p-10 shadow-[0_10px_40px_rgba(15,23,42,0.04)]' 
+      className={`w-full max-w-[460px] relative z-[50] transition-all duration-500 ${isRecruiter
+          ? 'bg-recruiter-card-bg border border-recruiter-card-border rounded-2xl p-8 md:p-10 shadow-[0_10px_40px_rgba(15,23,42,0.04)]'
           : 'bg-candidate-card-bg border border-candidate-card-border rounded-2xl p-8 md:p-9 shadow-[0_10px_40px_rgba(124,58,237,0.04)]'
-      }`}
+        }`}
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: 'easeOut' }}
@@ -114,19 +123,17 @@ const LoginCard = ({ role, setRole }) => {
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.25 }}
           >
-            <h2 
-              className={`font-plus-jakarta font-bold tracking-tight transition-colors duration-500 text-left ${
-                isRecruiter 
-                  ? 'text-[2.1rem] text-recruiter-text-main mb-3' 
+            <h2
+              className={`font-plus-jakarta font-bold tracking-tight transition-colors duration-500 text-left ${isRecruiter
+                  ? 'text-[2.1rem] text-recruiter-text-main mb-3'
                   : 'text-2xl text-candidate-text-main mb-2'
-              }`}
+                }`}
             >
               {headerContent.title}
             </h2>
-            <p 
-              className={`text-[0.925rem] leading-relaxed transition-colors duration-500 text-left ${
-                isRecruiter ? 'text-recruiter-text-sub' : 'text-candidate-text-muted'
-              }`}
+            <p
+              className={`text-[0.925rem] leading-relaxed transition-colors duration-500 text-left ${isRecruiter ? 'text-recruiter-text-sub' : 'text-candidate-text-muted'
+                }`}
             >
               {headerContent.subtitle}
             </p>
@@ -206,23 +213,22 @@ const LoginCard = ({ role, setRole }) => {
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
                   />
-                  <div 
-                    className={`relative w-4 h-4 rounded flex items-center justify-center transition-all duration-200 ${
-                      rememberMe 
-                        ? 'bg-candidate-primary border-transparent' 
+                  <div
+                    className={`relative w-4 h-4 rounded flex items-center justify-center transition-all duration-200 ${rememberMe
+                        ? 'bg-candidate-primary border-transparent'
                         : 'bg-input-bg-light border border-input-border-light'
-                    }`}
+                      }`}
                   >
-                    <Check 
-                      className={`text-white transition-all duration-200 ${rememberMe ? 'opacity-100 scale-100' : 'opacity-0 scale-[0.6]'}`} 
-                      size={12} 
-                      strokeWidth={3} 
+                    <Check
+                      className={`text-white transition-all duration-200 ${rememberMe ? 'opacity-100 scale-100' : 'opacity-0 scale-[0.6]'}`}
+                      size={12}
+                      strokeWidth={3}
                     />
                   </div>
                   <span>Remember Me</span>
                 </label>
-                <a 
-                  href="#forgot" 
+                <a
+                  href="#forgot"
                   className="no-underline font-medium transition-colors duration-200 text-candidate-text-sub hover:text-candidate-accent"
                 >
                   Forgot Password?
@@ -251,8 +257,8 @@ const LoginCard = ({ role, setRole }) => {
             {/* Registration redirect */}
             <div className="text-center text-[0.875rem] text-candidate-text-muted">
               <span>Don't have an account?</span>
-              <span 
-                className="font-semibold no-underline ml-1 transition-colors duration-200 cursor-pointer text-candidate-primary hover:text-candidate-primary-hover" 
+              <span
+                className="font-semibold no-underline ml-1 transition-colors duration-200 cursor-pointer text-candidate-primary hover:text-candidate-primary-hover"
                 onClick={() => setCandidateMode('register')}
               >
                 Register
@@ -332,17 +338,16 @@ const LoginCard = ({ role, setRole }) => {
                     checked={agreeTerms}
                     onChange={(e) => setAgreeTerms(e.target.checked)}
                   />
-                  <div 
-                    className={`relative w-4 h-4 rounded flex items-center justify-center transition-all duration-200 ${
-                      agreeTerms 
-                        ? 'bg-candidate-primary border-transparent' 
+                  <div
+                    className={`relative w-4 h-4 rounded flex items-center justify-center transition-all duration-200 ${agreeTerms
+                        ? 'bg-candidate-primary border-transparent'
                         : 'bg-input-bg-light border border-input-border-light'
-                    }`}
+                      }`}
                   >
-                    <Check 
-                      className={`text-white transition-all duration-200 ${agreeTerms ? 'opacity-100 scale-100' : 'opacity-0 scale-[0.6]'}`} 
-                      size={12} 
-                      strokeWidth={3} 
+                    <Check
+                      className={`text-white transition-all duration-200 ${agreeTerms ? 'opacity-100 scale-100' : 'opacity-0 scale-[0.6]'}`}
+                      size={12}
+                      strokeWidth={3}
                     />
                   </div>
                   <span>I agree to the Terms & Conditions</span>
@@ -363,8 +368,8 @@ const LoginCard = ({ role, setRole }) => {
             {/* Login redirect link */}
             <div className="text-center text-[0.875rem] text-candidate-text-muted mt-4">
               <span>Already have an account?</span>
-              <span 
-                className="font-semibold no-underline ml-1 transition-colors duration-200 cursor-pointer text-candidate-primary hover:text-candidate-primary-hover" 
+              <span
+                className="font-semibold no-underline ml-1 transition-colors duration-200 cursor-pointer text-candidate-primary hover:text-candidate-primary-hover"
                 onClick={() => setCandidateMode('login')}
               >
                 Sign In
