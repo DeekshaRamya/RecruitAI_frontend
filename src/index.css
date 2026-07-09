@@ -1,0 +1,74 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-candidate-bg: #f9f8fc;
+  --color-candidate-card-bg: #ffffff;
+  --color-candidate-card-border: rgba(124, 58, 237, 0.08);
+  --color-candidate-primary: #7c3aed;
+  --color-candidate-primary-hover: #6d28d9;
+  --color-candidate-accent: #ec4899;
+  --color-candidate-text-main: #1e1b4b;
+  --color-candidate-text-sub: #4f46e5;
+  --color-candidate-text-muted: #94a3b8;
+  --color-candidate-button-shadow: rgba(124, 58, 237, 0.08);
+
+  --color-recruiter-bg: #fafafc;
+  --color-recruiter-card-bg: #ffffff;
+  --color-recruiter-card-border: rgba(15, 23, 42, 0.08);
+  --color-recruiter-primary: #0f172a;
+  --color-recruiter-primary-hover: #1e293b;
+  --color-recruiter-accent: #2563eb;
+  --color-recruiter-text-main: #0f172a;
+  --color-recruiter-text-sub: #475569;
+  --color-recruiter-text-muted: #94a3b8;
+  --color-recruiter-button-shadow: rgba(15, 23, 42, 0.08);
+
+  --color-input-bg-light: #ffffff;
+  --color-input-border-light: #e2e8f0;
+  
+  --font-inter: 'Inter', sans-serif;
+  --font-outfit: 'Outfit', sans-serif;
+  --font-plus-jakarta: 'Plus Jakarta Sans', sans-serif;
+}
+
+@layer base {
+  body {
+    @apply font-inter h-screen max-h-screen overflow-hidden select-none bg-recruiter-bg text-recruiter-text-main;
+  }
+  
+  /* Custom scrollbar rules for register-form-grid */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #e2e8f0;
+    border-radius: 10px;
+  }
+}
+
+/* Background grid and meshes helper classes */
+.candidate-bg-mesh {
+  background-color: var(--color-candidate-bg);
+  background-image: radial-gradient(circle at 15% 40%, rgba(124, 58, 237, 0.04) 0%, transparent 60%),
+                    radial-gradient(circle at 85% 75%, rgba(236, 72, 153, 0.03) 0%, transparent 55%);
+}
+
+.candidate-grid-overlay {
+  background-image: radial-gradient(rgba(124, 58, 237, 0.03) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.recruiter-bg-mesh {
+  background-color: var(--color-recruiter-bg);
+  background-image: radial-gradient(circle at 10% 50%, rgba(37, 99, 235, 0.04) 0%, transparent 60%),
+                    radial-gradient(circle at 80% 80%, rgba(6, 182, 212, 0.03) 0%, transparent 50%);
+}
+
+.recruiter-grid-overlay {
+  background-image: radial-gradient(rgba(15, 23, 42, 0.03) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
