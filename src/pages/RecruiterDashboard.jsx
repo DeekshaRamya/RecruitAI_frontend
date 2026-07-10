@@ -555,7 +555,7 @@ const RecruiterDashboard = ({ onLogout }) => {
   };
 
   // Action: Generate Assessment with AI
-<<<<<<< HEAD
+
   const handleGenerateAssessment = async () => {
     const payload = getAssessmentPayload();
     showToast("Generating assessment with AI... Please wait.");
@@ -606,79 +606,6 @@ const RecruiterDashboard = ({ onLogout }) => {
       // Fallback: proceed to preview screen with existing mock list so user experience is not broken
       setActiveTab('preview-questions');
     }
-=======
-  const handleGenerateAssessment = () => {
-    // Generate questions based on selected topics
-    const generated = [];
-    let id = 1;
-
-    // Check if any topics are selected, otherwise fallback to standard default ones
-    const hasSelections = selectedTopics.Python.length > 0 || selectedTopics.SQL.length > 0 || selectedTopics.Aptitude.length > 0;
-
-    if (hasSelections) {
-      if (selectedTopics.Python.length > 0) {
-        // Add Python questions
-        questionPool.Python.forEach(q => {
-          generated.push({ ...q, id: id++, subject: 'Python', difficulty: difficulty });
-        });
-      }
-      if (selectedTopics.SQL.length > 0) {
-        // Add SQL questions
-        questionPool.SQL.forEach(q => {
-          generated.push({ ...q, id: id++, subject: 'SQL', difficulty: difficulty });
-        });
-      }
-      if (selectedTopics.Aptitude.length > 0) {
-        // Add Aptitude questions
-        questionPool.Aptitude.forEach(q => {
-          generated.push({ ...q, id: id++, subject: 'Aptitude', difficulty: difficulty });
-        });
-      }
-    } else {
-      // Fallback/default questions matching the screenshot
-      generated.push(
-        {
-          id: 1,
-          subject: 'Python',
-          difficulty: 'Medium',
-          question: 'Which keyword is used to define a generator function in Python?',
-          options: [
-            { label: 'A', text: 'return', isCorrect: false },
-            { label: 'B', text: 'yield', isCorrect: true },
-            { label: 'C', text: 'async', isCorrect: false },
-            { label: 'D', text: 'lambda', isCorrect: false }
-          ]
-        },
-        {
-          id: 2,
-          subject: 'Python',
-          difficulty: 'Easy',
-          question: 'What is the output of: list(map(lambda x: x**2, [1, 2, 3, 4]))?',
-          options: [
-            { label: 'A', text: '[1, 4, 9, 16]', isCorrect: true },
-            { label: 'B', text: '[2, 4, 6, 8]', isCorrect: false },
-            { label: 'C', text: '[1, 2, 3, 4]', isCorrect: false },
-            { label: 'D', text: 'Error', isCorrect: false }
-          ]
-        },
-        {
-          id: 3,
-          subject: 'Python',
-          difficulty: 'Medium',
-          question: 'Which decorator defines a class method that takes the class as the first argument?',
-          options: [
-            { label: 'A', text: '@staticmethod', isCorrect: false },
-            { label: 'B', text: '@property', isCorrect: false },
-            { label: 'C', text: '@classmethod', isCorrect: true },
-            { label: 'D', text: '@instancemethod', isCorrect: false }
-          ]
-        }
-      );
-    }
-
-    setPreviewQuestions(generated);
-    showToast(`Successfully generated assessment containing ${generated.length} questions!`);
-    setActiveTab('preview-questions');
   };
 
   const handleSaveAndAssign = () => {
@@ -690,52 +617,6 @@ const RecruiterDashboard = ({ onLogout }) => {
       Aptitude: []
     });
     setActiveTab('dashboard');
-  };
-
-  const handleDeleteQuestion = (id) => {
-    setPreviewQuestions(prev => prev.filter(q => q.id !== id));
-    showToast('Question deleted from preview pool.');
-  };
-
-  const handleRegenerateQuestion = (id) => {
-    setPreviewQuestions(prev => prev.map(q => {
-      if (q.id === id) {
-        const subject = q.subject;
-        const pool = questionPool[subject] || [];
-        const currentTexts = previewQuestions.map(curr => curr.question);
-        const alternatives = pool.filter(p => !currentTexts.includes(p.question));
-        const nextQ = alternatives.length > 0
-          ? alternatives[Math.floor(Math.random() * alternatives.length)]
-          : pool[Math.floor(Math.random() * pool.length)];
-
-        return {
-          ...q,
-          question: nextQ.question,
-          options: nextQ.options,
-          difficulty: nextQ.difficulty
-        };
-      }
-      return q;
-    }));
-    showToast('Question regenerated using AI.');
-  };
-
-  const handleStartEdit = (id, text) => {
-    setEditingQuestionId(id);
-    setEditingText(text);
-  };
-
-  const handleSaveEdit = (id) => {
-    if (!editingText.trim()) return;
-    setPreviewQuestions(prev => prev.map(q => {
-      if (q.id === id) {
-        return { ...q, question: editingText };
-      }
-      return q;
-    }));
-    setEditingQuestionId(null);
-    showToast('Question updated.');
->>>>>>> 9c22ecf (Save local changes)
   };
 
   const showToast = (msg) => {
@@ -872,8 +753,8 @@ const RecruiterDashboard = ({ onLogout }) => {
               <LogOut size={16} />
               <span>Log Out</span>
             </button>
-<<<<<<< HEAD
-=======
+
+
 
             {/* Cookie Manager Button matching image */}
             <button
@@ -882,7 +763,7 @@ const RecruiterDashboard = ({ onLogout }) => {
             >
               Manage cookies or opt out
             </button>
->>>>>>> 9c22ecf (Save local changes)
+
           </div>
         </div>
       </aside>
@@ -1366,15 +1247,9 @@ const RecruiterDashboard = ({ onLogout }) => {
                       <button
                         key={topic}
                         onClick={() => toggleTopic('Python', topic)}
-<<<<<<< HEAD
                         className={`relative pl-3.5 pr-8 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 cursor-pointer flex items-center gap-1.5 group/btn ${isSelected
                             ? 'bg-dash-primary-purple border-dash-primary-purple text-dash-white-card shadow-sm'
                             : 'bg-dash-white-card border-dash-border-gray hover:bg-dash-soft-pink hover:border-dash-primary-purple/40 text-dash-dark-purple'
-=======
-                        className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${isSelected
-                          ? 'bg-dash-primary-purple border-dash-primary-purple text-dash-white-card shadow-sm'
-                          : 'bg-dash-white-card border-dash-border-gray hover:bg-dash-soft-pink hover:border-dash-primary-purple/40 text-dash-dark-purple'
->>>>>>> 9c22ecf (Save local changes)
                           }`}
                       >
                         {isSelected && <Check size={12} strokeWidth={3} />}
@@ -1412,15 +1287,9 @@ const RecruiterDashboard = ({ onLogout }) => {
                       <button
                         key={topic}
                         onClick={() => toggleTopic('SQL', topic)}
-<<<<<<< HEAD
                         className={`relative pl-3.5 pr-8 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 cursor-pointer flex items-center gap-1.5 group/btn ${isSelected
                             ? 'bg-dash-primary-purple border-dash-primary-purple text-dash-white-card shadow-sm'
                             : 'bg-dash-white-card border-dash-border-gray hover:bg-dash-soft-pink hover:border-dash-primary-purple/40 text-dash-dark-purple'
-=======
-                        className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${isSelected
-                          ? 'bg-dash-primary-purple border-dash-primary-purple text-dash-white-card shadow-sm'
-                          : 'bg-dash-white-card border-dash-border-gray hover:bg-dash-soft-pink hover:border-dash-primary-purple/40 text-dash-dark-purple'
->>>>>>> 9c22ecf (Save local changes)
                           }`}
                       >
                         {isSelected && <Check size={12} strokeWidth={3} />}
@@ -1458,15 +1327,9 @@ const RecruiterDashboard = ({ onLogout }) => {
                       <button
                         key={topic}
                         onClick={() => toggleTopic('Aptitude', topic)}
-<<<<<<< HEAD
                         className={`relative pl-3.5 pr-8 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 cursor-pointer flex items-center gap-1.5 group/btn ${isSelected
                             ? 'bg-[#d97706] border-[#d97706] text-dash-white-card shadow-sm'
                             : 'bg-dash-white-card border-[#d97706]/40 hover:bg-[#fef3c7] hover:border-[#d97706] text-[#b45309]'
-=======
-                        className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${isSelected
-                          ? 'bg-[#d97706] border-[#d97706] text-dash-white-card shadow-sm'
-                          : 'bg-dash-white-card border-[#d97706]/40 hover:bg-[#fef3c7] hover:border-[#d97706] text-[#b45309]'
->>>>>>> 9c22ecf (Save local changes)
                           }`}
                       >
                         {isSelected && <Check size={12} strokeWidth={3} />}
@@ -1500,13 +1363,9 @@ const RecruiterDashboard = ({ onLogout }) => {
                   Assessment Settings
                 </h3>
 
-<<<<<<< HEAD
+
                 {/* Question Configuration */}
                 <div className="flex flex-col gap-3 border-b border-dash-border-gray/25 pb-4">
-=======
-                {/* Questions per Topic */}
-                <div className="flex flex-col gap-2">
->>>>>>> 9c22ecf (Save local changes)
                   <label className="text-xs font-bold text-dash-light-purple uppercase tracking-wider">
                     Question Configuration
                   </label>
@@ -1619,13 +1478,8 @@ const RecruiterDashboard = ({ onLogout }) => {
                           type="button"
                           onClick={() => setDifficulty(lvl)}
                           className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all duration-200 cursor-pointer ${isActive
-<<<<<<< HEAD
                               ? 'bg-dash-primary-purple/10 border-dash-primary-purple text-dash-primary-purple shadow-sm'
                               : 'bg-dash-white-card border-dash-border-gray text-dash-light-purple hover:border-dash-primary-purple/55 hover:text-dash-primary-purple'
-=======
-                            ? 'bg-dash-primary-purple/10 border-dash-primary-purple text-dash-primary-purple shadow-sm'
-                            : 'bg-dash-white-card border-dash-border-gray text-dash-light-purple hover:border-dash-primary-purple/55 hover:text-dash-primary-purple'
->>>>>>> 9c22ecf (Save local changes)
                             }`}
                         >
                           {lvl}
@@ -1706,150 +1560,17 @@ const RecruiterDashboard = ({ onLogout }) => {
 
         {/* 7. PREVIEW QUESTIONS SCREEN */}
         {activeTab === 'preview-questions' && (
-<<<<<<< HEAD
           <div className="bg-dash-white-card border border-dash-border-gray rounded-[24px] p-6 shadow-sm flex flex-col gap-6">
             <h3 className="font-outfit font-bold text-base text-dash-dark-purple border-b border-dash-border-gray/25 pb-3">
               AI Question Preview Pool
             </h3>
-            <div className="space-y-4">
-              {generatedQuestions.map((item, index) => (
-                <QuestionPreviewRenderer key={item.id} question={item} index={index} />
-=======
-          <div className="flex flex-col gap-6">
-            {/* Summary badges matching screenshot */}
-            {previewQuestions.length > 0 && (
-              <div className="flex flex-wrap gap-2 items-center">
-                <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-dash-dark-purple/10 border border-dash-border-gray/40 text-dash-dark-purple">
-                  {previewQuestions.length} questions
-                </span>
-                <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-dash-primary-purple/10 border border-dash-primary-purple/20 text-dash-primary-purple">
-                  Python: {previewQuestions.filter(q => q.subject === 'Python').length}
-                </span>
-                <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-dash-sidebar-bg/10 border border-dash-sidebar-bg/20 text-dash-sidebar-bg">
-                  SQL: {previewQuestions.filter(q => q.subject === 'SQL').length}
-                </span>
-                <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-[#d97706]/10 border border-[#d97706]/20 text-[#b45309]">
-                  Aptitude: {previewQuestions.filter(q => q.subject === 'Aptitude').length}
-                </span>
+            {generatedQuestions.length > 0 ? (
+              <div className="space-y-4">
+                {generatedQuestions.map((item, index) => (
+                  <QuestionPreviewRenderer key={item.id} question={item} index={index} />
+                ))}
               </div>
-            )}
-
-            <div className="space-y-5">
-              {previewQuestions.map((item, idx) => (
-                <div
-                  key={item.id}
-                  className="bg-dash-white-card border border-dash-border-gray p-6 rounded-[20px] flex flex-col gap-4 shadow-[0_4px_15px_rgba(87,82,170,0.02)] transition-all duration-300 relative"
-                >
-                  {/* Top card row: Question indices and difficulty badges + actions */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <span className="text-xs font-extrabold text-dash-dark-purple">
-                        Q{idx + 1}
-                      </span>
-                      <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-lg bg-dash-primary-purple/10 text-dash-primary-purple border border-dash-primary-purple/20">
-                        {item.subject}
-                      </span>
-                      <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-lg border ${item.difficulty === 'Easy'
-                        ? 'bg-dash-success-green/10 text-dash-success-green border-dash-success-green/20'
-                        : item.difficulty === 'Hard'
-                          ? 'bg-dash-accent-brown/10 text-dash-accent-brown border-dash-accent-brown/20'
-                          : 'bg-[#d97706]/10 text-[#b45309] border-[#d97706]/20'
-                        }`}>
-                        {item.difficulty}
-                      </span>
-                    </div>
-
-                    {/* Action buttons matching screenshot icons */}
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => handleStartEdit(item.id, item.question)}
-                        title="Edit question"
-                        className="p-1.5 rounded-lg border border-dash-border-gray/50 hover:bg-dash-soft-pink text-dash-light-purple hover:text-dash-primary-purple transition-all duration-200 cursor-pointer"
-                      >
-                        <Edit2 size={13} />
-                      </button>
-                      <button
-                        onClick={() => handleRegenerateQuestion(item.id)}
-                        title="Regenerate question"
-                        className="p-1.5 rounded-lg border border-dash-border-gray/50 hover:bg-dash-soft-pink text-dash-light-purple hover:text-dash-primary-purple transition-all duration-200 cursor-pointer"
-                      >
-                        <RefreshCw size={13} />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteQuestion(item.id)}
-                        title="Delete question"
-                        className="p-1.5 rounded-lg border border-dash-border-gray/50 hover:bg-dash-soft-pink text-dash-light-purple hover:text-dash-accent-brown transition-all duration-200 cursor-pointer"
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Question description */}
-                  {editingQuestionId === item.id ? (
-                    <div className="flex flex-col gap-2">
-                      <textarea
-                        value={editingText}
-                        onChange={(e) => setEditingText(e.target.value)}
-                        className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl p-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple"
-                        rows={2}
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleSaveEdit(item.id)}
-                          className="px-3.5 py-1.5 rounded-lg bg-dash-primary-purple text-dash-white-card text-xs font-bold hover:bg-dash-dark-purple cursor-pointer transition-all"
-                        >
-                          Save
-                        </button>
-                        <button
-                          onClick={() => setEditingQuestionId(null)}
-                          className="px-3.5 py-1.5 rounded-lg border border-dash-border-gray text-dash-dark-purple text-xs font-bold hover:bg-dash-soft-pink cursor-pointer transition-all"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-xs font-bold text-dash-dark-purple leading-relaxed">
-                      {item.question}
-                    </p>
-                  )}
-
-                  {/* Options render matching design */}
-                  {item.options && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1.5">
-                      {item.options.map((opt) => (
-                        <div
-                          key={opt.label}
-                          className={`flex items-center justify-between p-3.5 rounded-xl border text-xs font-semibold transition-all ${opt.isCorrect
-                            ? 'border-dash-success-green bg-dash-success-green/5 text-dash-dark-purple shadow-sm'
-                            : 'border-dash-border-gray/40 bg-dash-white-card text-dash-dark-purple hover:bg-dash-soft-pink'
-                            }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-extrabold ${opt.isCorrect
-                              ? 'bg-dash-success-green text-dash-white-card'
-                              : 'bg-dash-light-blue-bg text-dash-dark-purple'
-                              }`}>
-                              {opt.label}
-                            </span>
-                            <span className="text-dash-dark-purple">{opt.text}</span>
-                          </div>
-                          {opt.isCorrect && (
-                            <div className="w-5 h-5 rounded-full bg-dash-success-green flex items-center justify-center text-dash-white-card">
-                              <Check size={11} strokeWidth={3} />
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
->>>>>>> 9c22ecf (Save local changes)
-              ))}
-            </div>
-
-            {previewQuestions.length === 0 && (
+            ) : (
               <div className="p-12 text-center bg-dash-white-card border border-dash-border-gray rounded-[24px]">
                 <AlertCircle className="mx-auto mb-3 text-dash-light-purple animate-pulse" size={32} />
                 <p className="text-sm font-bold text-dash-light-purple">No questions in the preview pool.</p>
