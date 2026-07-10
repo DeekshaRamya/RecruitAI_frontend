@@ -54,8 +54,8 @@ const RecruiterDashboard = ({ onLogout }) => {
   // Interactive UI Drawer states
   const [selectedCandidate, setSelectedCandidate] = useState(null);
 
-  // Subjects and topics dataset
-  const subjectsData = {
+  // Subjects and topics dataset as state so recruiters can dynamically add/edit topics
+  const [subjectsData, setSubjectsData] = useState({
     Python: [
       'Variables & Data Types',
       'Control Flow & Loops',
@@ -92,6 +92,110 @@ const RecruiterDashboard = ({ onLogout }) => {
       'Probability',
       'Series & Patterns'
     ]
+  });
+
+  // State to track adding a new topic
+  const [addingTopicTo, setAddingTopicTo] = useState(null);
+  const [newTopicVal, setNewTopicVal] = useState('');
+
+  const handleAddTopic = (subject) => {
+    const trimmedVal = newTopicVal.trim();
+    if (!trimmedVal) return;
+
+    if (subjectsData[subject].some(t => t.toLowerCase() === trimmedVal.toLowerCase())) {
+      showToast(`Topic "${trimmedVal}" already exists in ${subject}!`);
+      return;
+    }
+
+    setSubjectsData(prev => ({
+      ...prev,
+      [subject]: [...prev[subject], trimmedVal]
+    }));
+
+    // Auto-select the newly added topic
+    setSelectedTopics(prev => ({
+      ...prev,
+      [subject]: [...prev[subject], trimmedVal]
+    }));
+
+    setTopicConfigs(prevConfigs => ({
+      ...prevConfigs,
+      [trimmedVal]: { mcqCount: 2, scenarioCount: 1 }
+    }));
+
+    showToast(`Added and selected topic "${trimmedVal}" under ${subject}!`);
+    setAddingTopicTo(null);
+    setNewTopicVal('');
+  };
+
+  const handleDeleteTopic = (subject, topic) => {
+    setSubjectsData(prev => ({
+      ...prev,
+      [subject]: prev[subject].filter(t => t !== topic)
+    }));
+
+    setSelectedTopics(prev => ({
+      ...prev,
+      [subject]: prev[subject].filter(t => t !== topic)
+    }));
+
+    setTopicConfigs(prevConfigs => {
+      const next = { ...prevConfigs };
+      delete next[topic];
+      return next;
+    });
+
+    showToast(`Deleted topic "${topic}" from ${subject}.`);
+  };
+
+  const renderAddTopicControl = (subject) => {
+    const isAdding = addingTopicTo === subject;
+    const accentColorClass = subject === 'Aptitude' ? 'border-[#d97706] text-[#b45309]' : 'border-dash-primary-purple text-dash-primary-purple';
+    const bgClass = subject === 'Aptitude' ? 'bg-[#fef3c7]/30 hover:bg-[#fef3c7] hover:border-[#d97706]' : 'bg-dash-primary-purple/5 hover:bg-dash-primary-purple/10 hover:border-dash-primary-purple';
+    const checkBtnBg = subject === 'Aptitude' ? 'bg-[#d97706] hover:bg-[#b45309]' : 'bg-dash-primary-purple hover:bg-dash-dark-purple';
+
+    if (isAdding) {
+      return (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleAddTopic(subject);
+          }}
+          className="flex items-center gap-1.5"
+        >
+          <input
+            type="text"
+            placeholder={`New ${subject} topic...`}
+            value={newTopicVal}
+            onChange={(e) => setNewTopicVal(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                setAddingTopicTo(null);
+                setNewTopicVal('');
+              }
+            }}
+            className={`px-3.5 py-2 rounded-xl text-xs font-semibold border bg-dash-white-card text-dash-dark-purple focus:outline-none w-36 shadow-sm ${subject === 'Aptitude' ? 'border-[#d97706] focus:border-[#d97706]' : 'border-dash-primary-purple focus:border-dash-primary-purple'}`}
+            autoFocus
+          />
+          <button type="submit" className={`p-2 rounded-xl text-dash-white-card transition-all duration-200 cursor-pointer flex items-center justify-center ${checkBtnBg}`}>
+            <Check size={12} strokeWidth={3} />
+          </button>
+          <button type="button" onClick={() => { setAddingTopicTo(null); setNewTopicVal(''); }} className="p-2 rounded-xl bg-dash-border-gray/30 text-dash-dark-purple hover:bg-dash-border-gray/50 transition-all duration-200 cursor-pointer flex items-center justify-center">
+            <X size={12} strokeWidth={3} />
+          </button>
+        </form>
+      );
+    }
+
+    return (
+      <button
+        onClick={() => { setAddingTopicTo(subject); setNewTopicVal(''); }}
+        className={`px-3.5 py-2 rounded-xl text-xs font-semibold border border-dashed transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${accentColorClass} ${bgClass}`}
+      >
+        <Plus size={12} strokeWidth={3} />
+        <span>Add Topic</span>
+      </button>
+    );
   };
 
   // Selected topics state (Python topics selected by default as in screenshot)
@@ -101,16 +205,75 @@ const RecruiterDashboard = ({ onLogout }) => {
     Aptitude: []
   });
 
+  // Topic configuration state: maps topic names to their MCQ and Scenario-Based counts
+  const [topicConfigs, setTopicConfigs] = useState({
+    'Variables & Data Types': { mcqCount: 2, scenarioCount: 1 },
+    'Control Flow & Loops': { mcqCount: 2, scenarioCount: 1 }
+  });
+
   // Assessment Settings states
-  const [questionsPerTopic, setQuestionsPerTopic] = useState('10 questions');
   const [difficulty, setDifficulty] = useState('Medium');
   const [duration, setDuration] = useState('60 minutes');
 
   // Dynamic assessment calculations
   const totalSelectedTopics = selectedTopics.Python.length + selectedTopics.SQL.length + selectedTopics.Aptitude.length;
   const activeSubjectsCount = (selectedTopics.Python.length > 0 ? 1 : 0) + (selectedTopics.SQL.length > 0 ? 1 : 0) + (selectedTopics.Aptitude.length > 0 ? 1 : 0);
-  const qPerTopicNum = parseInt(questionsPerTopic) || 10;
-  const totalQuestions = totalSelectedTopics * qPerTopicNum;
+
+  // Sum up MCQ and Scenario questions from active configurations
+  const totalMCQs = Object.keys(selectedTopics).reduce((sum, subject) => {
+    const list = selectedTopics[subject];
+    return sum + list.reduce((subSum, topicName) => {
+      const config = topicConfigs[topicName] || { mcqCount: 0 };
+      return subSum + (config.mcqCount || 0);
+    }, 0);
+  }, 0);
+
+  const totalScenarios = Object.keys(selectedTopics).reduce((sum, subject) => {
+    const list = selectedTopics[subject];
+    return sum + list.reduce((subSum, topicName) => {
+      const config = topicConfigs[topicName] || { scenarioCount: 0 };
+      return subSum + (config.scenarioCount || 0);
+    }, 0);
+  }, 0);
+
+  const totalQuestions = totalMCQs + totalScenarios;
+
+  const updateTopicConfig = (topicName, field, value) => {
+    setTopicConfigs(prev => ({
+      ...prev,
+      [topicName]: {
+        ...(prev[topicName] || { mcqCount: 0, scenarioCount: 0 }),
+        [field]: value
+      }
+    }));
+  };
+
+  const getAssessmentPayload = () => {
+    const payloadSubjects = [];
+    Object.keys(selectedTopics).forEach(subjectName => {
+      const list = selectedTopics[subjectName];
+      if (list.length > 0) {
+        const topicsPayload = list.map(topicName => {
+          const config = topicConfigs[topicName] || { mcqCount: 0, scenarioCount: 0 };
+          return {
+            name: topicName,
+            mcqCount: config.mcqCount || 0,
+            scenarioCount: config.scenarioCount || 0
+          };
+        });
+        payloadSubjects.push({
+          name: subjectName,
+          topics: topicsPayload
+        });
+      }
+    });
+
+    return {
+      subjects: payloadSubjects,
+      difficulty: difficulty,
+      duration: duration
+    };
+  };
 
   // Toggle selection for a topic
   const toggleTopic = (subject, topic) => {
@@ -120,6 +283,14 @@ const RecruiterDashboard = ({ onLogout }) => {
       const newList = isSelected
         ? currentList.filter(t => t !== topic)
         : [...currentList, topic];
+
+      if (!isSelected) {
+        setTopicConfigs(prevConfigs => ({
+          ...prevConfigs,
+          [topic]: prevConfigs[topic] || { mcqCount: 2, scenarioCount: 1 }
+        }));
+      }
+
       return {
         ...prev,
         [subject]: newList
@@ -140,6 +311,46 @@ const RecruiterDashboard = ({ onLogout }) => {
 
   // Dynamic states for active assessments metric count
   const [activeAssessmentsCount, setActiveAssessmentsCount] = useState(18);
+
+  // AI-generated questions list (starts with default demo questions, updated on AI generation)
+  const [generatedQuestions, setGeneratedQuestions] = useState([
+    {
+      id: 1,
+      subject: 'Python',
+      topic: 'Generators & Decorators',
+      difficulty: 'Medium',
+      type: 'MCQ',
+      question: 'Which keyword is used to define a generator function in Python?',
+      options: ['return', 'yield', 'async', 'lambda'],
+      correctAnswer: 'yield'
+    },
+    {
+      id: 2,
+      subject: 'Python',
+      topic: 'Exception Handling',
+      difficulty: 'Medium',
+      type: 'SCENARIO',
+      scenario: 'A developer wants to read a file that may not exist. The application should handle this gracefully without crashing and log a warning.',
+      question: 'Which approach is the best?',
+      options: [
+        'Ignore the error',
+        'Use try-except',
+        'Use continue',
+        'Restart the application'
+      ],
+      correctAnswer: 'Use try-except'
+    },
+    {
+      id: 3,
+      subject: 'SQL',
+      topic: 'JOINs',
+      difficulty: 'Medium',
+      type: 'MCQ',
+      question: 'Which SQL join returns all rows from the left table, and the matched rows from the right table?',
+      options: ['INNER JOIN', 'LEFT JOIN', 'RIGHT JOIN', 'FULL OUTER JOIN'],
+      correctAnswer: 'LEFT JOIN'
+    }
+  ]);
 
   // Dropdown open states
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
@@ -200,19 +411,56 @@ const RecruiterDashboard = ({ onLogout }) => {
   };
 
   // Action: Generate Assessment with AI
-  const handleGenerateAssessment = () => {
-    showToast(`Successfully generated assessment containing ${totalQuestions} questions across ${totalSelectedTopics} topics!`);
-    setActiveAssessmentsCount(prev => prev + 1);
-    
-    // Reset selection after delay and return to dashboard tab
-    setTimeout(() => {
-      setSelectedTopics({
-        Python: [],
-        SQL: [],
-        Aptitude: []
+  const handleGenerateAssessment = async () => {
+    const payload = getAssessmentPayload();
+    showToast("Generating assessment with AI... Please wait.");
+
+    try {
+      const token = localStorage.getItem('token') || '';
+      const response = await fetch('/api/assessment/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
       });
-      setActiveTab('dashboard');
-    }, 1800);
+
+      if (!response.ok) {
+        const errDetails = await response.json().catch(() => ({}));
+        throw new Error(errDetails.detail || `Server returned status ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (data && data.questions) {
+        // Format the questions from the API response
+        const formatted = data.questions.map((q, idx) => ({
+          id: idx + 1,
+          subject: q.subject,
+          topic: q.topic,
+          type: q.type,
+          difficulty: q.difficulty,
+          scenario: q.scenario,
+          question: q.question,
+          q: q.question, // fallback
+          options: q.options,
+          correctAnswer: q.correctAnswer
+        }));
+        setGeneratedQuestions(formatted);
+        showToast(`Successfully generated assessment containing ${formatted.length} questions across ${totalSelectedTopics} topics!`);
+        setActiveAssessmentsCount(prev => prev + 1);
+        
+        // Go to preview questions tab
+        setActiveTab('preview-questions');
+      } else {
+        throw new Error('Invalid questions format returned from backend');
+      }
+    } catch (err) {
+      console.error("AI assessment generation failed:", err);
+      showToast(`Error: ${err.message || err}. Falling back to preview...`);
+      // Fallback: proceed to preview screen with existing mock list so user experience is not broken
+      setActiveTab('preview-questions');
+    }
   };
 
   const showToast = (msg) => {
@@ -346,14 +594,6 @@ const RecruiterDashboard = ({ onLogout }) => {
             >
               <LogOut size={16} />
               <span>Log Out</span>
-            </button>
-
-            {/* Cookie Manager Button matching image */}
-            <button 
-              onClick={() => showToast('Cookie preferences updated!')}
-              className="w-full text-left px-3 py-2 rounded-lg bg-dash-white-card border border-dash-border-gray hover:bg-dash-soft-pink text-dash-dark-purple text-[10px] font-bold transition-all duration-200 cursor-pointer shadow-sm"
-            >
-              Manage cookies or opt out
             </button>
           </div>
         </div>
@@ -800,7 +1040,7 @@ const RecruiterDashboard = ({ onLogout }) => {
           <div className="grid grid-cols-1 xl:grid-cols-5 gap-6 items-start">
             {/* Left Pane: Subjects Grid (3/5 width) */}
             <div className="xl:col-span-3 flex flex-col gap-6">
-              
+
               {/* Python Card */}
               <div className="bg-dash-white-card border border-dash-border-gray rounded-[24px] p-6 shadow-sm flex flex-col gap-4">
                 <div className="flex items-center justify-between border-b border-dash-border-gray/25 pb-3">
@@ -816,17 +1056,28 @@ const RecruiterDashboard = ({ onLogout }) => {
                       <button
                         key={topic}
                         onClick={() => toggleTopic('Python', topic)}
-                        className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${
-                          isSelected
+                        className={`relative pl-3.5 pr-8 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 cursor-pointer flex items-center gap-1.5 group/btn ${isSelected
                             ? 'bg-dash-primary-purple border-dash-primary-purple text-dash-white-card shadow-sm'
                             : 'bg-dash-white-card border-dash-border-gray hover:bg-dash-soft-pink hover:border-dash-primary-purple/40 text-dash-dark-purple'
-                        }`}
+                          }`}
                       >
                         {isSelected && <Check size={12} strokeWidth={3} />}
-                        {topic}
+                        <span>{topic}</span>
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteTopic('Python', topic);
+                          }}
+                          className={`absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover/btn:opacity-60 hover:!opacity-100 p-0.5 rounded transition-all duration-150 ${isSelected ? 'hover:bg-white/20 text-white' : 'hover:bg-red-50 text-red-500'
+                            }`}
+                          title={`Delete "${topic}"`}
+                        >
+                          <X size={10} strokeWidth={3} />
+                        </span>
                       </button>
                     );
                   })}
+                  {renderAddTopicControl('Python')}
                 </div>
               </div>
 
@@ -845,22 +1096,33 @@ const RecruiterDashboard = ({ onLogout }) => {
                       <button
                         key={topic}
                         onClick={() => toggleTopic('SQL', topic)}
-                        className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${
-                          isSelected
+                        className={`relative pl-3.5 pr-8 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 cursor-pointer flex items-center gap-1.5 group/btn ${isSelected
                             ? 'bg-dash-primary-purple border-dash-primary-purple text-dash-white-card shadow-sm'
                             : 'bg-dash-white-card border-dash-border-gray hover:bg-dash-soft-pink hover:border-dash-primary-purple/40 text-dash-dark-purple'
-                        }`}
+                          }`}
                       >
                         {isSelected && <Check size={12} strokeWidth={3} />}
-                        {topic}
+                        <span>{topic}</span>
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteTopic('SQL', topic);
+                          }}
+                          className={`absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover/btn:opacity-60 hover:!opacity-100 p-0.5 rounded transition-all duration-150 ${isSelected ? 'hover:bg-white/20 text-white' : 'hover:bg-red-50 text-red-500'
+                            }`}
+                          title={`Delete "${topic}"`}
+                        >
+                          <X size={10} strokeWidth={3} />
+                        </span>
                       </button>
                     );
                   })}
+                  {renderAddTopicControl('SQL')}
                 </div>
               </div>
 
               {/* Aptitude Card (Amber styles matching the user's screenshot) */}
-              <div className="bg-dash-white-card border border-dash-border-gray rounded-[24px] p-6 shadow-sm flex flex-col gap-4">
+              <div className="bg-dash-white-card border border-[#d97706]/20 rounded-[24px] p-6 shadow-sm flex flex-col gap-4">
                 <div className="flex items-center justify-between border-b border-dash-border-gray/25 pb-3">
                   <h3 className="font-outfit font-bold text-base text-dash-dark-purple">Aptitude</h3>
                   <span className="text-xs font-bold text-dash-light-purple">
@@ -874,17 +1136,28 @@ const RecruiterDashboard = ({ onLogout }) => {
                       <button
                         key={topic}
                         onClick={() => toggleTopic('Aptitude', topic)}
-                        className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${
-                          isSelected
+                        className={`relative pl-3.5 pr-8 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 cursor-pointer flex items-center gap-1.5 group/btn ${isSelected
                             ? 'bg-[#d97706] border-[#d97706] text-dash-white-card shadow-sm'
                             : 'bg-dash-white-card border-[#d97706]/40 hover:bg-[#fef3c7] hover:border-[#d97706] text-[#b45309]'
-                        }`}
+                          }`}
                       >
                         {isSelected && <Check size={12} strokeWidth={3} />}
-                        {topic}
+                        <span>{topic}</span>
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteTopic('Aptitude', topic);
+                          }}
+                          className={`absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover/btn:opacity-60 hover:!opacity-100 p-0.5 rounded transition-all duration-150 ${isSelected ? 'hover:bg-white/20 text-white' : 'hover:bg-red-50 text-red-600'
+                            }`}
+                          title={`Delete "${topic}"`}
+                        >
+                          <X size={10} strokeWidth={3} />
+                        </span>
                       </button>
                     );
                   })}
+                  {renderAddTopicControl('Aptitude')}
                 </div>
               </div>
 
@@ -892,28 +1165,111 @@ const RecruiterDashboard = ({ onLogout }) => {
 
             {/* Right Pane: Settings & Summary (2/5 width) */}
             <div className="xl:col-span-2 flex flex-col gap-6">
-              
+
               {/* Assessment Settings Card */}
               <div className="bg-dash-white-card border border-dash-border-gray rounded-[24px] p-6 shadow-sm flex flex-col gap-5">
                 <h3 className="font-outfit font-bold text-base text-dash-dark-purple border-b border-dash-border-gray/25 pb-3">
                   Assessment Settings
                 </h3>
-                
-                {/* Questions per Topic */}
-                <div className="flex flex-col gap-2">
+
+                {/* Question Configuration */}
+                <div className="flex flex-col gap-3 border-b border-dash-border-gray/25 pb-4">
                   <label className="text-xs font-bold text-dash-light-purple uppercase tracking-wider">
-                    Questions per Topic
+                    Question Configuration
                   </label>
-                  <select
-                    value={questionsPerTopic}
-                    onChange={(e) => setQuestionsPerTopic(e.target.value)}
-                    className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2.5 px-4 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple cursor-pointer transition-all"
-                  >
-                    <option value="5 questions">5 questions</option>
-                    <option value="10 questions">10 questions</option>
-                    <option value="15 questions">15 questions</option>
-                    <option value="20 questions">20 questions</option>
-                  </select>
+
+                  {totalSelectedTopics === 0 ? (
+                    <div className="text-xs font-medium text-dash-light-purple italic py-2">
+                      No topics selected. Select topics to configure questions.
+                    </div>
+                  ) : (
+                    <div className="space-y-4 h-[115px] overflow-y-auto pr-1 scrollbar-thin">
+                      {Object.keys(selectedTopics).map((subject) => {
+                        const topics = selectedTopics[subject];
+                        if (topics.length === 0) return null;
+
+                        return (
+                          <div key={subject} className="space-y-2">
+                            <div className="text-xs font-bold text-dash-dark-purple flex items-center gap-1.5">
+                              <span className="text-[10px]">▼</span>
+                              <span>{subject}</span>
+                            </div>
+
+                            <div className="pl-3 space-y-3">
+                              {topics.map((topic) => {
+                                const config = topicConfigs[topic] || { mcqCount: 2, scenarioCount: 1 };
+                                return (
+                                  <div key={topic} className="space-y-2 border-l border-dash-border-gray/50 pl-3">
+                                    <div className="text-xs font-semibold text-dash-dark-purple">
+                                      {topic}
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-bold text-dash-light-purple uppercase">
+                                          MCQ Questions
+                                        </label>
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          max="100"
+                                          value={config.mcqCount}
+                                          onChange={(e) => {
+                                            let val = e.target.value.replace(/[^0-9]/g, '');
+                                            if (val === '') {
+                                              updateTopicConfig(topic, 'mcqCount', 0);
+                                            } else {
+                                              let parsed = parseInt(val, 10);
+                                              if (parsed > 100) parsed = 100;
+                                              if (parsed < 0) parsed = 0;
+                                              updateTopicConfig(topic, 'mcqCount', parsed);
+                                            }
+                                          }}
+                                          onKeyDown={(e) => {
+                                            if (['e', 'E', '+', '-', '.'].includes(e.key)) {
+                                              e.preventDefault();
+                                            }
+                                          }}
+                                          className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-1.5 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple transition-all"
+                                        />
+                                      </div>
+                                      <div className="flex flex-col gap-1">
+                                        <label className="text-[10px] font-bold text-dash-light-purple uppercase">
+                                          Scenario-Based
+                                        </label>
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          max="100"
+                                          value={config.scenarioCount}
+                                          onChange={(e) => {
+                                            let val = e.target.value.replace(/[^0-9]/g, '');
+                                            if (val === '') {
+                                              updateTopicConfig(topic, 'scenarioCount', 0);
+                                            } else {
+                                              let parsed = parseInt(val, 10);
+                                              if (parsed > 100) parsed = 100;
+                                              if (parsed < 0) parsed = 0;
+                                              updateTopicConfig(topic, 'scenarioCount', parsed);
+                                            }
+                                          }}
+                                          onKeyDown={(e) => {
+                                            if (['e', 'E', '+', '-', '.'].includes(e.key)) {
+                                              e.preventDefault();
+                                            }
+                                          }}
+                                          className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-1.5 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple transition-all"
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 {/* Difficulty Level selector */}
@@ -929,11 +1285,10 @@ const RecruiterDashboard = ({ onLogout }) => {
                           key={lvl}
                           type="button"
                           onClick={() => setDifficulty(lvl)}
-                          className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all duration-200 cursor-pointer ${
-                            isActive
+                          className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all duration-200 cursor-pointer ${isActive
                               ? 'bg-dash-primary-purple/10 border-dash-primary-purple text-dash-primary-purple shadow-sm'
                               : 'bg-dash-white-card border-dash-border-gray text-dash-light-purple hover:border-dash-primary-purple/55 hover:text-dash-primary-purple'
-                          }`}
+                            }`}
                         >
                           {lvl}
                         </button>
@@ -967,7 +1322,7 @@ const RecruiterDashboard = ({ onLogout }) => {
                 <h3 className="font-outfit font-bold text-base text-dash-dark-purple border-b border-dash-border-gray/25 pb-3">
                   Summary
                 </h3>
-                
+
                 <div className="space-y-3.5">
                   <div className="flex justify-between items-center text-xs font-semibold">
                     <span className="text-dash-light-purple">Topics selected</span>
@@ -987,13 +1342,19 @@ const RecruiterDashboard = ({ onLogout }) => {
                   </div>
                   <div className="flex justify-between items-center text-xs font-semibold">
                     <span className="text-dash-light-purple">Duration</span>
-                    <span className="text-dash-dark-purple font-bold">{qPerTopicNum * totalSelectedTopics > 0 ? duration : '--'}</span>
+                    <span className="text-dash-dark-purple font-bold">{totalQuestions > 0 ? duration : '--'}</span>
                   </div>
                 </div>
 
+                {totalSelectedTopics > 0 && totalQuestions === 0 && (
+                  <div className="text-[10px] font-bold text-red-500 bg-red-50 border border-red-200 rounded-xl p-2.5 text-center mt-1 animate-pulse">
+                    ⚠️ Configure at least 1 question to generate assessment.
+                  </div>
+                )}
+
                 <button
                   onClick={handleGenerateAssessment}
-                  disabled={totalSelectedTopics === 0}
+                  disabled={totalQuestions === 0}
                   className="w-full mt-3 py-3.5 rounded-xl bg-dash-primary-purple border border-dash-primary-purple text-dash-white-card font-bold text-sm hover:bg-dash-dark-purple hover:border-dash-dark-purple transition-all duration-200 shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Globe size={15} />
@@ -1012,47 +1373,8 @@ const RecruiterDashboard = ({ onLogout }) => {
               AI Question Preview Pool
             </h3>
             <div className="space-y-4">
-              {[
-                {
-                  id: 1,
-                  subject: 'Python',
-                  topic: 'Variables & Data Types',
-                  q: 'Explain the difference between mutable and immutable data types in Python. Give examples of each.',
-                  difficulty: 'Medium'
-                },
-                {
-                  id: 2,
-                  subject: 'Python',
-                  topic: 'Control Flow & Loops',
-                  q: 'What is the purpose of the else clause in a for loop? Provide a short snippet demonstrating its utility.',
-                  difficulty: 'Medium'
-                },
-                {
-                  id: 3,
-                  subject: 'SQL',
-                  topic: 'SELECT & Projection',
-                  q: 'Write a query to retrieve the second highest salary from an Employee table without using aggregate functions or LIMIT.',
-                  difficulty: 'Hard'
-                }
-              ].map(item => (
-                <div key={item.id} className="p-4 rounded-2xl bg-dash-light-blue-bg/40 border border-dash-border-gray/20 flex flex-col gap-2 hover:bg-dash-soft-pink transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-dash-primary-purple/10 text-dash-primary-purple border border-dash-primary-purple/20">
-                        {item.subject}
-                      </span>
-                      <span className="text-[10px] font-bold text-dash-light-purple">
-                        {item.topic}
-                      </span>
-                    </div>
-                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-dash-success-green/10 text-dash-success-green border border-dash-success-green/20">
-                      {item.difficulty}
-                    </span>
-                  </div>
-                  <p className="text-xs font-semibold text-dash-dark-purple leading-relaxed">
-                    {item.q}
-                  </p>
-                </div>
+              {generatedQuestions.map((item, index) => (
+                <QuestionPreviewRenderer key={item.id} question={item} index={index} />
               ))}
             </div>
           </div>
@@ -1238,6 +1560,187 @@ const RecruiterDashboard = ({ onLogout }) => {
 
     </div>
   );
+};
+
+// Scalable Question Preview Components
+const MCQQuestionPreview = ({ question, index }) => {
+  const optionLabels = ['A', 'B', 'C', 'D'];
+  return (
+    <div className="p-4 rounded-xl bg-dash-light-blue-bg/40 border border-dash-border-gray/20 flex flex-col gap-3 hover:bg-dash-soft-pink transition-colors">
+      {/* Header Info */}
+      <div className="flex items-center justify-between border-b border-dash-border-gray/15 pb-2">
+        <div className="flex items-center gap-2.5">
+          <span className="font-outfit font-extrabold text-xs text-dash-dark-purple">
+            Q{index + 1}
+          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-dash-primary-purple/10 text-dash-primary-purple border border-dash-primary-purple/20">
+              {question.subject}
+            </span>
+            <span className="text-[9px] font-bold text-dash-light-purple">
+              {question.topic}
+            </span>
+          </div>
+        </div>
+        <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-dash-success-green/10 text-dash-success-green border border-dash-success-green/20">
+          {question.difficulty}
+        </span>
+      </div>
+
+      {/* Question Text */}
+      <p className="text-[11px] font-bold text-dash-dark-purple leading-relaxed">
+        {question.question || question.q}
+      </p>
+
+      {/* Options Grid */}
+      {question.options && question.options.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-0.5">
+          {question.options.map((option, idx) => {
+            const isCorrect = option === question.correctAnswer;
+            const label = optionLabels[idx] || '';
+            return (
+              <div
+                key={idx}
+                className={`py-2 px-3 rounded-lg border flex items-center gap-2.5 transition-all ${
+                  isCorrect
+                    ? 'border-dash-success-green bg-dash-success-green/5 text-dash-success-green font-bold'
+                    : 'border-dash-border-gray/40 bg-dash-white-card/85 text-dash-dark-purple'
+                }`}
+              >
+                {isCorrect ? (
+                  <Check size={12} className="text-dash-success-green shrink-0" strokeWidth={3} />
+                ) : (
+                  <div className="w-3 h-3 rounded-full border border-dash-light-purple/60 shrink-0" />
+                )}
+                <span className="text-[11px] font-medium">
+                  {label}. {option}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Correct Answer Display */}
+      {question.correctAnswer && (
+        <div className="mt-1 pt-2 border-t border-dash-border-gray/15 flex flex-col gap-1">
+          <span className="text-[9px] font-extrabold text-dash-light-purple uppercase tracking-wider">
+            Correct Answer
+          </span>
+          <div className="flex items-center gap-1.5 text-[11px] font-bold text-dash-success-green">
+            <Check size={12} strokeWidth={3} className="text-dash-success-green" />
+            <span>
+              {optionLabels[question.options.indexOf(question.correctAnswer)] || ''}. {question.correctAnswer}
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ScenarioQuestionPreview = ({ question, index }) => {
+  return (
+    <div className="p-4 rounded-xl bg-dash-light-blue-bg/40 border border-dash-border-gray/20 flex flex-col gap-3 hover:bg-dash-soft-pink transition-colors">
+      {/* Header Info */}
+      <div className="flex items-center justify-between border-b border-dash-border-gray/15 pb-2">
+        <div className="flex items-center gap-2.5">
+          <span className="font-outfit font-extrabold text-xs text-dash-dark-purple">
+            Q{index + 1}
+          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-dash-primary-purple/10 text-dash-primary-purple border border-dash-primary-purple/20">
+              {question.subject}
+            </span>
+            <span className="text-[9px] font-bold text-dash-light-purple">
+              {question.topic}
+            </span>
+          </div>
+        </div>
+        <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-dash-success-green/10 text-dash-success-green border border-dash-success-green/20">
+          {question.difficulty}
+        </span>
+      </div>
+
+      {/* Scenario Context */}
+      <div className="flex flex-col gap-1">
+        <h4 className="text-[9px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
+          Scenario
+        </h4>
+        <p className="text-[11px] font-semibold text-dash-dark-purple leading-relaxed bg-dash-white-card/50 p-2.5 rounded-lg border border-dash-border-gray/20">
+          {question.scenario}
+        </p>
+      </div>
+
+      {/* Question Text */}
+      <div className="flex flex-col gap-1">
+        <h4 className="text-[9px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
+          Question
+        </h4>
+        <p className="text-[11px] font-bold text-dash-dark-purple leading-relaxed">
+          {question.question || question.q}
+        </p>
+      </div>
+
+      {/* Correct Answer Display */}
+      {question.correctAnswer && (
+        <div className="mt-1 pt-2 border-t border-dash-border-gray/15 flex flex-col gap-1">
+          <span className="text-[9px] font-extrabold text-dash-light-purple uppercase tracking-wider">
+            Correct Answer
+          </span>
+          <div className="flex items-center gap-1.5 text-[11px] font-bold text-dash-success-green">
+            <Check size={12} strokeWidth={3} className="text-dash-success-green" />
+            <span>
+              {question.correctAnswer}
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const DefaultQuestionPreview = ({ question, index }) => {
+  return (
+    <div className="p-4 rounded-xl bg-dash-light-blue-bg/40 border border-dash-border-gray/20 flex flex-col gap-3 hover:bg-dash-soft-pink transition-colors">
+      {/* Header Info */}
+      <div className="flex items-center justify-between border-b border-dash-border-gray/15 pb-2">
+        <div className="flex items-center gap-2.5">
+          <span className="font-outfit font-extrabold text-xs text-dash-dark-purple">
+            Q{index + 1}
+          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-dash-primary-purple/10 text-dash-primary-purple border border-dash-primary-purple/20">
+              {question.subject}
+            </span>
+            <span className="text-[9px] font-bold text-dash-light-purple">
+              {question.topic}
+            </span>
+          </div>
+        </div>
+        <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-dash-success-green/10 text-dash-success-green border border-dash-success-green/20">
+          {question.difficulty}
+        </span>
+      </div>
+
+      {/* Question Text */}
+      <p className="text-[11px] font-semibold text-dash-dark-purple leading-relaxed">
+        {question.question || question.q}
+      </p>
+    </div>
+  );
+};
+
+const QuestionPreviewRenderer = ({ question, index }) => {
+  const typeNormalized = (question.type || '').toUpperCase();
+  switch (typeNormalized) {
+    case 'MCQ':
+      return <MCQQuestionPreview question={question} index={index} />;
+    case 'SCENARIO':
+      return <ScenarioQuestionPreview question={question} index={index} />;
+    default:
+      return <DefaultQuestionPreview question={question} index={index} />;
+  }
 };
 
 export default RecruiterDashboard;
