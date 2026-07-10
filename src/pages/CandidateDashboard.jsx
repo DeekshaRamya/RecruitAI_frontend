@@ -1,23 +1,24 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Briefcase, 
-  Users, 
-  Settings, 
-  LogOut, 
-  Menu, 
-  X, 
-  FileText, 
-  Award, 
-  TrendingUp, 
-  Plus, 
-  Volume2, 
-  Terminal, 
-  Sparkles, 
-  CheckCircle2, 
-  Clock, 
+import { DotLottieReact } from '@lottiefiles/dotlottie-react';
+import {
+  Briefcase,
+  Users,
+  Settings,
+  LogOut,
+  Menu,
+  X,
+  FileText,
+  Award,
+  TrendingUp,
+  Plus,
+  Volume2,
+  Terminal,
+  Sparkles,
+  CheckCircle2,
+  Clock,
   ChevronRight,
-  UploadCloud 
+  UploadCloud
 } from 'lucide-react';
 
 const CandidateDashboard = ({ onLogout }) => {
@@ -67,79 +68,82 @@ const CandidateDashboard = ({ onLogout }) => {
     }
   };
 
-  // Stats definition based on mock
   const stats = [
-    { 
-      label: 'Resume', 
-      value: 'Uploaded', 
-      subtext: 'Arjun_Sharma_CV.pdf', 
-      icon: FileText, 
-      colorClass: 'text-dash-primary-purple bg-dash-primary-purple/10' 
+    {
+      label: 'Resume',
+      value: 'Uploaded',
+      subtext: 'Arjun_Sharma_CV.pdf',
+      icon: FileText,
+      colorClass: 'text-white bg-white/20',
+      cardBg: 'bg-gradient-to-br from-[#5E80B4] to-[#4D6D9E] text-white border-0 shadow-md'
     },
-    { 
-      label: 'Avg Skill Match', 
-      value: '78%', 
-      subtext: 'Across 4 categories', 
-      icon: Award, 
-      colorClass: 'text-dash-success-green bg-dash-success-green/10' 
+    {
+      label: 'Avg Skill Match',
+      value: '78%',
+      subtext: 'Across 4 categories',
+      icon: Award,
+      colorClass: 'text-white bg-white/20',
+      cardBg: 'bg-gradient-to-br from-[#8B95C9] to-[#7380BD] text-white border-0 shadow-md'
     },
-    { 
-      label: 'Assessment', 
-      value: '1 / 3', 
-      subtext: 'Modules completed', 
-      icon: Briefcase, 
-      colorClass: 'text-dash-accent-brown bg-dash-accent-brown/10' 
+    {
+      label: 'Assessment',
+      value: '1 / 3',
+      subtext: 'Modules completed',
+      icon: Briefcase,
+      colorClass: 'text-white bg-white/20',
+      cardBg: 'bg-gradient-to-br from-[#E57E88] to-[#D06774] text-white border-0 shadow-md'
     },
-    { 
-      label: 'Final Score', 
-      value: '—', 
-      subtext: 'Complete all to unlock', 
-      icon: TrendingUp, 
-      colorClass: 'text-dash-light-purple bg-dash-light-blue-bg' 
+    {
+      label: 'Final Score',
+      value: '—',
+      subtext: 'Complete all to unlock',
+      icon: TrendingUp,
+      colorClass: 'text-white bg-white/20',
+      cardBg: 'bg-gradient-to-br from-[#768CB5] to-[#5C7CAE] text-white border-0 shadow-md'
     }
   ];
 
   // Journey steps based on mock
   const journeySteps = [
-    { 
-      title: 'Resume Upload', 
-      description: 'Arjun_Sharma_CV.pdf uploaded successfully', 
-      status: 'Completed', 
-      statusColor: 'text-dash-success-green bg-dash-success-green/10 border-dash-success-green/20' 
+    {
+      title: 'Resume Upload',
+      description: 'Arjun_Sharma_CV.pdf uploaded successfully',
+      status: 'Completed',
+      statusColor: 'text-dash-success-green bg-dash-success-green/10 border-dash-success-green/20'
     },
-    { 
-      title: 'AI Analysis', 
-      description: 'Skills extracted & matched against 4 categories', 
-      status: 'Completed', 
-      statusColor: 'text-dash-success-green bg-dash-success-green/10 border-dash-success-green/20' 
+    {
+      title: 'AI Analysis',
+      description: 'Skills extracted & matched against 4 categories',
+      status: 'Completed',
+      statusColor: 'text-dash-success-green bg-dash-success-green/10 border-dash-success-green/20'
     },
-    { 
-      title: 'Technical Assessment', 
-      description: '30 questions · 60 min · Python, SQL, Aptitude', 
-      status: 'In Progress', 
-      statusColor: 'text-dash-primary-purple bg-dash-primary-purple/10 border-dash-primary-purple/20' 
+    {
+      title: 'Technical Assessment',
+      description: '30 questions · 60 min · Python, SQL, Aptitude',
+      status: 'In Progress',
+      statusColor: 'text-dash-primary-purple bg-dash-primary-purple/10 border-dash-primary-purple/20'
     },
-    { 
-      title: 'English Speaking', 
-      description: '5 AI-generated resume-based questions', 
-      status: 'Pending', 
-      statusColor: 'text-dash-light-purple bg-dash-border-gray/30 border-dash-border-gray/40' 
+    {
+      title: 'English Speaking',
+      description: '5 AI-generated resume-based questions',
+      status: 'Pending',
+      statusColor: 'text-dash-light-purple bg-dash-border-gray/30 border-dash-border-gray/40'
     }
   ];
 
   // Skills progress based on mock
   const skills = [
-    { name: 'Python', percent: 82, colorClass: 'bg-dash-primary-purple' },
-    { name: 'SQL', percent: 76, colorClass: 'bg-dash-primary-purple' },
-    { name: 'Aptitude', percent: 68, colorClass: 'bg-dash-accent-brown' },
-    { name: 'English', percent: 88, colorClass: 'bg-dash-success-green' }
+    { name: 'Python', percent: 82, colorClass: 'bg-gradient-to-r from-[#5E80B4] to-[#4D6D9E]' },
+    { name: 'SQL', percent: 76, colorClass: 'bg-gradient-to-r from-[#8B95C9] to-[#7380BD]' },
+    { name: 'Aptitude', percent: 68, colorClass: 'bg-gradient-to-r from-[#E57E88] to-[#D06774]' },
+    { name: 'English', percent: 88, colorClass: 'bg-gradient-to-r from-[#768CB5] to-[#5C7CAE]' }
   ];
 
   // Strengths tags
   const strengths = ['Python', 'Django', 'PostgreSQL', 'ML', 'Docker'];
 
   return (
-    <div className="bg-dash-light-blue-bg text-dash-dark-purple min-h-screen relative overflow-hidden font-inter flex w-full">
+    <div className="candidate-dashboard-theme bg-dash-light-blue-bg text-dash-dark-purple min-h-screen relative overflow-hidden font-inter flex w-full">
       {/* Toast Notification */}
       <AnimatePresence>
         {toastMessage && (
@@ -156,7 +160,7 @@ const CandidateDashboard = ({ onLogout }) => {
       </AnimatePresence>
 
       {/* 1. SIDEBAR (Full-Height Solid Layout matching Recruiter) */}
-      <aside className="hidden lg:flex flex-col w-[260px] h-screen shrink-0 bg-dash-sidebar-bg pt-8 pb-8 pl-6 pr-0 relative z-30 text-dash-white-card shadow-[4px_0_24px_rgba(0,0,0,0.03)] justify-between">
+      <aside className="hidden lg:flex flex-col w-[260px] h-screen shrink-0 bg-dash-sidebar-bg pt-8 pb-8 pl-6 pr-0 relative z-30 text-dash-dark-purple shadow-[4px_0_24px_rgba(0,0,0,0.03)] justify-between">
         <div>
           {/* Branding */}
           <div className="flex items-center gap-3 px-2 py-4 mb-6">
@@ -164,7 +168,7 @@ const CandidateDashboard = ({ onLogout }) => {
               <span className="font-outfit font-extrabold text-dash-white-card text-lg tracking-wider">R</span>
             </div>
             <div>
-              <h1 className="font-outfit font-bold text-base tracking-tight text-dash-white-card leading-none">RecruitAI</h1>
+              <h1 className="font-outfit font-bold text-base tracking-tight text-dash-dark-purple leading-none">RecruitAI</h1>
               <span className="text-[10px] text-dash-light-purple font-medium tracking-widest uppercase">Candidate Portal</span>
             </div>
           </div>
@@ -174,7 +178,6 @@ const CandidateDashboard = ({ onLogout }) => {
             {[
               { id: 'dashboard', label: 'Dashboard', icon: Briefcase },
               { id: 'resume', label: 'Resume Upload', icon: FileText },
-              { id: 'ai', label: 'AI Analysis', icon: Sparkles },
               { id: 'technical', label: 'Technical Test', icon: Terminal },
               { id: 'english', label: 'English Speaking', icon: Volume2 },
               { id: 'results', label: 'My Results', icon: Award },
@@ -190,11 +193,10 @@ const CandidateDashboard = ({ onLogout }) => {
                       showToast(`"${item.label}" feature is coming soon!`);
                     }
                   }}
-                  className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-l-[24px] rounded-r-none text-sm font-bold transition-all duration-300 relative group ${
-                    isActive 
-                      ? 'sidebar-active-tab shadow-sm' 
-                      : 'text-dash-light-purple hover:text-dash-white-card hover:bg-dash-primary-purple/20'
-                  }`}
+                  className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-l-[24px] rounded-r-none text-sm font-bold transition-all duration-300 relative group ${isActive
+                    ? 'sidebar-active-tab shadow-sm'
+                    : 'text-dash-light-purple hover:text-dash-dark-purple hover:bg-dash-primary-purple/20'
+                    }`}
                 >
                   <Icon size={18} className="relative z-10" />
                   <span className="relative z-10">{item.label}</span>
@@ -202,6 +204,16 @@ const CandidateDashboard = ({ onLogout }) => {
               );
             })}
           </nav>
+          {/* Centered Lottie Animation */}
+          <div className="flex items-center justify-center py-4 px-6 mt-2">
+            <div className="w-48 h-48 flex items-center justify-center">
+              <DotLottieReact
+                src="https://lottie.host/f5bd2f6c-67a9-44d5-954d-96176d4cb3df/USuWgujLWd.lottie"
+                loop
+                autoplay
+              />
+            </div>
+          </div>
         </div>
 
         {/* User Profile & Logout */}
@@ -212,12 +224,12 @@ const CandidateDashboard = ({ onLogout }) => {
                 AS
               </div>
               <div className="overflow-hidden">
-                <h4 className="text-xs font-semibold text-dash-white-card truncate">Arjun Sharma</h4>
+                <h4 className="text-xs font-semibold text-dash-dark-purple truncate">Arjun Sharma</h4>
                 <span className="text-[10px] text-dash-light-purple truncate block">Candidate</span>
               </div>
             </div>
           </div>
-          
+
           <button
             onClick={onLogout}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-dash-light-purple hover:bg-dash-primary-purple/20 transition-all duration-200 cursor-pointer"
@@ -249,18 +261,18 @@ const CandidateDashboard = ({ onLogout }) => {
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}
             transition={{ type: 'spring', bounce: 0.1, duration: 0.4 }}
-            className="fixed top-0 bottom-0 left-0 w-[270px] pt-6 pb-6 pl-6 pr-0 z-50 lg:hidden flex flex-col bg-dash-sidebar-bg text-dash-white-card border-r border-dash-border-gray/25"
+            className="fixed top-0 bottom-0 left-0 w-[270px] pt-6 pb-6 pl-6 pr-0 z-50 lg:hidden flex flex-col bg-dash-sidebar-bg text-dash-dark-purple border-r border-dash-border-gray/25"
           >
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-dash-primary-purple flex items-center justify-center">
                   <span className="font-outfit font-extrabold text-dash-white-card text-base">R</span>
                 </div>
-                <h1 className="font-outfit font-bold text-base text-dash-white-card">RecruitAI</h1>
+                <h1 className="font-outfit font-bold text-base text-dash-dark-purple">RecruitAI</h1>
               </div>
-              <button 
+              <button
                 onClick={() => setSidebarOpen(false)}
-                className="p-1 rounded-lg hover:bg-dash-primary-purple/20 text-dash-light-purple hover:text-dash-white-card mr-4"
+                className="p-1 rounded-lg hover:bg-dash-primary-purple/20 text-dash-light-purple hover:text-dash-dark-purple mr-4"
               >
                 <X size={20} />
               </button>
@@ -270,7 +282,6 @@ const CandidateDashboard = ({ onLogout }) => {
               {[
                 { id: 'dashboard', label: 'Dashboard', icon: Briefcase },
                 { id: 'resume', label: 'Resume Upload', icon: FileText },
-                { id: 'ai', label: 'AI Analysis', icon: Sparkles },
                 { id: 'technical', label: 'Technical Test', icon: Terminal },
                 { id: 'english', label: 'English Speaking', icon: Volume2 },
                 { id: 'results', label: 'My Results', icon: Award },
@@ -287,11 +298,10 @@ const CandidateDashboard = ({ onLogout }) => {
                         showToast(`"${item.label}" feature is coming soon!`);
                       }
                     }}
-                    className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-l-[24px] rounded-r-none text-sm font-bold transition-all duration-200 ${
-                      isActive 
-                        ? 'sidebar-active-tab shadow-sm' 
-                        : 'text-dash-light-purple hover:text-dash-white-card hover:bg-dash-primary-purple/20'
-                    }`}
+                    className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-l-[24px] rounded-r-none text-sm font-bold transition-all duration-200 ${isActive
+                      ? 'sidebar-active-tab shadow-sm'
+                      : 'text-dash-light-purple hover:text-dash-dark-purple hover:bg-dash-primary-purple/20'
+                      }`}
                   >
                     <Icon size={18} />
                     <span>{item.label}</span>
@@ -299,6 +309,16 @@ const CandidateDashboard = ({ onLogout }) => {
                 );
               })}
             </nav>
+            {/* Centered Lottie Animation */}
+            <div className="flex items-center justify-center py-2 pr-4 my-2">
+              <div className="w-44 h-44 flex items-center justify-center">
+                <DotLottieReact
+                  src="https://lottie.host/f5bd2f6c-67a9-44d5-954d-96176d4cb3df/USuWgujLWd.lottie"
+                  loop
+                  autoplay
+                />
+              </div>
+            </div>
 
             <div className="border-t border-dash-border-gray/25 pt-4 space-y-3 mr-4">
               <div className="flex items-center gap-3 px-2">
@@ -306,7 +326,7 @@ const CandidateDashboard = ({ onLogout }) => {
                   AS
                 </div>
                 <div>
-                  <h4 className="text-xs font-semibold text-dash-white-card">Arjun Sharma</h4>
+                  <h4 className="text-xs font-semibold text-dash-dark-purple">Arjun Sharma</h4>
                   <span className="text-[10px] text-dash-light-purple">Candidate</span>
                 </div>
               </div>
@@ -363,10 +383,10 @@ const CandidateDashboard = ({ onLogout }) => {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.4, delay: idx * 0.08 }}
                     whileHover={{ y: -5 }}
-                    className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-5.5 flex flex-col justify-between shadow-[0_4px_15px_rgba(87,82,170,0.02)] hover:bg-dash-soft-pink transition-all duration-300 group cursor-default min-h-[135px]"
+                    className={`border rounded-[24px] p-5.5 flex flex-col justify-between shadow-[0_4px_15px_rgba(87,82,170,0.02)] transition-all duration-300 group cursor-default min-h-[135px] ${stat.cardBg || 'bg-dash-white-card border-dash-border-gray/50 text-dash-dark-purple hover:bg-dash-soft-pink'}`}
                   >
                     <div className="flex justify-between items-start">
-                      <span className="text-xs font-bold text-dash-light-purple uppercase tracking-wider group-hover:text-dash-primary-purple transition-colors">
+                      <span className={`text-xs font-bold uppercase tracking-wider transition-colors ${stat.cardBg ? 'text-white/80' : 'text-dash-light-purple group-hover:text-dash-primary-purple'}`}>
                         {stat.label}
                       </span>
                       <div className={`p-2 rounded-xl transition-all duration-300 ${stat.colorClass} group-hover:scale-110`}>
@@ -374,10 +394,10 @@ const CandidateDashboard = ({ onLogout }) => {
                       </div>
                     </div>
                     <div>
-                      <h3 className="text-2xl font-plus-jakarta font-extrabold text-dash-dark-purple mt-2 tracking-tight">
+                      <h3 className={`text-2xl font-plus-jakarta font-extrabold mt-2 tracking-tight ${stat.cardBg ? 'text-white' : 'text-dash-dark-purple'}`}>
                         {stat.value}
                       </h3>
-                      <p className="text-xs text-dash-light-purple font-semibold mt-1">
+                      <p className={`text-xs font-semibold mt-1 ${stat.cardBg ? 'text-white/90' : 'text-dash-light-purple'}`}>
                         {stat.subtext}
                       </p>
                     </div>
@@ -450,7 +470,7 @@ const CandidateDashboard = ({ onLogout }) => {
                         <span className="text-dash-primary-purple">{skill.percent}%</span>
                       </div>
                       <div className="w-full h-2 rounded-full bg-dash-light-blue-bg overflow-hidden">
-                        <motion.div 
+                        <motion.div
                           initial={{ width: 0 }}
                           animate={{ width: `${skill.percent}%` }}
                           transition={{ duration: 0.8, ease: 'easeOut' }}
@@ -468,7 +488,7 @@ const CandidateDashboard = ({ onLogout }) => {
                   </h4>
                   <div className="flex flex-wrap gap-2">
                     {strengths.map((tag) => (
-                      <span 
+                      <span
                         key={tag}
                         className="px-3 py-1.5 rounded-xl bg-dash-light-blue-bg border border-dash-border-gray/30 text-xs font-bold text-dash-dark-purple hover:bg-dash-primary-purple hover:text-dash-white-card transition-all duration-200 cursor-default"
                       >
@@ -498,7 +518,7 @@ const CandidateDashboard = ({ onLogout }) => {
                     Supports PDF and DOCX files up to 5MB
                   </p>
                 </div>
-                <button 
+                <button
                   onClick={() => showToast('File browser initiated')}
                   className="mt-2 px-6 py-2.5 rounded-xl bg-dash-primary-purple text-dash-white-card font-bold text-sm hover:bg-dash-dark-purple transition-all duration-200 shadow-md cursor-pointer border-0"
                 >
@@ -538,7 +558,7 @@ const CandidateDashboard = ({ onLogout }) => {
                     'Skills', 'Languages', 'Projects', 'Experience',
                     'Education', 'Certifications', 'Tools', 'Technologies'
                   ].map((tag) => (
-                    <span 
+                    <span
                       key={tag}
                       className="px-3 py-1.5 rounded-xl bg-dash-light-blue-bg border border-dash-border-gray/30 text-xs font-bold text-dash-dark-purple hover:bg-dash-primary-purple hover:text-dash-white-card transition-all duration-200 cursor-default"
                     >
@@ -603,7 +623,7 @@ const CandidateDashboard = ({ onLogout }) => {
               </div>
 
               {/* CTA Button */}
-              <button 
+              <button
                 onClick={() => showToast('Technical Assessment started')}
                 className="w-full py-3.5 rounded-xl bg-dash-primary-purple text-dash-white-card font-bold text-sm hover:bg-dash-dark-purple transition-all duration-200 shadow-md cursor-pointer border-0 flex items-center justify-center gap-2"
               >
@@ -674,20 +694,17 @@ const CandidateDashboard = ({ onLogout }) => {
                 ].map((q) => (
                   <div
                     key={q.num}
-                    className={`flex items-start gap-3 p-3.5 rounded-2xl border transition-all duration-200 cursor-pointer ${
-                      q.active
-                        ? 'bg-dash-primary-purple/10 border-dash-primary-purple/30'
-                        : 'bg-dash-light-blue-bg/30 border-dash-border-gray/20 hover:bg-dash-soft-pink/30'
-                    }`}
+                    className={`flex items-start gap-3 p-3.5 rounded-2xl border transition-all duration-200 cursor-pointer ${q.active
+                      ? 'bg-dash-primary-purple/10 border-dash-primary-purple/30'
+                      : 'bg-dash-light-blue-bg/30 border-dash-border-gray/20 hover:bg-dash-soft-pink/30'
+                      }`}
                   >
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-extrabold shrink-0 mt-0.5 ${
-                      q.active ? 'bg-dash-primary-purple text-dash-white-card' : 'bg-dash-border-gray/40 text-dash-light-purple'
-                    }`}>
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-extrabold shrink-0 mt-0.5 ${q.active ? 'bg-dash-primary-purple text-dash-white-card' : 'bg-dash-border-gray/40 text-dash-light-purple'
+                      }`}>
                       {q.num}
                     </span>
-                    <p className={`text-xs font-semibold leading-relaxed ${
-                      q.active ? 'text-dash-dark-purple' : 'text-dash-light-purple'
-                    }`}>
+                    <p className={`text-xs font-semibold leading-relaxed ${q.active ? 'text-dash-dark-purple' : 'text-dash-light-purple'
+                      }`}>
                       {q.text}
                     </p>
                   </div>

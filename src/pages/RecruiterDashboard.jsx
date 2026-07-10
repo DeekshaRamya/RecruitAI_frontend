@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Briefcase, 
-  Users, 
-  Award, 
-  TrendingUp, 
-  Search, 
-  X, 
-  Check, 
-  Settings, 
-  Bell, 
-  Menu, 
+import { DotLottieReact } from '@lottiefiles/dotlottie-react';
+import {
+  Briefcase,
+  Users,
+  Award,
+  TrendingUp,
+  Search,
+  X,
+  Check,
+  Settings,
+  Bell,
+  Menu,
   ChevronRight,
   SlidersHorizontal,
   Mail,
@@ -85,9 +86,9 @@ const RecruiterDashboard = ({ onLogout }) => {
   const filteredCandidates = candidates
     .filter(candidate => {
       const matchesSearch = candidate.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            candidate.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            candidate.role.toLowerCase().includes(searchQuery.toLowerCase());
-      
+        candidate.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        candidate.role.toLowerCase().includes(searchQuery.toLowerCase());
+
       const matchesRole = selectedRole === 'All Roles' || candidate.role === selectedRole;
       const matchesStatus = selectedStatus === 'All Statuses' || candidate.status === selectedStatus;
 
@@ -110,10 +111,10 @@ const RecruiterDashboard = ({ onLogout }) => {
   const handleCreateAssessmentSubmit = (e) => {
     e.preventDefault();
     if (!newAssessment.title.trim()) return;
-    
+
     setIsCreateModalOpen(false);
     showToast(`Assessment "${newAssessment.title}" successfully created!`);
-    
+
     // Reset form
     setNewAssessment({
       title: '',
@@ -150,75 +151,75 @@ const RecruiterDashboard = ({ onLogout }) => {
       {/* 1. SIDEBAR (Full-Height Solid Layout) */}
       <aside className="hidden lg:flex flex-col w-[260px] h-screen shrink-0 bg-dash-sidebar-bg pt-8 pb-8 pl-6 pr-0 relative z-30 text-dash-white-card shadow-[4px_0_24px_rgba(0,0,0,0.03)] justify-between">
         <div>
-            {/* Branding */}
-            <div className="flex items-center gap-3 px-2 py-4 mb-6">
-              <div className="w-9 h-9 rounded-xl bg-dash-primary-purple flex items-center justify-center shadow-md">
-                <span className="font-outfit font-extrabold text-dash-white-card text-lg tracking-wider">R</span>
-              </div>
-              <div>
-                <h1 className="font-outfit font-bold text-base tracking-tight text-dash-white-card leading-none">RecruitAI</h1>
-                <span className="text-[10px] text-dash-light-purple font-medium tracking-widest uppercase">Workspace</span>
-              </div>
+          {/* Branding */}
+          <div className="flex items-center gap-3 px-2 py-4 mb-6">
+            <div className="w-9 h-9 rounded-xl bg-dash-primary-purple flex items-center justify-center shadow-md">
+              <span className="font-outfit font-extrabold text-dash-white-card text-lg tracking-wider">R</span>
             </div>
+            <div>
+              <h1 className="font-outfit font-bold text-base tracking-tight text-dash-white-card leading-none">RecruitAI</h1>
+              <span className="text-[10px] text-dash-light-purple font-medium tracking-widest uppercase">Workspace</span>
+            </div>
+          </div>
 
-            {/* Navigation Menu */}
-            <nav className="space-y-2">
-              {[
-                { id: 'overview', label: 'Overview', icon: Briefcase },
-                { id: 'candidates', label: 'Candidates', icon: Users },
-                { id: 'settings', label: 'Settings', icon: Settings },
-              ].map((item) => {
-                const Icon = item.icon;
-                const isActive = activeTab === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => setActiveTab(item.id)}
-                    className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-l-[24px] rounded-r-none text-sm font-bold transition-all duration-300 relative group ${
-                      isActive 
-                        ? 'sidebar-active-tab shadow-sm' 
-                        : 'text-dash-light-purple hover:text-dash-white-card hover:bg-dash-primary-purple/20'
+          {/* Navigation Menu */}
+          <nav className="space-y-2">
+            {[
+              { id: 'overview', label: 'Overview', icon: Briefcase },
+              { id: 'candidates', label: 'Candidates', icon: Users },
+              { id: 'settings', label: 'Settings', icon: Settings },
+            ].map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-l-[24px] rounded-r-none text-sm font-bold transition-all duration-300 relative group ${isActive
+                    ? 'sidebar-active-tab shadow-sm'
+                    : 'text-dash-light-purple hover:text-dash-white-card hover:bg-dash-primary-purple/20'
                     }`}
-                  >
-                    <Icon size={18} className="relative z-10" />
-                    <span className="relative z-10">{item.label}</span>
-                  </button>
-                );
-              })}
-            </nav>
+                >
+                  <Icon size={18} className="relative z-10" />
+                  <span className="relative z-10">{item.label}</span>
+                </button>
+              );
+            })}
+          </nav>
 
-            {/* Parrot Illustration (Nested under Settings) */}
-            <div className="mt-20 px-3 flex justify-center">
-              <img 
-                src="/parrot_logo.png" 
-                alt="Workspace Parrot Logo" 
-                className="w-40 h-auto object-contain drop-shadow-md rounded-2xl"
-              />
-            </div>
+          {/* Parrot Illustration (Nested under Settings) */}
+          <div className="mt-20 px-3 flex justify-center">
+            <DotLottieReact
+              src="https://lottie.host/defd84c4-5ba2-47c1-9c0e-5791da804e15/LDAVfJ7ud9.lottie"
+              loop
+              autoplay
+              style={{ width: '160px', height: '160px' }}
+            />
           </div>
+        </div>
 
-          {/* User Profile & Logout */}
-          <div className="space-y-4">
-            <div className="border-t border-dash-border-gray/25 pt-4 px-2">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-dash-primary-purple flex items-center justify-center font-semibold text-dash-white-card">
-                  RK
-                </div>
-                <div className="overflow-hidden">
-                  <h4 className="text-xs font-semibold text-dash-white-card truncate">Ranjith Kumar</h4>
-                  <span className="text-[10px] text-dash-light-purple truncate block">Lead Recruiter</span>
-                </div>
+        {/* User Profile & Logout */}
+        <div className="space-y-4">
+          <div className="border-t border-dash-border-gray/25 pt-4 px-2">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-dash-primary-purple flex items-center justify-center font-semibold text-dash-white-card">
+                RK
+              </div>
+              <div className="overflow-hidden">
+                <h4 className="text-xs font-semibold text-dash-white-card truncate">Ranjith Kumar</h4>
+                <span className="text-[10px] text-dash-light-purple truncate block">Lead Recruiter</span>
               </div>
             </div>
-            
-            <button
-              onClick={onLogout}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-dash-light-purple hover:bg-dash-primary-purple/20 transition-all duration-200 cursor-pointer"
-            >
-              <LogOut size={16} />
-              <span>Log Out</span>
-            </button>
           </div>
+
+          <button
+            onClick={onLogout}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-dash-light-purple hover:bg-dash-primary-purple/20 transition-all duration-200 cursor-pointer"
+          >
+            <LogOut size={16} />
+            <span>Log Out</span>
+          </button>
+        </div>
       </aside>
 
       {/* Mobile Sidebar Backdrop */}
@@ -251,7 +252,7 @@ const RecruiterDashboard = ({ onLogout }) => {
                 </div>
                 <h1 className="font-outfit font-bold text-base text-dash-white-card">RecruitAI</h1>
               </div>
-              <button 
+              <button
                 onClick={() => setSidebarOpen(false)}
                 className="p-1 rounded-lg hover:bg-dash-primary-purple/20 text-dash-light-purple hover:text-dash-white-card"
               >
@@ -274,11 +275,10 @@ const RecruiterDashboard = ({ onLogout }) => {
                       setActiveTab(item.id);
                       setSidebarOpen(false);
                     }}
-                    className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-l-[24px] rounded-r-none text-sm font-bold transition-all duration-200 ${
-                      isActive 
-                        ? 'sidebar-active-tab shadow-sm' 
-                        : 'text-dash-light-purple hover:text-dash-white-card hover:bg-dash-primary-purple/20'
-                    }`}
+                    className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-l-[24px] rounded-r-none text-sm font-bold transition-all duration-200 ${isActive
+                      ? 'sidebar-active-tab shadow-sm'
+                      : 'text-dash-light-purple hover:text-dash-white-card hover:bg-dash-primary-purple/20'
+                      }`}
                   >
                     <Icon size={18} />
                     <span>{item.label}</span>
@@ -391,10 +391,10 @@ const RecruiterDashboard = ({ onLogout }) => {
 
         {/* 4. CANDIDATE ASSESSMENT MANAGEMENT SECTION */}
         <section className="bg-dash-white-card border border-dash-border-gray rounded-[20px] shadow-sm flex-1 flex flex-col overflow-hidden">
-          
+
           {/* SEARCH & FILTERS BAR */}
           <div className="p-5 border-b border-dash-border-gray bg-dash-white-card flex flex-col md:flex-row gap-4 items-center justify-between z-20">
-            
+
             {/* Search Input Box */}
             <div className="relative w-full md:max-w-xs group">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-dash-light-purple transition-colors duration-300 group-focus-within:text-dash-primary-purple" size={16} />
@@ -417,7 +417,7 @@ const RecruiterDashboard = ({ onLogout }) => {
 
             {/* Filter Dropdowns */}
             <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-              
+
               {/* Role Select */}
               <div className="relative">
                 <button
@@ -587,7 +587,7 @@ const RecruiterDashboard = ({ onLogout }) => {
 
                         {/* Status Badges */}
                         <td className="px-6 py-4">
-                          <span 
+                          <span
                             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase border"
                             style={{
                               borderColor: `${statusColor}30`,
@@ -595,8 +595,8 @@ const RecruiterDashboard = ({ onLogout }) => {
                               color: statusColor,
                             }}
                           >
-                            <span 
-                              className="w-1.5 h-1.5 rounded-full" 
+                            <span
+                              className="w-1.5 h-1.5 rounded-full"
                               style={{ backgroundColor: statusColor }}
                             />
                             {candidate.status}
@@ -606,7 +606,7 @@ const RecruiterDashboard = ({ onLogout }) => {
                         {/* Assessment Score */}
                         <td className="px-6 py-4 text-center">
                           {candidate.score !== null ? (
-                            <span 
+                            <span
                               className="text-xs font-extrabold px-2.5 py-1 rounded-lg"
                               style={{
                                 color: candidate.score >= 85 ? '#149470' : candidate.score >= 70 ? '#7CB08D' : '#84492D',
@@ -713,7 +713,7 @@ const RecruiterDashboard = ({ onLogout }) => {
                     <div className="bg-dash-light-blue-bg/30 border border-dash-border-gray rounded-xl p-3.5">
                       <span className="text-[10px] text-dash-light-purple font-bold uppercase tracking-wider block mb-1">Score Result</span>
                       <span className="text-xs font-semibold text-dash-dark-purple flex items-center gap-1.5 mt-0.5">
-                        <span 
+                        <span
                           className="w-1.5 h-1.5 rounded-full"
                           style={{
                             backgroundColor: selectedCandidate.status === 'Completed' ? '#149470' : selectedCandidate.status === 'Under Review' ? '#7CB08D' : '#84492D'
@@ -778,11 +778,11 @@ const RecruiterDashboard = ({ onLogout }) => {
                   <div className="bg-dash-soft-pink border border-dash-border-gray rounded-xl p-4">
                     <h5 className="text-[10px] text-dash-primary-purple font-bold uppercase tracking-wider mb-1">AI Recommendation Feedback</h5>
                     <p className="text-xs text-dash-dark-purple leading-relaxed">
-                      {selectedCandidate.score >= 90 
-                        ? "Exceptional candidate. Outperformed in logic reasoning, optimization efficiency, and system scalability. Strongly suggest scheduling panel interviews immediately." 
-                        : selectedCandidate.score >= 75 
-                        ? "Strong performance. Demonstrated clear knowledge of frontend development concepts with average optimization skills. Recommend moving to technical round." 
-                        : "Candidate did not pass the required baseline performance standards. Scores were low in algorithmic solving speed."}
+                      {selectedCandidate.score >= 90
+                        ? "Exceptional candidate. Outperformed in logic reasoning, optimization efficiency, and system scalability. Strongly suggest scheduling panel interviews immediately."
+                        : selectedCandidate.score >= 75
+                          ? "Strong performance. Demonstrated clear knowledge of frontend development concepts with average optimization skills. Recommend moving to technical round."
+                          : "Candidate did not pass the required baseline performance standards. Scores were low in algorithmic solving speed."}
                     </p>
                   </div>
                 )}
@@ -848,7 +848,7 @@ const RecruiterDashboard = ({ onLogout }) => {
 
               {/* Form Input fields */}
               <form onSubmit={handleCreateAssessmentSubmit} className="space-y-4">
-                
+
                 {/* Title */}
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[10px] font-bold text-dash-light-purple uppercase tracking-wide">Assessment Title</label>

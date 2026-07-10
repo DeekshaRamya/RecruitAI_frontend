@@ -171,4 +171,19 @@
   box-shadow: 0 -24px 0 0 var(--color-dash-light-blue-bg);
   pointer-events: none;
   z-index: 10;
+}
+
+/* Candidate Dashboard Soft Light Theme matching the request image */
+.candidate-dashboard-theme {
+  --color-dash-primary-purple: #768CB5;
+  --color-dash-dark-purple: #2E3A59;
+  --color-dash-light-purple: #8F9BB3;
+  --color-dash-soft-pink: #F0F3F8;
+  --color-dash-light-blue-bg: #EDF0F5;
+  --color-dash-white-card: #FFFFFF;
+  --color-dash-success-green: #5FAD97;
+  --color-dash-light-green: #7CB08D;
+  --color-dash-border-gray: #E2E8F0;
+  --color-dash-accent-brown: #E57E88;
+  --color-dash-sidebar-bg: #FFFFFF;
 }

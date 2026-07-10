@@ -189,6 +189,7 @@ const LoginCard = ({ role, setRole, onRecruiterLogin, onLogin }) => {
                   onChange={(e) => setEmail(e.target.value)}
                   icon={Mail}
                   role={role}
+                  required={false}
                 />
 
                 <InputField
@@ -201,6 +202,7 @@ const LoginCard = ({ role, setRole, onRecruiterLogin, onLogin }) => {
                   onChange={(e) => setPassword(e.target.value)}
                   icon={Lock}
                   role={role}
+                  required={false}
                 />
               </div>
 
