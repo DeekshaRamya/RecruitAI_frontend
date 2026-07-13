@@ -425,7 +425,7 @@ const CandidateDashboard = ({ onLogout }) => {
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ duration: 0.3, delay: idx * 0.1 }}
                       whileHover={{ x: 4 }}
-                      className="p-4 rounded-2xl bg-dash-light-blue-bg/40 border border-dash-border-gray/20 flex items-center justify-between gap-4 hover:bg-dash-soft-pink hover:border-dash-border-gray/50 transition-all duration-200"
+                      className="p-4 rounded-2xl bg-dash-soft-pink border border-dash-border-gray/50 flex items-center justify-between gap-4 hover:bg-dash-border-gray transition-all duration-200"
                     >
                       <div className="flex items-start gap-3.5">
                         <div className="mt-1 flex items-center justify-center text-dash-primary-purple">
@@ -490,7 +490,7 @@ const CandidateDashboard = ({ onLogout }) => {
                     {strengths.map((tag) => (
                       <span
                         key={tag}
-                        className="px-3 py-1.5 rounded-xl bg-dash-light-blue-bg border border-dash-border-gray/30 text-xs font-bold text-dash-dark-purple hover:bg-dash-primary-purple hover:text-dash-white-card transition-all duration-200 cursor-default"
+                        className="px-3 py-1.5 rounded-xl bg-dash-soft-pink border border-dash-border-gray/50 text-xs font-bold text-dash-dark-purple hover:bg-dash-primary-purple hover:text-dash-white-card transition-all duration-200 cursor-default"
                       >
                         {tag}
                       </span>
@@ -603,7 +603,7 @@ const CandidateDashboard = ({ onLogout }) => {
                   { value: '60 min', label: 'Duration' },
                   { value: '3', label: 'Subjects' }
                 ].map((item) => (
-                  <div key={item.label} className="bg-dash-light-blue-bg/40 border border-dash-border-gray/30 rounded-2xl p-4 flex flex-col items-center justify-center gap-1 hover:bg-dash-soft-pink/30 transition-all">
+                  <div key={item.label} className="bg-dash-soft-pink border border-dash-border-gray/50 rounded-2xl p-4 flex flex-col items-center justify-center gap-1 hover:bg-dash-border-gray transition-all">
                     <span className="font-plus-jakarta font-extrabold text-lg text-dash-dark-purple">{item.value}</span>
                     <span className="text-[10px] font-bold text-dash-light-purple uppercase tracking-wider">{item.label}</span>
                   </div>
@@ -611,7 +611,7 @@ const CandidateDashboard = ({ onLogout }) => {
               </div>
 
               {/* Warning Instructions Box */}
-              <div className="w-full bg-dash-accent-brown/5 border border-dash-accent-brown/20 rounded-2xl p-5 text-left flex flex-col gap-2">
+              <div className="w-full bg-dash-soft-pink/50 border border-dash-accent-brown/40 rounded-2xl p-5 text-left flex flex-col gap-2">
                 <h4 className="text-xs font-bold text-dash-accent-brown uppercase tracking-wider flex items-center gap-1.5">
                   Before you start:
                 </h4>
@@ -646,7 +646,7 @@ const CandidateDashboard = ({ onLogout }) => {
                 </div>
 
                 {/* Question Text Box */}
-                <div className="bg-dash-light-blue-bg/40 border border-dash-border-gray/30 rounded-2xl p-5 mb-6">
+                <div className="bg-dash-soft-pink border border-dash-border-gray/50 rounded-2xl p-5 mb-6">
                   <p className="font-plus-jakarta font-bold text-base text-dash-dark-purple leading-relaxed">
                     "Can you briefly introduce yourself and walk me through your background?"
                   </p>
@@ -669,7 +669,7 @@ const CandidateDashboard = ({ onLogout }) => {
                 <h4 className="text-xs font-bold text-dash-dark-purple uppercase tracking-wider mb-4">AI Evaluation Criteria</h4>
                 <div className="grid grid-cols-5 gap-3">
                   {['Fluency', 'Pronunciation', 'Grammar', 'Vocabulary', 'Confidence'].map((criterion) => (
-                    <div key={criterion} className="flex flex-col items-center gap-2 p-3 rounded-2xl bg-dash-light-blue-bg/40 border border-dash-border-gray/20 hover:bg-dash-soft-pink/50 transition-all duration-200 cursor-default">
+                    <div key={criterion} className="flex flex-col items-center gap-2 p-3 rounded-2xl bg-dash-soft-pink border border-dash-border-gray/50 hover:bg-dash-border-gray transition-all duration-200 cursor-default">
                       <Volume2 size={18} className="text-dash-primary-purple" />
                       <span className="text-[10px] font-bold text-dash-dark-purple text-center tracking-tight">{criterion}</span>
                     </div>
@@ -695,8 +695,8 @@ const CandidateDashboard = ({ onLogout }) => {
                   <div
                     key={q.num}
                     className={`flex items-start gap-3 p-3.5 rounded-2xl border transition-all duration-200 cursor-pointer ${q.active
-                      ? 'bg-dash-primary-purple/10 border-dash-primary-purple/30'
-                      : 'bg-dash-light-blue-bg/30 border-dash-border-gray/20 hover:bg-dash-soft-pink/30'
+                      ? 'bg-dash-primary-purple/20 border-dash-primary-purple/40'
+                      : 'bg-dash-soft-pink border border-dash-border-gray/50 hover:bg-dash-border-gray'
                       }`}
                   >
                     <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-extrabold shrink-0 mt-0.5 ${q.active ? 'bg-dash-primary-purple text-dash-white-card' : 'bg-dash-border-gray/40 text-dash-light-purple'

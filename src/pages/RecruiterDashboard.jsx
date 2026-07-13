@@ -28,6 +28,7 @@ import {
   Lock,
   ArrowUpRight,
   FileText,
+<<<<<<< HEAD
   Sparkles,
   Trash2,
   Save,
@@ -38,7 +39,110 @@ import {
   Edit3,
   Play,
   BookOpen
+=======
+  Trash2,
+  RefreshCw
+>>>>>>> f07719b0326dd4164ac877a384ded28288d6d98a
 } from 'lucide-react';
+
+const questionPool = {
+  Python: [
+    {
+      question: 'Which keyword is used to define a generator function in Python?',
+      options: [
+        { label: 'A', text: 'return', isCorrect: false },
+        { label: 'B', text: 'yield', isCorrect: true },
+        { label: 'C', text: 'async', isCorrect: false },
+        { label: 'D', text: 'lambda', isCorrect: false }
+      ]
+    },
+    {
+      question: 'What is the output of: list(map(lambda x: x**2, [1, 2, 3, 4]))?',
+      options: [
+        { label: 'A', text: '[1, 4, 9, 16]', isCorrect: true },
+        { label: 'B', text: '[2, 4, 6, 8]', isCorrect: false },
+        { label: 'C', text: '[1, 2, 3, 4]', isCorrect: false },
+        { label: 'D', text: 'Error', isCorrect: false }
+      ]
+    },
+    {
+      question: 'Which decorator defines a class method that takes the class as the first argument?',
+      options: [
+        { label: 'A', text: '@staticmethod', isCorrect: false },
+        { label: 'B', text: '@property', isCorrect: false },
+        { label: 'C', text: '@classmethod', isCorrect: true },
+        { label: 'D', text: '@instancemethod', isCorrect: false }
+      ]
+    },
+    {
+      question: 'Which of the following is a mutable data type in Python?',
+      options: [
+        { label: 'A', text: 'tuple', isCorrect: false },
+        { label: 'B', text: 'string', isCorrect: false },
+        { label: 'C', text: 'list', isCorrect: true },
+        { label: 'D', text: 'int', isCorrect: false }
+      ]
+    }
+  ],
+  SQL: [
+    {
+      question: 'Which SQL clause is used to filter group results after aggregation?',
+      options: [
+        { label: 'A', text: 'WHERE', isCorrect: false },
+        { label: 'B', text: 'HAVING', isCorrect: true },
+        { label: 'C', text: 'GROUP BY', isCorrect: false },
+        { label: 'D', text: 'ORDER BY', isCorrect: false }
+      ]
+    },
+    {
+      question: 'What type of JOIN returns all records when there is a match in either left or right table?',
+      options: [
+        { label: 'A', text: 'INNER JOIN', isCorrect: false },
+        { label: 'B', text: 'LEFT JOIN', isCorrect: false },
+        { label: 'C', text: 'FULL OUTER JOIN', isCorrect: true },
+        { label: 'D', text: 'RIGHT JOIN', isCorrect: false }
+      ]
+    },
+    {
+      question: 'Which SQL constraint uniquely identifies each record in a database table?',
+      options: [
+        { label: 'A', text: 'UNIQUE', isCorrect: false },
+        { label: 'B', text: 'PRIMARY KEY', isCorrect: true },
+        { label: 'C', text: 'FOREIGN KEY', isCorrect: false },
+        { label: 'D', text: 'CHECK', isCorrect: false }
+      ]
+    }
+  ],
+  Aptitude: [
+    {
+      question: 'A work can be completed by 8 men in 12 days. How many days will 6 men take to complete the same work?',
+      options: [
+        { label: 'A', text: '16 days', isCorrect: true },
+        { label: 'B', text: '15 days', isCorrect: false },
+        { label: 'C', text: '18 days', isCorrect: false },
+        { label: 'D', text: '14 days', isCorrect: false }
+      ]
+    },
+    {
+      question: 'If a seller buys an item for $100 and sells it for $120, what is the profit percentage?',
+      options: [
+        { label: 'A', text: '10%', isCorrect: false },
+        { label: 'B', text: '15%', isCorrect: false },
+        { label: 'C', text: '20%', isCorrect: true },
+        { label: 'D', text: '25%', isCorrect: false }
+      ]
+    },
+    {
+      question: 'What is the next number in the series: 2, 6, 12, 20, 30, ...?',
+      options: [
+        { label: 'A', text: '40', isCorrect: false },
+        { label: 'B', text: '42', isCorrect: true },
+        { label: 'C', text: '44', isCorrect: false },
+        { label: 'D', text: '46', isCorrect: false }
+      ]
+    }
+  ]
+};
 
 const RecruiterDashboard = ({ onLogout }) => {
   // Candidate dataset state
@@ -319,6 +423,49 @@ const RecruiterDashboard = ({ onLogout }) => {
   // Successful assessment toast/alert notification
   const [toastMessage, setToastMessage] = useState('');
 
+  // AI Generated preview questions state
+  const [previewQuestions, setPreviewQuestions] = useState([
+    {
+      id: 1,
+      subject: 'Python',
+      difficulty: 'Medium',
+      question: 'Which keyword is used to define a generator function in Python?',
+      options: [
+        { label: 'A', text: 'return', isCorrect: false },
+        { label: 'B', text: 'yield', isCorrect: true },
+        { label: 'C', text: 'async', isCorrect: false },
+        { label: 'D', text: 'lambda', isCorrect: false }
+      ]
+    },
+    {
+      id: 2,
+      subject: 'Python',
+      difficulty: 'Easy',
+      question: 'What is the output of: list(map(lambda x: x**2, [1, 2, 3, 4]))?',
+      options: [
+        { label: 'A', text: '[1, 4, 9, 16]', isCorrect: true },
+        { label: 'B', text: '[2, 4, 6, 8]', isCorrect: false },
+        { label: 'C', text: '[1, 2, 3, 4]', isCorrect: false },
+        { label: 'D', text: 'Error', isCorrect: false }
+      ]
+    },
+    {
+      id: 3,
+      subject: 'Python',
+      difficulty: 'Medium',
+      question: 'Which decorator defines a class method that takes the class as the first argument?',
+      options: [
+        { label: 'A', text: '@staticmethod', isCorrect: false },
+        { label: 'B', text: '@property', isCorrect: false },
+        { label: 'C', text: '@classmethod', isCorrect: true },
+        { label: 'D', text: '@instancemethod', isCorrect: false }
+      ]
+    }
+  ]);
+
+  const [editingQuestionId, setEditingQuestionId] = useState(null);
+  const [editingText, setEditingText] = useState('');
+
   // Dynamic states for active assessments metric count
   const [activeAssessmentsCount, setActiveAssessmentsCount] = useState(18);
 
@@ -448,6 +595,7 @@ const RecruiterDashboard = ({ onLogout }) => {
   };
 
   // Action: Generate Assessment with AI
+
   const handleGenerateAssessment = async () => {
     const payload = getAssessmentPayload();
     showToast("Generating assessment with AI... Please wait.");
@@ -500,6 +648,17 @@ const RecruiterDashboard = ({ onLogout }) => {
     }
   };
 
+  const handleSaveAndAssign = () => {
+    showToast('Assessment saved and assigned successfully!');
+    setActiveAssessmentsCount(prev => prev + 1);
+    setSelectedTopics({
+      Python: [],
+      SQL: [],
+      Aptitude: []
+    });
+    setActiveTab('dashboard');
+  };
+
   const showToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => {
@@ -523,9 +682,9 @@ const RecruiterDashboard = ({ onLogout }) => {
         };
       case 'preview-questions':
         return {
-          title: 'Preview Questions',
+          title: 'Assessment Preview',
           tag: 'QA Mode',
-          subtitle: 'Review and customize the AI-generated questions before publishing.'
+          subtitle: 'Review AI-generated questions before saving and assigning to candidates.'
         };
       case 'monitor':
         return {
@@ -599,14 +758,16 @@ const RecruiterDashboard = ({ onLogout }) => {
             })}
           </nav>
 
-          {/* Parrot Illustration */}
-          <div className="mt-14 px-3 flex justify-center">
-            <DotLottieReact
-              src="https://lottie.host/defd84c4-5ba2-47c1-9c0e-5791da804e15/LDAVfJ7ud9.lottie"
-              loop
-              autoplay
-              style={{ width: '150px', height: '150px' }}
-            />
+          {/* Recruiter Sidebar Animation */}
+          <div className="flex items-center justify-center -mt-3 px-4">
+            <div className="w-56 h-56 flex items-center justify-center overflow-hidden">
+              <DotLottieReact
+                src="https://lottie.host/5521a48e-619e-490f-a9b2-f4fb0386526e/5IWtyksCcc.lottie"
+                loop
+                autoplay
+                style={{ width: '100%', height: '100%', transform: 'scale(1.35)', transformOrigin: 'center center' }}
+              />
+            </div>
           </div>
         </div>
 
@@ -632,6 +793,17 @@ const RecruiterDashboard = ({ onLogout }) => {
               <LogOut size={16} />
               <span>Log Out</span>
             </button>
+
+
+
+            {/* Cookie Manager Button matching image */}
+            <button
+              onClick={() => showToast('Cookie preferences updated!')}
+              className="w-full text-left px-3 py-2 rounded-lg bg-dash-white-card border border-dash-border-gray hover:bg-dash-soft-pink text-dash-dark-purple text-[10px] font-bold transition-all duration-200 cursor-pointer shadow-sm"
+            >
+              Manage cookies or opt out
+            </button>
+
           </div>
         </div>
       </aside>
@@ -752,23 +924,45 @@ const RecruiterDashboard = ({ onLogout }) => {
           </div>
 
           <div className="flex items-center gap-3.5 self-end sm:self-auto">
-            {/* Notifications */}
-            <button className="relative p-2.5 rounded-xl bg-dash-white-card border border-dash-border-gray text-dash-primary-purple hover:bg-dash-soft-pink transition-all duration-300 hover:scale-105">
-              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-dash-primary-purple animate-pulse" />
-              <Bell size={18} />
-            </button>
+            {activeTab === 'preview-questions' ? (
+              <>
+                <button
+                  onClick={() => setActiveTab('create-assessment')}
+                  className="px-4 py-2 rounded-xl border border-dash-border-gray hover:bg-dash-soft-pink text-dash-dark-purple text-xs font-bold transition-all duration-200 cursor-pointer flex items-center gap-2"
+                >
+                  <span>← Back</span>
+                </button>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleSaveAndAssign}
+                  className="px-4.5 py-2.5 rounded-xl bg-dash-primary-purple border border-dash-primary-purple text-dash-white-card font-bold text-sm cursor-pointer shadow-md hover:bg-dash-dark-purple hover:border-dash-dark-purple transition-all duration-300 flex items-center gap-2"
+                >
+                  <Check size={16} strokeWidth={2.5} />
+                  <span>Save & Assign</span>
+                </motion.button>
+              </>
+            ) : (
+              <>
+                {/* Notifications */}
+                <button className="relative p-2.5 rounded-xl bg-dash-white-card border border-dash-border-gray text-dash-primary-purple hover:bg-dash-soft-pink transition-all duration-300 hover:scale-105">
+                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-dash-primary-purple animate-pulse" />
+                  <Bell size={18} />
+                </button>
 
-            {/* Create Assessment Button (Primary Purple style) */}
-            {activeTab !== 'create-assessment' && (
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setActiveTab('create-assessment')}
-                className="px-4.5 py-2.5 rounded-xl bg-dash-primary-purple border border-dash-primary-purple text-dash-white-card font-bold text-sm cursor-pointer shadow-md hover:bg-dash-dark-purple hover:border-dash-dark-purple transition-all duration-300 flex items-center gap-2"
-              >
-                <Plus size={16} strokeWidth={2.5} />
-                <span>Create Assessment</span>
-              </motion.button>
+                {/* Create Assessment Button (Primary Purple style) */}
+                {activeTab !== 'create-assessment' && (
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setActiveTab('create-assessment')}
+                    className="px-4.5 py-2.5 rounded-xl bg-dash-primary-purple border border-dash-primary-purple text-dash-white-card font-bold text-sm cursor-pointer shadow-md hover:bg-dash-dark-purple hover:border-dash-dark-purple transition-all duration-300 flex items-center gap-2"
+                  >
+                    <Plus size={16} strokeWidth={2.5} />
+                    <span>Create Assessment</span>
+                  </motion.button>
+                )}
+              </>
             )}
           </div>
         </header>
@@ -1209,6 +1403,7 @@ const RecruiterDashboard = ({ onLogout }) => {
                   Assessment Settings
                 </h3>
 
+
                 {/* Question Configuration */}
                 <div className="flex flex-col gap-3 border-b border-dash-border-gray/25 pb-4">
                   <label className="text-xs font-bold text-dash-light-purple uppercase tracking-wider">
@@ -1405,11 +1600,37 @@ const RecruiterDashboard = ({ onLogout }) => {
 
         {/* 7. PREVIEW QUESTIONS SCREEN */}
         {activeTab === 'preview-questions' && (
+<<<<<<< HEAD
           <QuestionPreviewHub
             generatedQuestions={generatedQuestions}
             setGeneratedQuestions={setGeneratedQuestions}
             showToast={showToast}
           />
+=======
+          <div className="bg-dash-white-card border border-dash-border-gray rounded-[24px] p-6 shadow-sm flex flex-col gap-6">
+            <h3 className="font-outfit font-bold text-base text-dash-dark-purple border-b border-dash-border-gray/25 pb-3">
+              AI Question Preview Pool
+            </h3>
+            {generatedQuestions.length > 0 ? (
+              <div className="space-y-4">
+                {generatedQuestions.map((item, index) => (
+                  <QuestionPreviewRenderer key={item.id} question={item} index={index} />
+                ))}
+              </div>
+            ) : (
+              <div className="p-12 text-center bg-dash-white-card border border-dash-border-gray rounded-[24px]">
+                <AlertCircle className="mx-auto mb-3 text-dash-light-purple animate-pulse" size={32} />
+                <p className="text-sm font-bold text-dash-light-purple">No questions in the preview pool.</p>
+                <button
+                  onClick={() => setActiveTab('create-assessment')}
+                  className="mt-4 px-4.5 py-2.5 rounded-xl bg-dash-primary-purple text-dash-white-card text-xs font-bold hover:bg-dash-dark-purple transition-all shadow-md cursor-pointer"
+                >
+                  Create Assessment
+                </button>
+              </div>
+            )}
+          </div>
+>>>>>>> f07719b0326dd4164ac877a384ded28288d6d98a
         )}
 
         {/* 8. MONITOR ACTIVE SCREEN */}

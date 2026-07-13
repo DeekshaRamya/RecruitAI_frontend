@@ -51,7 +51,7 @@ const RecruiterAnimation = () => {
       />
 
       {/* Fine connection grid lines */}
-      <svg 
+      <svg
         className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-15 z-10"
         viewBox="0 0 500 500"
       >

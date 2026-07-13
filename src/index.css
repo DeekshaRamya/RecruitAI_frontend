@@ -125,14 +125,17 @@
   width: 6px;
   height: 6px;
 }
+
 .dashboard-scrollbar::-webkit-scrollbar-track {
   background: rgba(255, 255, 255, 0.02);
   border-radius: 8px;
 }
+
 .dashboard-scrollbar::-webkit-scrollbar-thumb {
   background: rgba(37, 99, 235, 0.2);
   border-radius: 8px;
 }
+
 .dashboard-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(37, 99, 235, 0.4);
 }
@@ -175,15 +178,25 @@
 
 /* Candidate Dashboard Soft Light Theme matching the request image */
 .candidate-dashboard-theme {
-  --color-dash-primary-purple: #768CB5;
-  --color-dash-dark-purple: #2E3A59;
-  --color-dash-light-purple: #8F9BB3;
-  --color-dash-soft-pink: #F0F3F8;
-  --color-dash-light-blue-bg: #EDF0F5;
+  --color-dash-primary-purple: #1E3A8A;
+  --color-dash-dark-purple: #0F172A;
+  --color-dash-light-purple: #475569;
+  --color-dash-soft-pink: #E2E8F0;
+  --color-dash-light-blue-bg: #F1F5F9;
   --color-dash-white-card: #FFFFFF;
-  --color-dash-success-green: #5FAD97;
-  --color-dash-light-green: #7CB08D;
-  --color-dash-border-gray: #E2E8F0;
-  --color-dash-accent-brown: #E57E88;
+  --color-dash-success-green: #059669;
+  --color-dash-light-green: #10B981;
+  --color-dash-border-gray: #CBD5E1;
+  --color-dash-accent-brown: #B91C1C;
   --color-dash-sidebar-bg: #FFFFFF;
-}
+}
+
+/* Custom highly visible hovers for Candidate Dashboard */
+.candidate-dashboard-theme aside button:hover:not(.sidebar-active-tab) {
+  background-color: rgba(30, 58, 138, 0.1) !important;
+  color: #0F172A !important;
+}
+
+.candidate-dashboard-theme button.bg-dash-primary-purple:hover {
+  background-color: #172554 !important;
+}
