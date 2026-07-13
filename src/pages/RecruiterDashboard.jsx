@@ -29,7 +29,8 @@ import {
   ArrowUpRight,
   FileText,
   Trash2,
-  RefreshCw
+  RefreshCw,
+  Eye
 } from 'lucide-react';
 
 const questionPool = {
@@ -134,12 +135,96 @@ const questionPool = {
 const RecruiterDashboard = ({ onLogout }) => {
   // Candidate dataset state
   const [candidates, setCandidates] = useState([
-    { id: 1, name: 'Sarah Connor', email: 'sarah.c@sky.net', role: 'Senior React Developer', date: '2026-07-08', status: 'Completed', score: 94 },
-    { id: 2, name: 'Alex Mercer', email: 'alex@gentek.org', role: 'Backend Engineer', date: '2026-07-07', status: 'In Progress', score: null },
-    { id: 3, name: 'Diana Prince', email: 'diana.p@themyscira.gov', role: 'Lead Product Designer', date: '2026-07-06', status: 'Under Review', score: 88 },
-    { id: 4, name: 'Bruce Wayne', email: 'bruce@waynecorp.com', role: 'Security Architect', date: '2026-07-05', status: 'Completed', score: 99 },
-    { id: 5, name: 'Peter Parker', email: 'peter@dailybugle.com', role: 'Frontend Engineer', date: '2026-07-04', status: 'Failed', score: 45 },
-    { id: 6, name: 'Clark Kent', email: 'clark.k@dailyplanet.com', role: 'Content Manager', date: '2026-07-03', status: 'Completed', score: 92 },
+    {
+      id: 1,
+      name: 'Sneha Patel',
+      email: 'sneha.patel@recruitai.com',
+      role: 'ML Engineer',
+      date: '2026-07-08',
+      resume: 95,
+      python: 92,
+      sql: 84,
+      aptitude: 88,
+      english: 96,
+      final: 91,
+      recommendation: 'Strong Hire',
+      status: 'Completed'
+    },
+    {
+      id: 2,
+      name: 'Priya Nair',
+      email: 'priya.nair@recruitai.com',
+      role: 'Data Analyst',
+      date: '2026-07-07',
+      resume: 91,
+      python: 88,
+      sql: 76,
+      aptitude: 82,
+      english: 94,
+      final: 87,
+      recommendation: 'Strong Hire',
+      status: 'Completed'
+    },
+    {
+      id: 3,
+      name: 'Arjun Sharma',
+      email: 'arjun.sharma@recruitai.com',
+      role: 'Python Developer',
+      date: '2026-07-06',
+      resume: 84,
+      python: 78,
+      sql: 82,
+      aptitude: 74,
+      english: 88,
+      final: 82,
+      recommendation: 'Strong Hire',
+      status: 'Completed'
+    },
+    {
+      id: 4,
+      name: 'Divya Krishnan',
+      email: 'divya.krishnan@recruitai.com',
+      role: 'Full Stack Developer',
+      date: '2026-07-05',
+      resume: 78,
+      python: 74,
+      sql: 70,
+      aptitude: 68,
+      english: 82,
+      final: 74,
+      recommendation: 'Moderate',
+      status: 'In Progress'
+    },
+    {
+      id: 5,
+      name: 'Rahul Verma',
+      email: 'rahul.verma@recruitai.com',
+      role: 'Backend Engineer',
+      date: '2026-07-04',
+      resume: 72,
+      python: 65,
+      sql: 88,
+      aptitude: 58,
+      english: 72,
+      final: 72,
+      recommendation: 'Moderate',
+      status: 'Completed'
+    },
+    {
+      id: 6,
+      name: 'Karan Mehta',
+      email: 'karan.mehta@recruitai.com',
+      role: 'Data Engineer',
+      date: '2026-07-03',
+      resume: 62,
+      python: 48,
+      sql: 54,
+      aptitude: 44,
+      english: 58,
+      final: 48,
+      recommendation: 'Not Ready',
+      status: 'Completed'
+    }
   ]);
 
   // Sidebar navigation state
@@ -148,7 +233,6 @@ const RecruiterDashboard = ({ onLogout }) => {
 
   // Search, filter, and sort states
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedRole, setSelectedRole] = useState('All Roles');
   const [selectedStatus, setSelectedStatus] = useState('All Statuses');
   const [sortBy, setSortBy] = useState('newest');
 
@@ -452,6 +536,7 @@ const RecruiterDashboard = ({ onLogout }) => {
 
   const [editingQuestionId, setEditingQuestionId] = useState(null);
   const [editingText, setEditingText] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // Dynamic states for active assessments metric count
   const [activeAssessmentsCount, setActiveAssessmentsCount] = useState(18);
@@ -497,7 +582,6 @@ const RecruiterDashboard = ({ onLogout }) => {
   ]);
 
   // Dropdown open states
-  const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
 
   // Statistics data (dynamic active assessments)
@@ -509,7 +593,6 @@ const RecruiterDashboard = ({ onLogout }) => {
   ];
 
   // List of roles and statuses for filters
-  const roles = ['All Roles', ...new Set(candidates.map(c => c.role))];
   const statuses = ['All Statuses', 'Completed', 'In Progress', 'Under Review', 'Failed'];
 
   // Handle Search, Filters, and Sorting
@@ -519,20 +602,19 @@ const RecruiterDashboard = ({ onLogout }) => {
         candidate.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
         candidate.role.toLowerCase().includes(searchQuery.toLowerCase());
 
-      const matchesRole = selectedRole === 'All Roles' || candidate.role === selectedRole;
       const matchesStatus = selectedStatus === 'All Statuses' || candidate.status === selectedStatus;
 
-      return matchesSearch && matchesRole && matchesStatus;
+      return matchesSearch && matchesStatus;
     })
     .sort((a, b) => {
       if (sortBy === 'newest') {
         return new Date(b.date) - new Date(a.date);
       }
       if (sortBy === 'score-high') {
-        return (b.score || 0) - (a.score || 0);
+        return (b.final || 0) - (a.final || 0);
       }
       if (sortBy === 'score-low') {
-        return (a.score || 0) - (b.score || 0);
+        return (a.final || 0) - (b.final || 0);
       }
       return 0;
     });
@@ -559,6 +641,7 @@ const RecruiterDashboard = ({ onLogout }) => {
   const handleGenerateAssessment = async () => {
     const payload = getAssessmentPayload();
     showToast("Generating assessment with AI... Please wait.");
+    setIsGenerating(true);
 
     try {
       const token = localStorage.getItem('token') || '';
@@ -605,6 +688,8 @@ const RecruiterDashboard = ({ onLogout }) => {
       showToast(`Error: ${err.message || err}. Falling back to preview...`);
       // Fallback: proceed to preview screen with existing mock list so user experience is not broken
       setActiveTab('preview-questions');
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -991,48 +1076,7 @@ const RecruiterDashboard = ({ onLogout }) => {
                 {/* Filter Dropdowns */}
                 <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
 
-                  {/* Role Select */}
-                  <div className="relative">
-                    <button
-                      onClick={() => {
-                        setRoleDropdownOpen(!roleDropdownOpen);
-                        setStatusDropdownOpen(false);
-                      }}
-                      className="px-3.5 py-2 rounded-lg bg-dash-white-card border border-dash-border-gray text-xs font-bold text-dash-dark-purple flex items-center gap-2 hover:border-dash-primary-purple transition-all duration-200 cursor-pointer"
-                    >
-                      <span className="text-dash-light-purple font-medium">Role:</span>
-                      <span>{selectedRole}</span>
-                      <SlidersHorizontal size={12} className="text-dash-primary-purple" />
-                    </button>
 
-                    <AnimatePresence>
-                      {roleDropdownOpen && (
-                        <>
-                          <div className="fixed inset-0 z-40" onClick={() => setRoleDropdownOpen(false)} />
-                          <motion.div
-                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                            className="absolute right-0 mt-2 w-48 rounded-xl bg-dash-white-card border border-dash-border-gray shadow-lg z-50 py-1 overflow-hidden"
-                          >
-                            {roles.map((role) => (
-                              <button
-                                key={role}
-                                onClick={() => {
-                                  setSelectedRole(role);
-                                  setRoleDropdownOpen(false);
-                                }}
-                                className="w-full text-left px-4 py-2 text-xs font-bold text-dash-dark-purple hover:bg-dash-soft-pink flex items-center justify-between cursor-pointer border-none"
-                              >
-                                <span>{role}</span>
-                                {selectedRole === role && <Check size={12} className="text-dash-primary-purple" />}
-                              </button>
-                            ))}
-                          </motion.div>
-                        </>
-                      )}
-                    </AnimatePresence>
-                  </div>
 
                   {/* Status Select */}
                   <div className="relative">
@@ -1094,31 +1138,51 @@ const RecruiterDashboard = ({ onLogout }) => {
 
               {/* CANDIDATE LIST DATA TABLE */}
               <div className="flex-1 overflow-x-auto dashboard-scrollbar">
-                <table className="w-full min-w-[700px] border-collapse text-left text-sm">
+                <table className="w-full min-w-[900px] border-collapse text-left text-sm">
                   <thead>
                     <tr className="bg-dash-soft-pink border-b border-dash-border-gray text-[10px] font-extrabold text-dash-dark-purple tracking-widest uppercase">
-                      <th className="px-6 py-4.5">Candidate Info</th>
-                      <th className="px-6 py-4.5">Applied Role</th>
-                      <th className="px-6 py-4.5">Submission Date</th>
-                      <th className="px-6 py-4.5">Assessment Status</th>
-                      <th className="px-6 py-4.5 text-center">Score</th>
-                      <th className="px-6 py-4.5 text-right">Actions</th>
+                      <th className="px-6 py-4.5">Candidate</th>
+                      <th className="px-6 py-4.5">Resume</th>
+                      <th className="px-6 py-4.5">Python</th>
+                      <th className="px-6 py-4.5">SQL</th>
+                      <th className="px-6 py-4.5">Aptitude</th>
+                      <th className="px-6 py-4.5">English</th>
+                      <th className="px-6 py-4.5">Final</th>
+                      <th className="px-6 py-4.5">AI Recommendation</th>
+                      <th className="px-6 py-4.5">Status</th>
+                      <th className="px-6 py-4.5"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-dash-border-gray">
                     <AnimatePresence mode="popLayout">
                       {filteredCandidates.map((candidate) => {
+                        const getScoreColor = (val) => {
+                          if (val >= 80) return '#149470';
+                          if (val >= 60) return '#d97706';
+                          return '#84492D';
+                        };
+
                         let statusColor = '';
                         let statusBg = '';
                         if (candidate.status === 'Completed') {
                           statusColor = '#149470';
                           statusBg = 'rgba(20, 148, 112, 0.1)';
-                        } else if (candidate.status === 'Under Review') {
-                          statusColor = '#7CB08D';
-                          statusBg = 'rgba(124, 176, 141, 0.1)';
                         } else {
-                          statusColor = '#84492D';
-                          statusBg = 'rgba(132, 73, 45, 0.1)';
+                          statusColor = '#5752AA'; // Purple/Blue for In Progress
+                          statusBg = 'rgba(87, 82, 170, 0.1)';
+                        }
+
+                        let recColor = '';
+                        let recPrefix = '';
+                        if (candidate.recommendation === 'Strong Hire') {
+                          recColor = '#149470';
+                          recPrefix = '✓ ';
+                        } else if (candidate.recommendation === 'Moderate') {
+                          recColor = '#d97706';
+                          recPrefix = '~ ';
+                        } else {
+                          recColor = '#84492D';
+                          recPrefix = 'X ';
                         }
 
                         return (
@@ -1131,30 +1195,54 @@ const RecruiterDashboard = ({ onLogout }) => {
                             transition={{ duration: 0.3 }}
                             className="bg-dash-white-card hover:bg-dash-soft-pink transition-colors duration-200 group"
                           >
-                            {/* Name and Email */}
+                            {/* Candidate info (name and role) */}
                             <td className="px-6 py-4">
-                              <div className="flex items-center gap-3">
-                                <div className="w-9 h-9 rounded-full bg-dash-light-blue-bg border border-dash-border-gray flex items-center justify-center text-xs font-semibold text-dash-dark-purple group-hover:border-dash-primary-purple/40 transition-colors duration-250">
-                                  {candidate.name.split(' ').map(n => n[0]).join('')}
-                                </div>
-                                <div>
-                                  <h4 className="text-xs font-bold text-dash-dark-purple group-hover:text-dash-primary-purple transition-colors duration-200">{candidate.name}</h4>
-                                  <span className="text-[10px] text-dash-light-purple">{candidate.email}</span>
-                                </div>
+                              <div>
+                                <h4 className="text-xs font-bold text-dash-dark-purple group-hover:text-dash-primary-purple transition-colors duration-200">
+                                  {candidate.name}
+                                </h4>
+                                <span className="text-[10px] text-dash-light-purple font-medium">
+                                  {candidate.role}
+                                </span>
                               </div>
                             </td>
 
-                            {/* Applied Role */}
-                            <td className="px-6 py-4">
-                              <span className="text-xs font-semibold text-dash-dark-purple">{candidate.role}</span>
+                            {/* Resume score */}
+                            <td className="px-6 py-4 text-xs font-bold" style={{ color: getScoreColor(candidate.resume) }}>
+                              {candidate.resume}%
                             </td>
 
-                            {/* Submission Date */}
-                            <td className="px-6 py-4 text-xs text-dash-light-purple">
-                              {candidate.date}
+                            {/* Python score */}
+                            <td className="px-6 py-4 text-xs font-bold" style={{ color: getScoreColor(candidate.python) }}>
+                              {candidate.python}%
                             </td>
 
-                            {/* Status Badges */}
+                            {/* SQL score */}
+                            <td className="px-6 py-4 text-xs font-bold" style={{ color: getScoreColor(candidate.sql) }}>
+                              {candidate.sql}%
+                            </td>
+
+                            {/* Aptitude score */}
+                            <td className="px-6 py-4 text-xs font-bold" style={{ color: getScoreColor(candidate.aptitude) }}>
+                              {candidate.aptitude}%
+                            </td>
+
+                            {/* English score */}
+                            <td className="px-6 py-4 text-xs font-bold" style={{ color: getScoreColor(candidate.english) }}>
+                              {candidate.english}%
+                            </td>
+
+                            {/* Final score */}
+                            <td className="px-6 py-4 text-xs font-bold" style={{ color: getScoreColor(candidate.final) }}>
+                              {candidate.final}%
+                            </td>
+
+                            {/* AI Recommendation */}
+                            <td className="px-6 py-4 text-xs font-bold" style={{ color: recColor }}>
+                              {recPrefix}{candidate.recommendation}
+                            </td>
+
+                            {/* Status */}
                             <td className="px-6 py-4">
                               <span
                                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase border"
@@ -1172,31 +1260,14 @@ const RecruiterDashboard = ({ onLogout }) => {
                               </span>
                             </td>
 
-                            {/* Assessment Score */}
-                            <td className="px-6 py-4 text-center">
-                              {candidate.score !== null ? (
-                                <span
-                                  className="text-xs font-extrabold px-2.5 py-1 rounded-lg"
-                                  style={{
-                                    color: candidate.score >= 85 ? '#149470' : candidate.score >= 70 ? '#7CB08D' : '#84492D',
-                                    backgroundColor: candidate.score >= 85 ? 'rgba(20, 148, 112, 0.05)' : candidate.score >= 70 ? 'rgba(124, 176, 141, 0.05)' : 'rgba(132, 73, 45, 0.05)'
-                                  }}
-                                >
-                                  {candidate.score}%
-                                </span>
-                              ) : (
-                                <span className="text-xs font-semibold text-dash-light-purple">--</span>
-                              )}
-                            </td>
-
-                            {/* Report Action Button */}
+                            {/* Actions / Report */}
                             <td className="px-6 py-4 text-right">
                               <button
                                 onClick={() => setSelectedCandidate(candidate)}
                                 className="px-3 py-1.5 rounded-lg bg-dash-white-card border border-dash-border-gray hover:border-dash-primary-purple text-dash-primary-purple text-xs font-bold hover:bg-dash-soft-pink transition-all duration-300 flex items-center gap-1.5 ml-auto cursor-pointer"
                               >
-                                <FileText size={13} />
-                                <span>View Report</span>
+                                <Eye size={13} />
+                                <span>Report</span>
                               </button>
                             </td>
                           </motion.tr>
@@ -1546,11 +1617,20 @@ const RecruiterDashboard = ({ onLogout }) => {
 
                 <button
                   onClick={handleGenerateAssessment}
-                  disabled={totalQuestions === 0}
+                  disabled={totalQuestions === 0 || isGenerating}
                   className="w-full mt-3 py-3.5 rounded-xl bg-dash-primary-purple border border-dash-primary-purple text-dash-white-card font-bold text-sm hover:bg-dash-dark-purple hover:border-dash-dark-purple transition-all duration-200 shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Globe size={15} />
-                  <span>Generate with AI</span>
+                  {isGenerating ? (
+                    <>
+                      <RefreshCw className="animate-spin" size={15} />
+                      <span>Generating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Globe size={15} />
+                      <span>Generate with AI</span>
+                    </>
+                  )}
                 </button>
               </div>
 
@@ -1661,10 +1741,10 @@ const RecruiterDashboard = ({ onLogout }) => {
                         <span
                           className="w-1.5 h-1.5 rounded-full"
                           style={{
-                            backgroundColor: selectedCandidate.status === 'Completed' ? '#149470' : selectedCandidate.status === 'Under Review' ? '#7CB08D' : '#84492D'
+                            backgroundColor: selectedCandidate.status === 'Completed' ? '#149470' : '#5752AA'
                           }}
                         />
-                        {selectedCandidate.score !== null ? `${selectedCandidate.score}%` : '--'}
+                        {selectedCandidate.final !== undefined ? `${selectedCandidate.final}%` : '--'}
                       </span>
                     </div>
                   </div>
@@ -1673,40 +1753,29 @@ const RecruiterDashboard = ({ onLogout }) => {
                 {/* Evaluation detailed breakdown values */}
                 <div className="mb-6">
                   <h4 className="text-xs font-bold text-dash-dark-purple tracking-wider uppercase mb-3">Skill breakdown</h4>
-                  {selectedCandidate.score !== null ? (
+                  {selectedCandidate.final !== undefined ? (
                     <div className="space-y-4">
-                      {/* Metric 1 */}
-                      <div>
-                        <div className="flex justify-between text-xs font-medium mb-1.5">
-                          <span className="text-dash-light-purple">React & Frontend Logic</span>
-                          <span className="text-dash-dark-purple font-bold">{selectedCandidate.score - 2}%</span>
+                      {[
+                        { name: 'Resume Match', value: selectedCandidate.resume },
+                        { name: 'Python Score', value: selectedCandidate.python },
+                        { name: 'SQL Score', value: selectedCandidate.sql },
+                        { name: 'Aptitude Score', value: selectedCandidate.aptitude },
+                        { name: 'English Score', value: selectedCandidate.english },
+                        { name: 'Final Score', value: selectedCandidate.final }
+                      ].map((skill) => (
+                        <div key={skill.name}>
+                          <div className="flex justify-between text-xs font-medium mb-1.5">
+                            <span className="text-dash-light-purple">{skill.name}</span>
+                            <span className="text-dash-dark-purple font-bold">{skill.value}%</span>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-dash-soft-pink overflow-hidden">
+                            <div
+                              className="h-full bg-dash-primary-purple rounded-full"
+                              style={{ width: `${skill.value}%` }}
+                            />
+                          </div>
                         </div>
-                        <div className="h-1.5 rounded-full bg-dash-soft-pink overflow-hidden">
-                          <div className="h-full bg-dash-primary-purple rounded-full" style={{ width: `${selectedCandidate.score - 2}%` }} />
-                        </div>
-                      </div>
-
-                      {/* Metric 2 */}
-                      <div>
-                        <div className="flex justify-between text-xs font-medium mb-1.5">
-                          <span className="text-dash-light-purple">System Design</span>
-                          <span className="text-dash-dark-purple font-bold">{selectedCandidate.score + 1}%</span>
-                        </div>
-                        <div className="h-1.5 rounded-full bg-dash-soft-pink overflow-hidden">
-                          <div className="h-full bg-dash-primary-purple rounded-full" style={{ width: `${selectedCandidate.score + 1}%` }} />
-                        </div>
-                      </div>
-
-                      {/* Metric 3 */}
-                      <div>
-                        <div className="flex justify-between text-xs font-medium mb-1.5">
-                          <span className="text-dash-light-purple">Problem Solving</span>
-                          <span className="text-dash-dark-purple font-bold">{selectedCandidate.score - 8}%</span>
-                        </div>
-                        <div className="h-1.5 rounded-full bg-dash-soft-pink overflow-hidden">
-                          <div className="h-full bg-dash-primary-purple rounded-full" style={{ width: `${selectedCandidate.score - 8}%` }} />
-                        </div>
-                      </div>
+                      ))}
                     </div>
                   ) : (
                     <div className="p-5 text-center bg-dash-light-blue-bg/30 border border-dash-border-gray rounded-xl">
@@ -1719,15 +1788,15 @@ const RecruiterDashboard = ({ onLogout }) => {
                 </div>
 
                 {/* AI Recommendation Feedback */}
-                {selectedCandidate.score !== null && (
+                {selectedCandidate.final !== undefined && (
                   <div className="bg-dash-soft-pink border border-dash-border-gray rounded-xl p-4">
                     <h5 className="text-[10px] text-dash-primary-purple font-bold uppercase tracking-wider mb-1">AI Recommendation Feedback</h5>
                     <p className="text-xs text-dash-dark-purple leading-relaxed">
-                      {selectedCandidate.score >= 90
-                        ? "Exceptional candidate. Outperformed in logic reasoning, optimization efficiency, and system scalability. Strongly suggest scheduling panel interviews immediately."
-                        : selectedCandidate.score >= 75
-                          ? "Strong performance. Demonstrated clear knowledge of frontend development concepts with average optimization skills. Recommend moving to technical round."
-                          : "Candidate did not pass the required baseline performance standards. Scores were low in algorithmic solving speed."}
+                      {selectedCandidate.recommendation === 'Strong Hire'
+                        ? "Exceptional candidate. Outperformed in logic reasoning, Python, SQL, Aptitude and English sections. Strongly suggest scheduling panel interviews immediately."
+                        : selectedCandidate.recommendation === 'Moderate'
+                          ? "Moderate performance. Demonstrated average capacity across evaluation sections. Recommend moving to follow-up technical review round."
+                          : "Candidate did not meet standard benchmark requirements. Performance in several sections remains below baseline."}
                     </p>
                   </div>
                 )}
@@ -1738,7 +1807,7 @@ const RecruiterDashboard = ({ onLogout }) => {
               <div className="pt-5 border-t border-dash-border-gray flex gap-3 mt-8">
                 <button
                   onClick={() => showToast(`Report for ${selectedCandidate.name} downloaded successfully!`)}
-                  disabled={selectedCandidate.score === null}
+                  disabled={selectedCandidate.final === undefined}
                   className="flex-1 py-3 rounded-2xl border border-dash-border-gray hover:bg-dash-soft-pink text-dash-primary-purple font-bold text-xs transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
                 >
                   <Download size={14} />
