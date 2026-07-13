@@ -27,7 +27,17 @@ import {
   Edit2,
   Lock,
   ArrowUpRight,
-  FileText
+  FileText,
+  Sparkles,
+  Trash2,
+  Save,
+  Copy,
+  Terminal,
+  HelpCircle,
+  CheckCircle,
+  Edit3,
+  Play,
+  BookOpen
 } from 'lucide-react';
 
 const RecruiterDashboard = ({ onLogout }) => {
@@ -316,39 +326,66 @@ const RecruiterDashboard = ({ onLogout }) => {
   const [generatedQuestions, setGeneratedQuestions] = useState([
     {
       id: 1,
+      type: 'SCENARIO_CODING',
       subject: 'Python',
-      topic: 'Generators & Decorators',
+      topic: 'Functions & Strings',
       difficulty: 'Medium',
-      type: 'MCQ',
-      question: 'Which keyword is used to define a generator function in Python?',
-      options: ['return', 'yield', 'async', 'lambda'],
-      correctAnswer: 'yield'
+      estimatedTime: '15 Minutes',
+      question: 'Write a Python function that checks whether a given string is a palindrome without using Python\'s built-in reverse methods.',
+      problemStatement: 'Write a Python function that checks whether a given string is a palindrome without using Python\'s built-in reverse methods.',
+      exampleInput: 'madam',
+      exampleOutput: 'True',
+      constraints: ['Length <= 1000', 'Ignore Case', 'Ignore Spaces'],
+      expectedAnswer: 'def is_palindrome(text):\n    cleaned = text.replace(" ","").lower()\n    return cleaned == cleaned[::-1]',
+      explanation: 'The input string is first converted into lowercase and spaces are removed. The cleaned string is then compared with its reversed version.',
+      isSaved: false
     },
     {
       id: 2,
-      subject: 'Python',
-      topic: 'Exception Handling',
-      difficulty: 'Medium',
-      type: 'SCENARIO',
-      scenario: 'A developer wants to read a file that may not exist. The application should handle this gracefully without crashing and log a warning.',
-      question: 'Which approach is the best?',
-      options: [
-        'Ignore the error',
-        'Use try-except',
-        'Use continue',
-        'Restart the application'
-      ],
-      correctAnswer: 'Use try-except'
+      type: 'SCENARIO_CODING',
+      subject: 'SQL',
+      topic: 'Window Functions & Subqueries',
+      difficulty: 'Hard',
+      estimatedTime: '20 Minutes',
+      question: 'Find the second highest salary from an Employee table without using the LIMIT clause.',
+      problemStatement: 'Write an SQL query to find the second highest salary from the Employee table. If there is no second highest salary, the query should return NULL. Do not use the LIMIT or OFFSET clauses.',
+      exampleInput: 'Employee Table:\n+----+--------+\n| Id | Salary |\n+----+--------+\n| 1  | 100    |\n| 2  | 200    |\n| 3  | 300    |\n+----+--------+',
+      exampleOutput: '+---------------------+\n| SecondHighestSalary |\n+---------------------+\n| 200                 |\n+---------------------+',
+      constraints: ['Do not use LIMIT', 'Do not use OFFSET', 'Handle duplicates gracefully', 'Return NULL if no second highest exists'],
+      expectedAnswer: 'SELECT MAX(Salary) AS SecondHighestSalary\nFROM Employee\nWHERE Salary < (SELECT MAX(Salary) FROM Employee);',
+      explanation: 'The subquery finds the maximum salary in the Employee table. The outer query then finds the maximum salary that is strictly less than the absolute maximum salary, effectively yielding the second highest salary.',
+      isSaved: false
     },
     {
       id: 3,
-      subject: 'SQL',
-      topic: 'JOINs',
-      difficulty: 'Medium',
       type: 'MCQ',
-      question: 'Which SQL join returns all rows from the left table, and the matched rows from the right table?',
-      options: ['INNER JOIN', 'LEFT JOIN', 'RIGHT JOIN', 'FULL OUTER JOIN'],
-      correctAnswer: 'LEFT JOIN'
+      subject: 'Python',
+      topic: 'Generators & Decorators',
+      difficulty: 'Medium',
+      estimatedTime: '5 Minutes',
+      question: 'Which keyword is used to define a generator function in Python?',
+      options: ['return', 'yield', 'async', 'lambda'],
+      correctAnswer: 'yield',
+      explanation: 'The yield keyword is used to return a value from a generator function, pausing its execution and maintaining its local state.',
+      isSaved: false
+    },
+    {
+      id: 4,
+      type: 'MCQ',
+      subject: 'Python',
+      topic: 'Exception Handling',
+      difficulty: 'Easy',
+      estimatedTime: '5 Minutes',
+      question: 'A developer wants to read a file that may not exist. The application should handle this gracefully without crashing and log a warning. Which approach is the best?',
+      options: [
+        'Ignore the error',
+        'Use try-except block to catch FileNotFoundError',
+        'Use a while loop to check continuously',
+        'Restart the application when error occurs'
+      ],
+      correctAnswer: 'Use try-except block to catch FileNotFoundError',
+      explanation: 'Using try-except allows the application to intercept specific exceptions like FileNotFoundError, handle them (e.g., logging a warning), and resume normal execution.',
+      isSaved: false
     }
   ]);
 
@@ -1368,16 +1405,11 @@ const RecruiterDashboard = ({ onLogout }) => {
 
         {/* 7. PREVIEW QUESTIONS SCREEN */}
         {activeTab === 'preview-questions' && (
-          <div className="bg-dash-white-card border border-dash-border-gray rounded-[24px] p-6 shadow-sm flex flex-col gap-6">
-            <h3 className="font-outfit font-bold text-base text-dash-dark-purple border-b border-dash-border-gray/25 pb-3">
-              AI Question Preview Pool
-            </h3>
-            <div className="space-y-4">
-              {generatedQuestions.map((item, index) => (
-                <QuestionPreviewRenderer key={item.id} question={item} index={index} />
-              ))}
-            </div>
-          </div>
+          <QuestionPreviewHub
+            generatedQuestions={generatedQuestions}
+            setGeneratedQuestions={setGeneratedQuestions}
+            showToast={showToast}
+          />
         )}
 
         {/* 8. MONITOR ACTIVE SCREEN */}
@@ -1562,185 +1594,853 @@ const RecruiterDashboard = ({ onLogout }) => {
   );
 };
 
-// Scalable Question Preview Components
-const MCQQuestionPreview = ({ question, index }) => {
-  const optionLabels = ['A', 'B', 'C', 'D'];
+// Scalable Interactive Question Preview components
+const SyntaxHighlighter = ({ code, language }) => {
+  if (!code) return null;
+  const lang = (language || 'python').toLowerCase();
+  
+  if (lang === 'python') {
+    const combinedRegex = new RegExp(
+      `(?<comment>#.*)|(?<string>"(?:\\\\.|[^"\\\\])*"|'(?:\\\\.|[^'\\\\])*')|(?<keyword>\\b(?:def|return|if|else|elif|for|in|while|import|from|as|try|except|finally|with|class|pass|and|or|not|is|None|True|False)\\b)|(?<func>\\b(?:print|len|range|str|int|float|list|dict|set|tuple|type|replace|lower|upper|strip|split|join|append)\\b)|(?<number>\\b\\d+\\b)|(?<other>[\\s\\S])`,
+      'g'
+    );
+    
+    const tokens = [];
+    let match;
+    while ((match = combinedRegex.exec(code)) !== null) {
+      const groups = match.groups;
+      if (groups.comment) {
+        tokens.push(<span key={match.index} className="text-[#94a3b8] italic">{groups.comment}</span>);
+      } else if (groups.string) {
+        tokens.push(<span key={match.index} className="text-[#10b981] font-medium">{groups.string}</span>);
+      } else if (groups.keyword) {
+        tokens.push(<span key={match.index} className="text-[#8b5cf6] font-bold">{groups.keyword}</span>);
+      } else if (groups.func) {
+        tokens.push(<span key={match.index} className="text-[#3b82f6] font-semibold">{groups.func}</span>);
+      } else if (groups.number) {
+        tokens.push(<span key={match.index} className="text-[#f59e0b] font-medium">{groups.number}</span>);
+      } else {
+        tokens.push(groups.other);
+      }
+    }
+    return <pre className="font-mono text-xs leading-relaxed overflow-x-auto whitespace-pre-wrap text-[#0f172a]">{tokens}</pre>;
+  }
+
+  if (lang === 'sql') {
+    const combinedRegex = new RegExp(
+      `(?<comment>--.*)|(?<string>'(?:\\\\.|[^'\\\\])*')|(?<keyword>\\b(?:SELECT|FROM|WHERE|GROUP\\s+BY|HAVING|ORDER\\s+BY|JOIN|LEFT|RIGHT|INNER|OUTER|ON|AND|OR|NOT|AS|IN|LIKE|IS|NULL|LIMIT|OFFSET)\\b)|(?<func>\\b(?:COUNT|SUM|AVG|MIN|MAX|COALESCE|CONCAT|NOW|DATE|ROW_NUMBER|DENSE_RANK)\\b)|(?<number>\\b\\d+\\b)|(?<other>[\\s\\S])`,
+      'gi'
+    );
+    
+    const tokens = [];
+    let match;
+    while ((match = combinedRegex.exec(code)) !== null) {
+      const groups = match.groups;
+      if (groups.comment) {
+        tokens.push(<span key={match.index} className="text-[#94a3b8] italic">{groups.comment}</span>);
+      } else if (groups.string) {
+        tokens.push(<span key={match.index} className="text-[#10b981] font-medium">{groups.string}</span>);
+      } else if (groups.keyword) {
+        tokens.push(<span key={match.index} className="text-[#2563eb] font-bold uppercase">{groups.keyword}</span>);
+      } else if (groups.func) {
+        tokens.push(<span key={match.index} className="text-[#8b5cf6] font-semibold uppercase">{groups.func}</span>);
+      } else if (groups.number) {
+        tokens.push(<span key={match.index} className="text-[#f59e0b] font-medium">{groups.number}</span>);
+      } else {
+        tokens.push(groups.other);
+      }
+    }
+    return <pre className="font-mono text-xs leading-relaxed overflow-x-auto whitespace-pre-wrap text-[#0f172a]">{tokens}</pre>;
+  }
+
+  return <pre className="font-mono text-xs leading-relaxed overflow-x-auto whitespace-pre-wrap text-[#0f172a]">{code}</pre>;
+};
+
+const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToast }) => {
+  const [selectedId, setSelectedId] = useState(generatedQuestions[0]?.id || null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [copiedId, setCopiedId] = useState(null);
+
+  // Edit form state
+  const [editForm, setEditForm] = useState({
+    subject: '',
+    topic: '',
+    difficulty: '',
+    estimatedTime: '',
+    problemStatement: '',
+    exampleInput: '',
+    exampleOutput: '',
+    constraints: '',
+    expectedAnswer: '',
+    explanation: '',
+    question: '', 
+    options: '', 
+    correctAnswer: '' 
+  });
+
+  const selectedQuestion = generatedQuestions.find(q => q.id === selectedId);
+
+  // Sync edit form when selected question changes
+  React.useEffect(() => {
+    if (selectedQuestion) {
+      const isCoding = selectedQuestion.type?.includes('CODING') || selectedQuestion.type === 'SCENARIO_CODING';
+      setEditForm({
+        subject: selectedQuestion.subject || '',
+        topic: selectedQuestion.topic || '',
+        difficulty: selectedQuestion.difficulty || 'Medium',
+        estimatedTime: selectedQuestion.estimatedTime || (isCoding ? '15 Minutes' : '5 Minutes'),
+        problemStatement: selectedQuestion.problemStatement || selectedQuestion.question || selectedQuestion.scenario || '',
+        exampleInput: selectedQuestion.exampleInput || '',
+        exampleOutput: selectedQuestion.exampleOutput || '',
+        constraints: selectedQuestion.constraints ? selectedQuestion.constraints.join(', ') : '',
+        expectedAnswer: selectedQuestion.expectedAnswer || selectedQuestion.correctAnswer || '',
+        explanation: selectedQuestion.explanation || '',
+        question: selectedQuestion.question || '',
+        options: selectedQuestion.options ? selectedQuestion.options.join(', ') : '',
+        correctAnswer: selectedQuestion.correctAnswer || ''
+      });
+      setIsEditing(false);
+    }
+  }, [selectedId, selectedQuestion]);
+
+  const handleCopyCode = (code, id) => {
+    navigator.clipboard.writeText(code);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+    showToast("Code copied to clipboard!");
+  };
+
+  const handleDifficultyChange = (qId, newDiff) => {
+    setGeneratedQuestions(prev => prev.map(q => q.id === qId ? { ...q, difficulty: newDiff } : q));
+    showToast(`Updated difficulty to ${newDiff}`);
+  };
+
+  const handleSaveQuestionToggle = (qId) => {
+    setGeneratedQuestions(prev => prev.map(q => {
+      if (q.id === qId) {
+        const nextSaved = !q.isSaved;
+        showToast(nextSaved ? "Question saved to assessment pool!" : "Question removed from saved pool.");
+        return { ...q, isSaved: nextSaved };
+      }
+      return q;
+    }));
+  };
+
+  const handleDeleteQuestion = (qId) => {
+    const confirmDelete = window.confirm("Are you sure you want to delete this question?");
+    if (!confirmDelete) return;
+
+    const remaining = generatedQuestions.filter(q => q.id !== qId);
+    setGeneratedQuestions(remaining);
+    showToast("Question deleted from pool.");
+
+    // Select another question
+    if (remaining.length > 0) {
+      setSelectedId(remaining[0].id);
+    } else {
+      setSelectedId(null);
+    }
+  };
+
+  // Simulates AI regeneration of the question
+  const handleRegenerateQuestion = (qId) => {
+    setIsGenerating(true);
+    showToast("Generating alternative scenario with AI...");
+    
+    setTimeout(() => {
+      setIsGenerating(false);
+      setGeneratedQuestions(prev => prev.map(q => {
+        if (q.id === qId) {
+          if (q.type?.includes('CODING') || q.type === 'SCENARIO_CODING') {
+            if (q.subject === 'Python') {
+              return {
+                ...q,
+                question: 'Write a Python function to find the length of the longest substring without repeating characters.',
+                problemStatement: 'Write a Python function to find the length of the longest substring without repeating characters.',
+                exampleInput: 'abcabcbb',
+                exampleOutput: '3',
+                constraints: ['Length <= 5 * 10^4', 'ASCII characters only', 'Time complexity O(N)'],
+                expectedAnswer: 'def length_of_longest_substring(s):\n    char_map = {}\n    max_len = start = 0\n    for idx, char in enumerate(s):\n        if char in char_map and char_map[char] >= start:\n            start = char_map[char] + 1\n        char_map[char] = idx\n        max_len = max(max_len, idx - start + 1)\n    return max_len',
+                explanation: 'A sliding window approach is used. The start pointer is moved to one position past the last occurrence of the duplicate character when a duplicate is found in the current window.',
+                difficulty: 'Hard',
+                estimatedTime: '20 Minutes'
+              };
+            } else {
+              // SQL
+              return {
+                ...q,
+                question: 'Write an SQL query to find employees who have the highest salary in each of the departments.',
+                problemStatement: 'Write an SQL query to find employees who have the highest salary in each of the departments. Return the Department, Employee name, and Salary.',
+                exampleInput: 'Employee Table:\n+----+-------+--------+--------------+\n| Id | Name  | Salary | DepartmentId |\n+----+-------+--------+--------------+\n| 1  | Joe   | 70000  | 1            |\n| 2  | Jim   | 90000  | 1            |\n| 3  | Henry | 80000  | 2            |\n| 4  | Sam   | 60000  | 2            |\n+----+-------+--------+--------------+\n\nDepartment Table:\n+----+-------+\n| Id | Name  |\n+----+-------+\n| 1  | IT    |\n| 2  | Sales |\n+----+-------+',
+                exampleOutput: '+------------+----------+--------+\n| Department | Employee | Salary |\n+------------+----------+--------+\n| IT         | Jim      | 90000  |\n| Sales      | Henry    | 80000  |\n+------------+----------+--------+',
+                constraints: ['Handle department empty cases', 'Include multiple employees if salaries tie'],
+                expectedAnswer: 'SELECT d.Name AS Department, e.Name AS Employee, e.Salary\nFROM Employee e\nJOIN Department d ON e.DepartmentId = d.Id\nWHERE (e.DepartmentId, e.Salary) IN (\n    SELECT DepartmentId, MAX(Salary)\n    FROM Employee\n    GROUP BY DepartmentId\n);',
+                explanation: 'The query joins the Employee and Department tables. It filters rows where the employee\'s department and salary match the department maximum salary computed in the subquery.',
+                difficulty: 'Medium',
+                estimatedTime: '15 Minutes'
+              };
+            }
+          } else {
+            // MCQ
+            return {
+              ...q,
+              question: 'Which of the following is correct about Python decorators?',
+              options: [
+                'Decorators are function modifiers that alter a function dynamically',
+                'Decorators must always return the input function unmodified',
+                'Decorators can only be applied to class methods, not plain functions',
+                'Decorators are executed every time the decorated function is called'
+              ],
+              correctAnswer: 'Decorators are function modifiers that alter a function dynamically',
+              explanation: 'Decorators allow wrapping another function to extend the behavior of the wrapped function without permanently modifying it.',
+              difficulty: 'Hard'
+            };
+          }
+        }
+        return q;
+      }));
+      showToast("Question successfully regenerated with alternative AI scenario!");
+    }, 1200);
+  };
+
+  const handleSaveChanges = (e) => {
+    e.preventDefault();
+    setGeneratedQuestions(prev => prev.map(q => {
+      if (q.id === selectedId) {
+        const isCoding = q.type?.includes('CODING') || q.type === 'SCENARIO_CODING';
+        return {
+          ...q,
+          subject: editForm.subject,
+          topic: editForm.topic,
+          difficulty: editForm.difficulty,
+          estimatedTime: editForm.estimatedTime,
+          question: isCoding ? editForm.problemStatement : editForm.question,
+          problemStatement: editForm.problemStatement,
+          exampleInput: editForm.exampleInput,
+          exampleOutput: editForm.exampleOutput,
+          constraints: editForm.constraints ? editForm.constraints.split(',').map(s => s.trim()).filter(Boolean) : [],
+          expectedAnswer: editForm.expectedAnswer,
+          explanation: editForm.explanation,
+          options: editForm.options ? editForm.options.split(',').map(s => s.trim()).filter(Boolean) : [],
+          correctAnswer: editForm.correctAnswer
+        };
+      }
+      return q;
+    }));
+    setIsEditing(false);
+    showToast("Changes saved successfully!");
+  };
+
+  const filteredQuestions = generatedQuestions.filter(q => {
+    const query = searchQuery.toLowerCase();
+    const qText = (q.question || q.problemStatement || '').toLowerCase();
+    const qSub = (q.subject || '').toLowerCase();
+    const qTopic = (q.topic || '').toLowerCase();
+    return qText.includes(query) || qSub.includes(query) || qTopic.includes(query);
+  });
+
   return (
-    <div className="p-4 rounded-xl bg-dash-light-blue-bg/40 border border-dash-border-gray/20 flex flex-col gap-3 hover:bg-dash-soft-pink transition-colors">
-      {/* Header Info */}
-      <div className="flex items-center justify-between border-b border-dash-border-gray/15 pb-2">
-        <div className="flex items-center gap-2.5">
-          <span className="font-outfit font-extrabold text-xs text-dash-dark-purple">
-            Q{index + 1}
-          </span>
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch w-full">
+      {/* LEFT PANEL: QUESTION LIST POOL */}
+      <div className="lg:col-span-4 bg-dash-white-card border border-dash-border-gray rounded-[24px] p-5 shadow-[0_4px_20px_rgba(87,82,170,0.02)] flex flex-col gap-4 min-h-[450px] lg:h-[720px]">
+        <div className="flex items-center justify-between border-b border-dash-border-gray/25 pb-3">
           <div className="flex items-center gap-2">
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-dash-primary-purple/10 text-dash-primary-purple border border-dash-primary-purple/20">
-              {question.subject}
-            </span>
-            <span className="text-[9px] font-bold text-dash-light-purple">
-              {question.topic}
-            </span>
+            <div className="w-2 h-2 rounded-full bg-dash-primary-purple animate-pulse" />
+            <h3 className="font-outfit font-extrabold text-sm text-dash-dark-purple uppercase tracking-wider">
+              AI Question Pool
+            </h3>
           </div>
+          <span className="text-xs font-bold text-dash-primary-purple bg-dash-primary-purple/10 px-2.5 py-0.5 rounded-full border border-dash-primary-purple/10">
+            {generatedQuestions.length} Questions
+          </span>
         </div>
-        <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-dash-success-green/10 text-dash-success-green border border-dash-success-green/20">
-          {question.difficulty}
-        </span>
-      </div>
 
-      {/* Question Text */}
-      <p className="text-[11px] font-bold text-dash-dark-purple leading-relaxed">
-        {question.question || question.q}
-      </p>
+        {/* Search Question Bar */}
+        <div className="relative group">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-dash-light-purple transition-colors duration-300 group-focus-within:text-dash-primary-purple" size={14} />
+          <input
+            type="text"
+            placeholder="Search question pool..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 pl-9 pr-4 text-xs font-semibold text-dash-dark-purple placeholder-dash-light-purple/60 focus:outline-none focus:border-dash-primary-purple focus:ring-2 focus:ring-dash-primary-purple/5 transition-all"
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-dash-light-purple hover:text-dash-dark-purple">
+              <X size={12} />
+            </button>
+          )}
+        </div>
 
-      {/* Options Grid */}
-      {question.options && question.options.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-0.5">
-          {question.options.map((option, idx) => {
-            const isCorrect = option === question.correctAnswer;
-            const label = optionLabels[idx] || '';
+        {/* Question List container */}
+        <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 dashboard-scrollbar">
+          {filteredQuestions.map((q, idx) => {
+            const isSelected = q.id === selectedId;
+            const actualIndex = generatedQuestions.findIndex(item => item.id === q.id) + 1;
+            const isCoding = q.type?.includes('CODING') || q.type === 'SCENARIO_CODING';
+            
+            let diffColor = 'text-green-600 bg-green-50 border-green-200/50';
+            if (q.difficulty === 'Medium') diffColor = 'text-amber-600 bg-amber-50 border-amber-200/50';
+            else if (q.difficulty === 'Hard') diffColor = 'text-rose-600 bg-rose-50 border-rose-200/50';
+
             return (
               <div
-                key={idx}
-                className={`py-2 px-3 rounded-lg border flex items-center gap-2.5 transition-all ${
-                  isCorrect
-                    ? 'border-dash-success-green bg-dash-success-green/5 text-dash-success-green font-bold'
-                    : 'border-dash-border-gray/40 bg-dash-white-card/85 text-dash-dark-purple'
+                key={q.id}
+                onClick={() => setSelectedId(q.id)}
+                className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all duration-300 group ${
+                  isSelected
+                    ? 'border-dash-primary-purple bg-dash-soft-pink shadow-[0_4px_12px_rgba(87,82,170,0.06)]'
+                    : 'border-dash-border-gray/60 bg-dash-white-card hover:bg-dash-soft-pink/50 hover:border-dash-primary-purple/30'
                 }`}
               >
-                {isCorrect ? (
-                  <Check size={12} className="text-dash-success-green shrink-0" strokeWidth={3} />
-                ) : (
-                  <div className="w-3 h-3 rounded-full border border-dash-light-purple/60 shrink-0" />
-                )}
-                <span className="text-[11px] font-medium">
-                  {label}. {option}
-                </span>
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <span className={`text-[10px] font-extrabold font-outfit uppercase tracking-wider ${isSelected ? 'text-dash-primary-purple' : 'text-dash-light-purple'}`}>
+                    {isCoding ? 'Scenario Coding' : 'MCQ'} #{actualIndex}
+                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md border ${diffColor}`}>
+                      {q.difficulty}
+                    </span>
+                    {q.isSaved && (
+                      <CheckCircle className="w-3.5 h-3.5 text-dash-success-green" fill="currentColor" stroke="white" strokeWidth={2.5} />
+                    )}
+                  </div>
+                </div>
+
+                <h4 className={`text-xs font-bold leading-snug line-clamp-2 ${isSelected ? 'text-dash-dark-purple' : 'text-dash-dark-purple/80 group-hover:text-dash-primary-purple'} transition-colors`}>
+                  {q.question || q.problemStatement}
+                </h4>
+
+                <div className="flex items-center gap-2 mt-3 text-[10px] font-bold text-dash-light-purple">
+                  <span className="px-1.5 py-0.5 rounded bg-dash-light-blue-bg border border-dash-border-gray/30 text-dash-dark-purple/70">
+                    {q.subject}
+                  </span>
+                  <span className="truncate">
+                    {q.topic}
+                  </span>
+                </div>
               </div>
             );
           })}
-        </div>
-      )}
 
-      {/* Correct Answer Display */}
-      {question.correctAnswer && (
-        <div className="mt-1 pt-2 border-t border-dash-border-gray/15 flex flex-col gap-1">
-          <span className="text-[9px] font-extrabold text-dash-light-purple uppercase tracking-wider">
-            Correct Answer
-          </span>
-          <div className="flex items-center gap-1.5 text-[11px] font-bold text-dash-success-green">
-            <Check size={12} strokeWidth={3} className="text-dash-success-green" />
-            <span>
-              {optionLabels[question.options.indexOf(question.correctAnswer)] || ''}. {question.correctAnswer}
-            </span>
-          </div>
+          {filteredQuestions.length === 0 && (
+            <div className="py-12 text-center text-xs text-dash-light-purple font-medium flex flex-col items-center justify-center gap-2">
+              <HelpCircle size={28} className="text-dash-light-purple/60" />
+              <span>No questions found matching criteria.</span>
+            </div>
+          )}
         </div>
-      )}
+      </div>
+
+      {/* RIGHT PANEL: SCENARIO-BASED PREVIEW CARD / EDIT INTERFACE */}
+      <div className="lg:col-span-8 bg-dash-white-card border border-dash-border-gray rounded-[24px] p-6 shadow-[0_4px_20px_rgba(87,82,170,0.02)] flex flex-col min-h-[500px] lg:h-[720px] overflow-y-auto">
+        {!selectedQuestion ? (
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
+            <div className="w-16 h-16 rounded-full bg-dash-light-blue-bg flex items-center justify-center text-dash-primary-purple mb-4">
+              <Sparkles size={32} className="animate-pulse" />
+            </div>
+            <h3 className="font-plus-jakarta font-extrabold text-base text-dash-dark-purple">
+              No Question Selected
+            </h3>
+            <p className="text-xs text-dash-light-purple font-medium mt-1.5 max-w-xs">
+              Select an AI generated question from the pool on the left to preview and customize it.
+            </p>
+          </div>
+        ) : isEditing ? (
+          /* EDIT MODE FORM */
+          <form onSubmit={handleSaveChanges} className="flex-1 flex flex-col justify-between gap-5">
+            <div className="space-y-4">
+              {/* Edit Header */}
+              <div className="flex items-center justify-between border-b border-dash-border-gray/25 pb-3">
+                <div>
+                  <span className="text-[10px] text-dash-primary-purple font-extrabold tracking-wider uppercase">Editing Mode</span>
+                  <h3 className="font-outfit font-bold text-base text-dash-dark-purple mt-0.5">
+                    Customize Question #{generatedQuestions.findIndex(q => q.id === selectedId) + 1}
+                  </h3>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing(false)}
+                    className="px-3.5 py-1.5 rounded-xl border border-dash-border-gray text-xs font-bold text-dash-dark-purple hover:bg-dash-soft-pink transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-3.5 py-1.5 rounded-xl bg-dash-primary-purple text-dash-white-card text-xs font-bold hover:bg-dash-dark-purple transition-colors cursor-pointer shadow-sm"
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </div>
+
+              {/* Form inputs grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Category (Subject)</label>
+                  <input
+                    type="text"
+                    value={editForm.subject}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, subject: e.target.value }))}
+                    className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Topic</label>
+                  <input
+                    type="text"
+                    value={editForm.topic}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, topic: e.target.value }))}
+                    className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Difficulty</label>
+                  <select
+                    value={editForm.difficulty}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, difficulty: e.target.value }))}
+                    className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-bold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple"
+                  >
+                    <option value="Easy">Easy</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Hard">Hard</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Estimated Time</label>
+                  <input
+                    type="text"
+                    value={editForm.estimatedTime}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, estimatedTime: e.target.value }))}
+                    className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
+                    placeholder="e.g. 15 Minutes"
+                  />
+                </div>
+              </div>
+
+              {/* Problem statement / Question block */}
+              <div>
+                <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Problem Statement / Question Context</label>
+                <textarea
+                  rows="3"
+                  value={editForm.problemStatement}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, problemStatement: e.target.value, question: e.target.value }))}
+                  className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10 resize-y"
+                  required
+                />
+              </div>
+
+              {/* Conditional options for MCQ vs Coding */}
+              {!(selectedQuestion.type?.includes('CODING') || selectedQuestion.type === 'SCENARIO_CODING') ? (
+                /* MCQ EDIT FIELDS */
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Options (comma-separated list)</label>
+                    <input
+                      type="text"
+                      value={editForm.options}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, options: e.target.value }))}
+                      className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
+                      placeholder="yield, return, async, lambda"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Correct Answer</label>
+                    <input
+                      type="text"
+                      value={editForm.correctAnswer}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, correctAnswer: e.target.value }))}
+                      className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
+                      required
+                    />
+                  </div>
+                </div>
+              ) : (
+                /* CODING SCENARIO EDIT FIELDS */
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Example Input</label>
+                      <input
+                        type="text"
+                        value={editForm.exampleInput}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, exampleInput: e.target.value }))}
+                        className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
+                        placeholder="e.g. madam"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Example Output</label>
+                      <input
+                        type="text"
+                        value={editForm.exampleOutput}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, exampleOutput: e.target.value }))}
+                        className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
+                        placeholder="e.g. True"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Constraints (comma-separated list)</label>
+                    <input
+                      type="text"
+                      value={editForm.constraints}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, constraints: e.target.value }))}
+                      className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
+                      placeholder="e.g. Length <=1000, Ignore Case, Ignore Spaces"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Expected Answer (Code)</label>
+                    <textarea
+                      rows="3"
+                      value={editForm.expectedAnswer}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, expectedAnswer: e.target.value }))}
+                      className="w-full bg-[#fafafc] border border-dash-border-gray rounded-xl py-2.5 px-4 text-xs font-mono text-[#0f172a] focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10 resize-y"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Explanation */}
+              <div>
+                <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Explanation</label>
+                <textarea
+                  rows="2"
+                  value={editForm.explanation}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, explanation: e.target.value }))}
+                  className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10 resize-y"
+                />
+              </div>
+            </div>
+
+            {/* Bottom edit buttons */}
+            <div className="flex items-center gap-3 border-t border-dash-border-gray/25 pt-4 mt-2">
+              <button
+                type="button"
+                onClick={() => setIsEditing(false)}
+                className="flex-1 py-3 rounded-xl border border-dash-border-gray text-xs font-bold text-dash-dark-purple hover:bg-dash-soft-pink transition-colors cursor-pointer"
+              >
+                Discard Changes
+              </button>
+              <button
+                type="submit"
+                className="flex-1 py-3 rounded-xl bg-dash-primary-purple text-dash-white-card text-xs font-bold hover:bg-dash-dark-purple transition-colors cursor-pointer shadow-[0_4px_12px_rgba(87,82,170,0.15)]"
+              >
+                Save Question Changes
+              </button>
+            </div>
+          </form>
+        ) : (
+          /* HIGH-FIDELITY PREVIEW CARD VIEW */
+          <div className="flex-1 flex flex-col justify-between">
+            <div className="space-y-5.5 relative">
+              {/* Loader overlay for Simulated AI Regeneration */}
+              {isGenerating && (
+                <div className="absolute inset-0 bg-dash-white-card/90 z-20 flex flex-col items-center justify-center gap-3 animate-fade-in">
+                  <div className="p-3 rounded-full bg-dash-primary-purple/10 text-dash-primary-purple animate-spin">
+                    <Sparkles size={28} />
+                  </div>
+                  <span className="text-xs font-bold text-dash-primary-purple font-outfit uppercase tracking-widest animate-pulse">
+                    AI Generating Scenario...
+                  </span>
+                </div>
+              )}
+
+              {/* Preview Header Row */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 border-b border-dash-border-gray/25 pb-3">
+                <div>
+                  <span className="text-[10px] text-dash-primary-purple font-extrabold tracking-widest uppercase font-outfit">
+                    {selectedQuestion.type === 'MCQ' ? 'Multiple Choice Question' : 'Scenario Based Question'}
+                  </span>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="font-outfit font-extrabold text-base text-dash-dark-purple">
+                      Previewing Question Details
+                    </span>
+                    {selectedQuestion.isSaved && (
+                      <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-dash-success-green/10 text-dash-success-green border border-dash-success-green/20 flex items-center gap-1">
+                        <Check size={10} strokeWidth={3} />
+                        Saved
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 text-xs font-bold text-dash-light-purple">
+                  <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-dash-dark-purple/80 bg-dash-light-blue-bg border border-dash-border-gray/30 px-2.5 py-1 rounded-xl">
+                    <BookOpen size={12} className="text-dash-primary-purple" />
+                    {selectedQuestion.subject}
+                  </span>
+                  <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-dash-dark-purple/80 bg-dash-light-blue-bg border border-dash-border-gray/30 px-2.5 py-1 rounded-xl">
+                    <Clock size={12} className="text-dash-primary-purple" />
+                    {selectedQuestion.estimatedTime || '15 Minutes'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Premium Question Card Details Metadata Block */}
+              <div className="bg-dash-light-blue-bg/30 border border-dash-border-gray/40 rounded-2xl p-4.5 grid grid-cols-3 gap-4 items-center">
+                <div>
+                  <span className="text-[10px] font-bold text-dash-light-purple uppercase tracking-wider block mb-1">
+                    Question No
+                  </span>
+                  <span className="text-xs font-extrabold text-dash-dark-purple font-outfit">
+                    {generatedQuestions.findIndex(q => q.id === selectedId) + 1}
+                  </span>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-bold text-dash-light-purple uppercase tracking-wider block mb-1">
+                    Category
+                  </span>
+                  <span className="text-xs font-extrabold text-dash-dark-purple font-outfit">
+                    {selectedQuestion.subject}
+                  </span>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-bold text-dash-light-purple uppercase tracking-wider block mb-1">
+                    Estimated Time
+                  </span>
+                  <span className="text-xs font-extrabold text-dash-dark-purple font-outfit">
+                    {selectedQuestion.estimatedTime || '15 Minutes'}
+                  </span>
+                </div>
+
+                <div className="col-span-3 pt-3.5 mt-1.5 border-t border-dash-border-gray/40 flex items-center justify-between">
+                  <span className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider">
+                    Difficulty Level
+                  </span>
+                  <div className="flex items-center gap-1 bg-dash-white-card border border-dash-border-gray/80 p-0.5 rounded-lg">
+                    {['Easy', 'Medium', 'Hard'].map((lvl) => {
+                      const isActive = selectedQuestion.difficulty === lvl;
+                      let activeStyle = '';
+                      if (isActive) {
+                        if (lvl === 'Easy') activeStyle = 'bg-green-600 text-white shadow-sm';
+                        else if (lvl === 'Medium') activeStyle = 'bg-amber-500 text-white shadow-sm';
+                        else if (lvl === 'Hard') activeStyle = 'bg-rose-600 text-white shadow-sm';
+                      } else {
+                        activeStyle = 'text-dash-light-purple hover:bg-dash-soft-pink hover:text-dash-primary-purple';
+                      }
+
+                      return (
+                        <button
+                          key={lvl}
+                          type="button"
+                          onClick={() => handleDifficultyChange(selectedQuestion.id, lvl)}
+                          className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all border-none cursor-pointer ${activeStyle}`}
+                        >
+                          {lvl}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Main Content Area */}
+              <div className="space-y-4.5">
+                {/* 1. Problem Statement */}
+                <div className="space-y-1.5">
+                  <h4 className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
+                    Problem Statement
+                  </h4>
+                  <p className="text-xs font-semibold text-dash-dark-purple leading-relaxed bg-dash-white-card border border-dash-border-gray/40 p-4 rounded-2xl shadow-[0_2px_8px_rgba(87,82,170,0.01)] select-text">
+                    {selectedQuestion.problemStatement || selectedQuestion.question || selectedQuestion.scenario}
+                  </p>
+                </div>
+
+                {/* MCQ Options Display (for MCQ type) */}
+                {!(selectedQuestion.type?.includes('CODING') || selectedQuestion.type === 'SCENARIO_CODING') && (
+                  <div className="space-y-2">
+                    <h4 className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
+                      Options & Correct Answer
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                      {selectedQuestion.options?.map((opt, idx) => {
+                        const isCorrect = opt === selectedQuestion.correctAnswer;
+                        const label = ['A', 'B', 'C', 'D'][idx] || '';
+                        return (
+                          <div
+                            key={idx}
+                            className={`p-3 rounded-xl border flex items-center gap-3 transition-all ${
+                              isCorrect
+                                ? 'border-green-500 bg-green-50/40 text-green-700 font-bold'
+                                : 'border-dash-border-gray/50 bg-dash-white-card/90 text-dash-dark-purple'
+                            }`}
+                          >
+                            {isCorrect ? (
+                              <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />
+                            ) : (
+                              <div className="w-4 h-4 rounded-full border border-dash-light-purple/60 shrink-0 flex items-center justify-center font-bold text-[9px] text-dash-light-purple">
+                                {label}
+                              </div>
+                            )}
+                            <span className="text-xs font-semibold leading-relaxed">
+                              {opt}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Example Input / Output (only for coding scenario) */}
+                {(selectedQuestion.type?.includes('CODING') || selectedQuestion.type === 'SCENARIO_CODING') && (
+                  <div className="space-y-2">
+                    <h4 className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
+                      Example
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Input Box */}
+                      <div className="space-y-1">
+                        <span className="text-[9px] font-bold text-dash-light-purple uppercase tracking-wider">Input</span>
+                        <div className="bg-[#fafafc] border border-dash-border-gray/50 rounded-xl p-3 font-mono text-[11px] text-dash-dark-purple flex items-center gap-2">
+                          <Terminal size={12} className="text-dash-light-purple shrink-0" />
+                          <span className="select-text whitespace-pre-wrap">{selectedQuestion.exampleInput || 'No input details'}</span>
+                        </div>
+                      </div>
+                      {/* Output Box */}
+                      <div className="space-y-1">
+                        <span className="text-[9px] font-bold text-dash-light-purple uppercase tracking-wider">Output</span>
+                        <div className="bg-[#fafafc] border border-dash-border-gray/50 rounded-xl p-3 font-mono text-[11px] text-dash-dark-purple flex items-center gap-2">
+                          <Play size={12} className="text-dash-light-purple shrink-0" />
+                          <span className="select-text whitespace-pre-wrap">{selectedQuestion.exampleOutput || 'No output details'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Constraints (only for coding scenario) */}
+                {(selectedQuestion.type?.includes('CODING') || selectedQuestion.type === 'SCENARIO_CODING') && selectedQuestion.constraints && selectedQuestion.constraints.length > 0 && (
+                  <div className="space-y-1.5">
+                    <h4 className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
+                      Constraints
+                    </h4>
+                    <div className="bg-[#fefaf6] border border-[#f59e0b]/15 rounded-2xl p-4 flex flex-col gap-2 shadow-sm">
+                      {selectedQuestion.constraints.map((c, i) => (
+                        <div key={i} className="flex items-center gap-2 text-xs font-semibold text-dash-dark-purple/85">
+                          <div className="w-1.5 h-1.5 rounded-full bg-[#f59e0b] shrink-0" />
+                          <span>{c}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Expected Answer (Code Box or correct option) */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
+                      {selectedQuestion.type === 'MCQ' ? 'Correct Answer Details' : 'Expected Answer'}
+                    </h4>
+                    {selectedQuestion.expectedAnswer && (
+                      <button
+                        onClick={() => handleCopyCode(selectedQuestion.expectedAnswer, selectedQuestion.id)}
+                        className="px-2.5 py-1 rounded-lg border border-dash-border-gray text-[9px] font-bold text-dash-primary-purple hover:bg-dash-soft-pink transition-all flex items-center gap-1 cursor-pointer"
+                      >
+                        {copiedId === selectedQuestion.id ? (
+                          <>
+                            <Check size={10} strokeWidth={3} className="text-green-600" />
+                            <span className="text-green-600">Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy size={10} />
+                            <span>Copy Answer</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+
+                  {selectedQuestion.type === 'MCQ' ? (
+                    <div className="bg-green-50/40 border border-green-200 text-green-700 rounded-xl p-3.5 font-semibold text-xs flex items-center gap-2">
+                      <CheckCircle className="text-green-600 shrink-0" size={16} />
+                      <span>{selectedQuestion.correctAnswer}</span>
+                    </div>
+                  ) : (
+                    <div className="bg-[#fafafc] border border-dash-border-gray/50 rounded-2xl p-4.5 overflow-hidden shadow-inner border-l-4 border-l-dash-primary-purple relative">
+                      <div className="absolute right-3.5 top-3.5 text-[9px] font-bold text-dash-light-purple/60 font-mono uppercase tracking-wider select-none">
+                        python
+                      </div>
+                      <SyntaxHighlighter
+                        code={selectedQuestion.expectedAnswer}
+                        language={selectedQuestion.subject.toLowerCase() === 'sql' ? 'sql' : 'python'}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Explanation */}
+                {selectedQuestion.explanation && (
+                  <div className="space-y-1.5 pb-2">
+                    <h4 className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
+                      Explanation
+                    </h4>
+                    <p className="text-xs font-medium text-dash-light-purple leading-relaxed bg-[#f8fafc]/50 p-4 rounded-2xl border border-dash-border-gray/30 shadow-[0_1px_5px_rgba(0,0,0,0.01)] select-text">
+                      {selectedQuestion.explanation}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Preview Action Buttons Footer */}
+            <div className="flex items-center gap-3 border-t border-dash-border-gray/25 pt-4 mt-4">
+              <button
+                type="button"
+                onClick={() => setIsEditing(true)}
+                className="flex-1 py-3 rounded-xl border border-dash-border-gray/80 hover:bg-dash-soft-pink text-dash-dark-purple font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Edit3 size={13} />
+                <span>Edit Question</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleRegenerateQuestion(selectedQuestion.id)}
+                className="flex-1 py-3 rounded-xl border border-dash-primary-purple/20 hover:border-dash-primary-purple/40 bg-dash-primary-purple/5 hover:bg-dash-primary-purple/10 text-dash-primary-purple font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Sparkles size={13} />
+                <span>Regenerate</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleDeleteQuestion(selectedQuestion.id)}
+                className="py-3 px-4 rounded-xl border border-red-200 hover:border-red-300 bg-red-50/50 hover:bg-red-50 text-red-600 font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer"
+                title="Delete Question"
+              >
+                <Trash2 size={13} />
+                <span>Delete</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSaveQuestionToggle(selectedQuestion.id)}
+                className={`flex-1 py-3 rounded-xl font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 border cursor-pointer ${
+                  selectedQuestion.isSaved
+                    ? 'bg-dash-success-green border-dash-success-green text-dash-white-card shadow-sm hover:opacity-90'
+                    : 'bg-dash-primary-purple border-dash-primary-purple text-dash-white-card shadow-md hover:bg-dash-dark-purple hover:border-dash-dark-purple shadow-[0_4px_12px_rgba(87,82,170,0.15)]'
+                }`}
+              >
+                <Save size={13} />
+                <span>{selectedQuestion.isSaved ? 'Question Saved' : 'Save Question'}</span>
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
-};
-
-const ScenarioQuestionPreview = ({ question, index }) => {
-  return (
-    <div className="p-4 rounded-xl bg-dash-light-blue-bg/40 border border-dash-border-gray/20 flex flex-col gap-3 hover:bg-dash-soft-pink transition-colors">
-      {/* Header Info */}
-      <div className="flex items-center justify-between border-b border-dash-border-gray/15 pb-2">
-        <div className="flex items-center gap-2.5">
-          <span className="font-outfit font-extrabold text-xs text-dash-dark-purple">
-            Q{index + 1}
-          </span>
-          <div className="flex items-center gap-2">
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-dash-primary-purple/10 text-dash-primary-purple border border-dash-primary-purple/20">
-              {question.subject}
-            </span>
-            <span className="text-[9px] font-bold text-dash-light-purple">
-              {question.topic}
-            </span>
-          </div>
-        </div>
-        <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-dash-success-green/10 text-dash-success-green border border-dash-success-green/20">
-          {question.difficulty}
-        </span>
-      </div>
-
-      {/* Scenario Context */}
-      <div className="flex flex-col gap-1">
-        <h4 className="text-[9px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
-          Scenario
-        </h4>
-        <p className="text-[11px] font-semibold text-dash-dark-purple leading-relaxed bg-dash-white-card/50 p-2.5 rounded-lg border border-dash-border-gray/20">
-          {question.scenario}
-        </p>
-      </div>
-
-      {/* Question Text */}
-      <div className="flex flex-col gap-1">
-        <h4 className="text-[9px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
-          Question
-        </h4>
-        <p className="text-[11px] font-bold text-dash-dark-purple leading-relaxed">
-          {question.question || question.q}
-        </p>
-      </div>
-
-      {/* Correct Answer Display */}
-      {question.correctAnswer && (
-        <div className="mt-1 pt-2 border-t border-dash-border-gray/15 flex flex-col gap-1">
-          <span className="text-[9px] font-extrabold text-dash-light-purple uppercase tracking-wider">
-            Correct Answer
-          </span>
-          <div className="flex items-center gap-1.5 text-[11px] font-bold text-dash-success-green">
-            <Check size={12} strokeWidth={3} className="text-dash-success-green" />
-            <span>
-              {question.correctAnswer}
-            </span>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-const DefaultQuestionPreview = ({ question, index }) => {
-  return (
-    <div className="p-4 rounded-xl bg-dash-light-blue-bg/40 border border-dash-border-gray/20 flex flex-col gap-3 hover:bg-dash-soft-pink transition-colors">
-      {/* Header Info */}
-      <div className="flex items-center justify-between border-b border-dash-border-gray/15 pb-2">
-        <div className="flex items-center gap-2.5">
-          <span className="font-outfit font-extrabold text-xs text-dash-dark-purple">
-            Q{index + 1}
-          </span>
-          <div className="flex items-center gap-2">
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-dash-primary-purple/10 text-dash-primary-purple border border-dash-primary-purple/20">
-              {question.subject}
-            </span>
-            <span className="text-[9px] font-bold text-dash-light-purple">
-              {question.topic}
-            </span>
-          </div>
-        </div>
-        <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-dash-success-green/10 text-dash-success-green border border-dash-success-green/20">
-          {question.difficulty}
-        </span>
-      </div>
-
-      {/* Question Text */}
-      <p className="text-[11px] font-semibold text-dash-dark-purple leading-relaxed">
-        {question.question || question.q}
-      </p>
-    </div>
-  );
-};
-
-const QuestionPreviewRenderer = ({ question, index }) => {
-  const typeNormalized = (question.type || '').toUpperCase();
-  switch (typeNormalized) {
-    case 'MCQ':
-      return <MCQQuestionPreview question={question} index={index} />;
-    case 'SCENARIO':
-      return <ScenarioQuestionPreview question={question} index={index} />;
-    default:
-      return <DefaultQuestionPreview question={question} index={index} />;
-  }
 };
 
 export default RecruiterDashboard;
