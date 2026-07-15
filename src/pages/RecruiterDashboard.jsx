@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import {
@@ -39,8 +39,11 @@ import {
   Play,
   BookOpen,
   RefreshCw,
-  Eye
+  Eye,
+  UserPlus,
+  Send
 } from 'lucide-react';
+import api from '../api';
 
 const questionPool = {
   Python: [
@@ -143,98 +146,132 @@ const questionPool = {
 
 const RecruiterDashboard = ({ onLogout }) => {
   // Candidate dataset state
-  const [candidates, setCandidates] = useState([
-    {
-      id: 1,
-      name: 'Sneha Patel',
-      email: 'sneha.patel@recruitai.com',
-      role: 'ML Engineer',
-      date: '2026-07-08',
-      resume: 95,
-      python: 92,
-      sql: 84,
-      aptitude: 88,
-      english: 96,
-      final: 91,
-      recommendation: 'Strong Hire',
-      status: 'Completed'
-    },
-    {
-      id: 2,
-      name: 'Priya Nair',
-      email: 'priya.nair@recruitai.com',
-      role: 'Data Analyst',
-      date: '2026-07-07',
-      resume: 91,
-      python: 88,
-      sql: 76,
-      aptitude: 82,
-      english: 94,
-      final: 87,
-      recommendation: 'Strong Hire',
-      status: 'Completed'
-    },
-    {
-      id: 3,
-      name: 'Arjun Sharma',
-      email: 'arjun.sharma@recruitai.com',
-      role: 'Python Developer',
-      date: '2026-07-06',
-      resume: 84,
-      python: 78,
-      sql: 82,
-      aptitude: 74,
-      english: 88,
-      final: 82,
-      recommendation: 'Strong Hire',
-      status: 'Completed'
-    },
-    {
-      id: 4,
-      name: 'Divya Krishnan',
-      email: 'divya.krishnan@recruitai.com',
-      role: 'Full Stack Developer',
-      date: '2026-07-05',
-      resume: 78,
-      python: 74,
-      sql: 70,
-      aptitude: 68,
-      english: 82,
-      final: 74,
-      recommendation: 'Moderate',
-      status: 'In Progress'
-    },
-    {
-      id: 5,
-      name: 'Rahul Verma',
-      email: 'rahul.verma@recruitai.com',
-      role: 'Backend Engineer',
-      date: '2026-07-04',
-      resume: 72,
-      python: 65,
-      sql: 88,
-      aptitude: 58,
-      english: 72,
-      final: 72,
-      recommendation: 'Moderate',
-      status: 'Completed'
-    },
-    {
-      id: 6,
-      name: 'Karan Mehta',
-      email: 'karan.mehta@recruitai.com',
-      role: 'Data Engineer',
-      date: '2026-07-03',
-      resume: 62,
-      python: 48,
-      sql: 54,
-      aptitude: 44,
-      english: 58,
-      final: 48,
-      recommendation: 'Not Ready',
-      status: 'Completed'
+  const [candidates, setCandidates] = useState(() => {
+    const saved = localStorage.getItem('recruitai_candidates');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Error parsing candidates from localStorage:", e);
+      }
     }
-  ]);
+    return [
+      {
+        id: 1,
+        name: 'Sneha Patel',
+        email: 'sneha.patel@recruitai.com',
+        role: 'ML Engineer',
+        date: '2026-07-08',
+        resume: 95,
+        python: 92,
+        sql: 84,
+        aptitude: 88,
+        english: 96,
+        final: 91,
+        recommendation: 'Strong Hire',
+        status: 'Completed'
+      },
+      {
+        id: 2,
+        name: 'Priya Nair',
+        email: 'priya.nair@recruitai.com',
+        role: 'Data Analyst',
+        date: '2026-07-07',
+        resume: 91,
+        python: 88,
+        sql: 76,
+        aptitude: 82,
+        english: 94,
+        final: 87,
+        recommendation: 'Strong Hire',
+        status: 'Completed'
+      },
+      {
+        id: 3,
+        name: 'Arjun Sharma',
+        email: 'arjun.sharma@recruitai.com',
+        role: 'Python Developer',
+        date: '2026-07-06',
+        resume: 84,
+        python: 78,
+        sql: 82,
+        aptitude: 74,
+        english: 88,
+        final: 82,
+        recommendation: 'Strong Hire',
+        status: 'Completed'
+      },
+      {
+        id: 4,
+        name: 'Divya Krishnan',
+        email: 'divya.krishnan@recruitai.com',
+        role: 'Full Stack Developer',
+        date: '2026-07-05',
+        resume: 78,
+        python: 74,
+        sql: 70,
+        aptitude: 68,
+        english: 82,
+        final: 74,
+        recommendation: 'Moderate',
+        status: 'In Progress'
+      },
+      {
+        id: 5,
+        name: 'Rahul Verma',
+        email: 'rahul.verma@recruitai.com',
+        role: 'Backend Engineer',
+        date: '2026-07-04',
+        resume: 72,
+        python: 65,
+        sql: 88,
+        aptitude: 58,
+        english: 72,
+        final: 72,
+        recommendation: 'Moderate',
+        status: 'Completed'
+      },
+      {
+        id: 6,
+        name: 'Karan Mehta',
+        email: 'karan.mehta@recruitai.com',
+        role: 'Data Engineer',
+        date: '2026-07-03',
+        resume: 62,
+        python: 48,
+        sql: 54,
+        aptitude: 44,
+        english: 58,
+        final: 48,
+        recommendation: 'Not Ready',
+        status: 'Completed'
+      }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('recruitai_candidates', JSON.stringify(candidates));
+  }, [candidates]);
+
+  // Saved Assessments State
+  const [savedAssessments, setSavedAssessments] = useState([]);
+  const [selectedAssessmentForView, setSelectedAssessmentForView] = useState(null);
+
+  // Fetch assessments from backend on mount
+  useEffect(() => {
+    const fetchAssessments = async () => {
+      try {
+        const response = await api.get('/api/assessment');
+        if (response.data) {
+          setSavedAssessments(response.data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch assessments from backend:", err);
+        showToast("Error loading assessments from server.");
+      }
+    };
+    fetchAssessments();
+  }, []);
 
   // Sidebar navigation state
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -622,7 +659,7 @@ const RecruiterDashboard = ({ onLogout }) => {
 
   // Statistics data (dynamic active assessments)
   const stats = [
-    { label: 'Total Candidates', value: '1,248', change: '+12% this week', icon: Users },
+    { label: 'Total Candidates', value: candidates.length.toString(), change: '+12% this week', icon: Users },
     { label: 'Active Assessments', value: activeAssessmentsCount.toString(), change: '+2 new today', icon: Briefcase },
     { label: 'Completion Rate', value: '84.5%', change: '+3% avg. rate', icon: TrendingUp },
     { label: 'Average Score', value: '78.2%', change: '+1.4% improvement', icon: Award },
@@ -708,12 +745,15 @@ const RecruiterDashboard = ({ onLogout }) => {
           question: q.question,
           q: q.question, // fallback
           options: q.options,
-          correctAnswer: q.correctAnswer
+          correctAnswer: q.correctAnswer,
+          expectedAnswer: q.type === 'SCENARIO' ? q.correctAnswer : '',
+          exampleInput: q.exampleInput || '',
+          exampleOutput: q.exampleOutput || ''
         }));
         setGeneratedQuestions(formatted);
         showToast(`Successfully generated assessment containing ${formatted.length} questions across ${totalSelectedTopics} topics!`);
         setActiveAssessmentsCount(prev => prev + 1);
-        
+
         // Go to preview questions tab
         setActiveTab('preview-questions');
       } else {
@@ -729,15 +769,40 @@ const RecruiterDashboard = ({ onLogout }) => {
     }
   };
 
-  const handleSaveAndAssign = () => {
-    showToast('Assessment saved and assigned successfully!');
-    setActiveAssessmentsCount(prev => prev + 1);
-    setSelectedTopics({
-      Python: [],
-      SQL: [],
-      Aptitude: []
-    });
-    setActiveTab('dashboard');
+  const handleSaveAndAssign = async () => {
+    const subjectsInQuestions = [...new Set(generatedQuestions.map(q => q.subject))].filter(Boolean);
+    const activeSubjects = subjectsInQuestions.length > 0 ? subjectsInQuestions : ['General'];
+    const name = `${activeSubjects.join(' & ')} Technical Test`;
+
+    const payload = {
+      name: name,
+      subjects: activeSubjects,
+      difficulty: difficulty || 'Medium',
+      duration: duration || '45 minutes',
+      questionsCount: generatedQuestions.length,
+      createdDate: new Date().toISOString().split('T')[0],
+      status: 'Active',
+      candidatesAssigned: 0,
+      questions: generatedQuestions
+    };
+
+    try {
+      const response = await api.post('/api/assessment', payload);
+      if (response.data) {
+        setSavedAssessments(prev => [response.data, ...prev]);
+        showToast('Assessment saved successfully!');
+        setActiveAssessmentsCount(prev => prev + 1);
+        setSelectedTopics({
+          Python: [],
+          SQL: [],
+          Aptitude: []
+        });
+        setActiveTab('assessments');
+      }
+    } catch (err) {
+      console.error("Failed to save assessment to backend:", err);
+      showToast("Error saving assessment to database.");
+    }
   };
 
   const showToast = (msg) => {
@@ -767,11 +832,11 @@ const RecruiterDashboard = ({ onLogout }) => {
           tag: 'QA Mode',
           subtitle: 'Review AI-generated questions before saving and assigning to candidates.'
         };
-      case 'monitor':
+      case 'assessments':
         return {
-          title: 'Assessment Monitor',
-          tag: 'Live Analytics',
-          subtitle: 'Track candidate completion rates and performance analytics in real-time.'
+          title: 'Saved Assessments',
+          tag: 'Pool',
+          subtitle: 'Manage, view, and assign generated assessments for candidate evaluation.'
         };
       default:
         return {
@@ -819,7 +884,7 @@ const RecruiterDashboard = ({ onLogout }) => {
               { id: 'dashboard', label: 'Dashboard', icon: Briefcase },
               { id: 'create-assessment', label: 'Create Assessment', icon: Plus },
               { id: 'preview-questions', label: 'Preview Questions', icon: FileText },
-              { id: 'monitor', label: 'Monitor', icon: TrendingUp },
+              { id: 'assessments', label: 'Assessments', icon: Save },
             ].map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
@@ -932,7 +997,7 @@ const RecruiterDashboard = ({ onLogout }) => {
                 { id: 'dashboard', label: 'Dashboard', icon: Briefcase },
                 { id: 'create-assessment', label: 'Create Assessment', icon: Plus },
                 { id: 'preview-questions', label: 'Preview Questions', icon: FileText },
-                { id: 'monitor', label: 'Monitor', icon: TrendingUp },
+                { id: 'assessments', label: 'Assessments', icon: Save },
               ].map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
@@ -1355,8 +1420,8 @@ const RecruiterDashboard = ({ onLogout }) => {
                         key={topic}
                         onClick={() => toggleTopic('Python', topic)}
                         className={`relative pl-3.5 pr-8 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 cursor-pointer flex items-center gap-1.5 group/btn ${isSelected
-                            ? 'bg-dash-primary-purple border-dash-primary-purple text-dash-white-card shadow-sm'
-                            : 'bg-dash-white-card border-dash-border-gray hover:bg-dash-soft-pink hover:border-dash-primary-purple/40 text-dash-dark-purple'
+                          ? 'bg-dash-primary-purple border-dash-primary-purple text-dash-white-card shadow-sm'
+                          : 'bg-dash-white-card border-dash-border-gray hover:bg-dash-soft-pink hover:border-dash-primary-purple/40 text-dash-dark-purple'
                           }`}
                       >
                         {isSelected && <Check size={12} strokeWidth={3} />}
@@ -1395,8 +1460,8 @@ const RecruiterDashboard = ({ onLogout }) => {
                         key={topic}
                         onClick={() => toggleTopic('SQL', topic)}
                         className={`relative pl-3.5 pr-8 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 cursor-pointer flex items-center gap-1.5 group/btn ${isSelected
-                            ? 'bg-dash-primary-purple border-dash-primary-purple text-dash-white-card shadow-sm'
-                            : 'bg-dash-white-card border-dash-border-gray hover:bg-dash-soft-pink hover:border-dash-primary-purple/40 text-dash-dark-purple'
+                          ? 'bg-dash-primary-purple border-dash-primary-purple text-dash-white-card shadow-sm'
+                          : 'bg-dash-white-card border-dash-border-gray hover:bg-dash-soft-pink hover:border-dash-primary-purple/40 text-dash-dark-purple'
                           }`}
                       >
                         {isSelected && <Check size={12} strokeWidth={3} />}
@@ -1435,8 +1500,8 @@ const RecruiterDashboard = ({ onLogout }) => {
                         key={topic}
                         onClick={() => toggleTopic('Aptitude', topic)}
                         className={`relative pl-3.5 pr-8 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 cursor-pointer flex items-center gap-1.5 group/btn ${isSelected
-                            ? 'bg-[#d97706] border-[#d97706] text-dash-white-card shadow-sm'
-                            : 'bg-dash-white-card border-[#d97706]/40 hover:bg-[#fef3c7] hover:border-[#d97706] text-[#b45309]'
+                          ? 'bg-[#d97706] border-[#d97706] text-dash-white-card shadow-sm'
+                          : 'bg-dash-white-card border-[#d97706]/40 hover:bg-[#fef3c7] hover:border-[#d97706] text-[#b45309]'
                           }`}
                       >
                         {isSelected && <Check size={12} strokeWidth={3} />}
@@ -1585,8 +1650,8 @@ const RecruiterDashboard = ({ onLogout }) => {
                           type="button"
                           onClick={() => setDifficulty(lvl)}
                           className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all duration-200 cursor-pointer ${isActive
-                              ? 'bg-dash-primary-purple/10 border-dash-primary-purple text-dash-primary-purple shadow-sm'
-                              : 'bg-dash-white-card border-dash-border-gray text-dash-light-purple hover:border-dash-primary-purple/55 hover:text-dash-primary-purple'
+                            ? 'bg-dash-primary-purple/10 border-dash-primary-purple text-dash-primary-purple shadow-sm'
+                            : 'bg-dash-white-card border-dash-border-gray text-dash-light-purple hover:border-dash-primary-purple/55 hover:text-dash-primary-purple'
                             }`}
                         >
                           {lvl}
@@ -1683,19 +1748,15 @@ const RecruiterDashboard = ({ onLogout }) => {
           />
         )}
 
-        {/* 8. MONITOR ACTIVE SCREEN */}
-        {activeTab === 'monitor' && (
-          <div className="bg-dash-white-card border border-dash-border-gray rounded-[24px] p-8 text-center flex flex-col items-center justify-center min-h-[350px]">
-            <div className="p-4 rounded-full bg-dash-light-blue-bg text-dash-primary-purple mb-4">
-              <TrendingUp size={36} className="animate-pulse" />
-            </div>
-            <h3 className="font-plus-jakarta font-extrabold text-lg text-dash-dark-purple">
-              Live Evaluation Analytics
-            </h3>
-            <p className="text-sm text-dash-light-purple font-medium mt-2 max-w-sm">
-              Real-time candidate telemetry and evaluation logs are active. Awaiting submissions for the current cycle.
-            </p>
-          </div>
+        {/* 8. ASSESSMENTS ACTIVE SCREEN */}
+        {activeTab === 'assessments' && (
+          <AssessmentsManager
+            savedAssessments={savedAssessments}
+            setSavedAssessments={setSavedAssessments}
+            showToast={showToast}
+            setActiveTab={setActiveTab}
+            setSelectedAssessmentForView={setSelectedAssessmentForView}
+          />
         )}
       </main>
 
@@ -1848,6 +1909,17 @@ const RecruiterDashboard = ({ onLogout }) => {
         )}
       </AnimatePresence>
 
+      {/* Drawer for Saved Assessment Details */}
+      <AnimatePresence>
+        {selectedAssessmentForView && (
+          <AssessmentDetailsDrawer
+            assessment={selectedAssessmentForView}
+            onClose={() => setSelectedAssessmentForView(null)}
+            showToast={showToast}
+          />
+        )}
+      </AnimatePresence>
+
 
 
     </div>
@@ -1858,13 +1930,13 @@ const RecruiterDashboard = ({ onLogout }) => {
 const SyntaxHighlighter = ({ code, language }) => {
   if (!code) return null;
   const lang = (language || 'python').toLowerCase();
-  
+
   if (lang === 'python') {
     const combinedRegex = new RegExp(
       `(?<comment>#.*)|(?<string>"(?:\\\\.|[^"\\\\])*"|'(?:\\\\.|[^'\\\\])*')|(?<keyword>\\b(?:def|return|if|else|elif|for|in|while|import|from|as|try|except|finally|with|class|pass|and|or|not|is|None|True|False)\\b)|(?<func>\\b(?:print|len|range|str|int|float|list|dict|set|tuple|type|replace|lower|upper|strip|split|join|append)\\b)|(?<number>\\b\\d+\\b)|(?<other>[\\s\\S])`,
       'g'
     );
-    
+
     const tokens = [];
     let match;
     while ((match = combinedRegex.exec(code)) !== null) {
@@ -1891,7 +1963,7 @@ const SyntaxHighlighter = ({ code, language }) => {
       `(?<comment>--.*)|(?<string>'(?:\\\\.|[^'\\\\])*')|(?<keyword>\\b(?:SELECT|FROM|WHERE|GROUP\\s+BY|HAVING|ORDER\\s+BY|JOIN|LEFT|RIGHT|INNER|OUTER|ON|AND|OR|NOT|AS|IN|LIKE|IS|NULL|LIMIT|OFFSET)\\b)|(?<func>\\b(?:COUNT|SUM|AVG|MIN|MAX|COALESCE|CONCAT|NOW|DATE|ROW_NUMBER|DENSE_RANK)\\b)|(?<number>\\b\\d+\\b)|(?<other>[\\s\\S])`,
       'gi'
     );
-    
+
     const tokens = [];
     let match;
     while ((match = combinedRegex.exec(code)) !== null) {
@@ -1935,9 +2007,9 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
     constraints: '',
     expectedAnswer: '',
     explanation: '',
-    question: '', 
-    options: '', 
-    correctAnswer: '' 
+    question: '',
+    options: '',
+    correctAnswer: ''
   });
 
   const selectedQuestion = generatedQuestions.find(q => q.id === selectedId);
@@ -1945,7 +2017,7 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
   // Sync edit form when selected question changes
   React.useEffect(() => {
     if (selectedQuestion) {
-      const isCoding = selectedQuestion.type?.includes('CODING') || selectedQuestion.type === 'SCENARIO_CODING';
+      const isCoding = selectedQuestion.type?.includes('CODING') || selectedQuestion.type === 'SCENARIO_CODING' || selectedQuestion.type === 'SCENARIO';
       setEditForm({
         subject: selectedQuestion.subject || '',
         topic: selectedQuestion.topic || '',
@@ -2008,12 +2080,12 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
   const handleRegenerateQuestion = (qId) => {
     setIsGenerating(true);
     showToast("Generating alternative scenario with AI...");
-    
+
     setTimeout(() => {
       setIsGenerating(false);
       setGeneratedQuestions(prev => prev.map(q => {
         if (q.id === qId) {
-          if (q.type?.includes('CODING') || q.type === 'SCENARIO_CODING') {
+          if (q.type?.includes('CODING') || q.type === 'SCENARIO_CODING' || q.type === 'SCENARIO') {
             if (q.subject === 'Python') {
               return {
                 ...q,
@@ -2069,7 +2141,7 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
     e.preventDefault();
     setGeneratedQuestions(prev => prev.map(q => {
       if (q.id === selectedId) {
-        const isCoding = q.type?.includes('CODING') || q.type === 'SCENARIO_CODING';
+        const isCoding = q.type?.includes('CODING') || q.type === 'SCENARIO_CODING' || q.type === 'SCENARIO';
         return {
           ...q,
           subject: editForm.subject,
@@ -2139,8 +2211,8 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
           {filteredQuestions.map((q, idx) => {
             const isSelected = q.id === selectedId;
             const actualIndex = generatedQuestions.findIndex(item => item.id === q.id) + 1;
-            const isCoding = q.type?.includes('CODING') || q.type === 'SCENARIO_CODING';
-            
+            const isCoding = q.type?.includes('CODING') || q.type === 'SCENARIO_CODING' || q.type === 'SCENARIO';
+
             let diffColor = 'text-green-600 bg-green-50 border-green-200/50';
             if (q.difficulty === 'Medium') diffColor = 'text-amber-600 bg-amber-50 border-amber-200/50';
             else if (q.difficulty === 'Hard') diffColor = 'text-rose-600 bg-rose-50 border-rose-200/50';
@@ -2149,11 +2221,10 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
               <div
                 key={q.id}
                 onClick={() => setSelectedId(q.id)}
-                className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all duration-300 group ${
-                  isSelected
+                className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all duration-300 group ${isSelected
                     ? 'border-dash-primary-purple bg-dash-soft-pink shadow-[0_4px_12px_rgba(87,82,170,0.06)]'
                     : 'border-dash-border-gray/60 bg-dash-white-card hover:bg-dash-soft-pink/50 hover:border-dash-primary-purple/30'
-                }`}
+                  }`}
               >
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <span className={`text-[10px] font-extrabold font-outfit uppercase tracking-wider ${isSelected ? 'text-dash-primary-purple' : 'text-dash-light-purple'}`}>
@@ -2296,7 +2367,7 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
               </div>
 
               {/* Conditional options for MCQ vs Coding */}
-              {!(selectedQuestion.type?.includes('CODING') || selectedQuestion.type === 'SCENARIO_CODING') ? (
+              {!(selectedQuestion.type?.includes('CODING') || selectedQuestion.type === 'SCENARIO_CODING' || selectedQuestion.type === 'SCENARIO') ? (
                 /* MCQ EDIT FIELDS */
                 <div className="space-y-4">
                   <div>
@@ -2516,7 +2587,7 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
                 </div>
 
                 {/* MCQ Options Display (for MCQ type) */}
-                {!(selectedQuestion.type?.includes('CODING') || selectedQuestion.type === 'SCENARIO_CODING') && (
+                {!(selectedQuestion.type?.includes('CODING') || selectedQuestion.type === 'SCENARIO_CODING' || selectedQuestion.type === 'SCENARIO') && (
                   <div className="space-y-2">
                     <h4 className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
                       Options & Correct Answer
@@ -2528,11 +2599,10 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
                         return (
                           <div
                             key={idx}
-                            className={`p-3 rounded-xl border flex items-center gap-3 transition-all ${
-                              isCorrect
+                            className={`p-3 rounded-xl border flex items-center gap-3 transition-all ${isCorrect
                                 ? 'border-green-500 bg-green-50/40 text-green-700 font-bold'
                                 : 'border-dash-border-gray/50 bg-dash-white-card/90 text-dash-dark-purple'
-                            }`}
+                              }`}
                           >
                             {isCorrect ? (
                               <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />
@@ -2552,7 +2622,7 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
                 )}
 
                 {/* Example Input / Output (only for coding scenario) */}
-                {(selectedQuestion.type?.includes('CODING') || selectedQuestion.type === 'SCENARIO_CODING') && (
+                {(selectedQuestion.type?.includes('CODING') || selectedQuestion.type === 'SCENARIO_CODING' || selectedQuestion.type === 'SCENARIO') && (
                   <div className="space-y-2">
                     <h4 className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
                       Example
@@ -2579,7 +2649,7 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
                 )}
 
                 {/* Constraints (only for coding scenario) */}
-                {(selectedQuestion.type?.includes('CODING') || selectedQuestion.type === 'SCENARIO_CODING') && selectedQuestion.constraints && selectedQuestion.constraints.length > 0 && (
+                {(selectedQuestion.type?.includes('CODING') || selectedQuestion.type === 'SCENARIO_CODING' || selectedQuestion.type === 'SCENARIO') && selectedQuestion.constraints && selectedQuestion.constraints.length > 0 && (
                   <div className="space-y-1.5">
                     <h4 className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
                       Constraints
@@ -2686,11 +2756,10 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
               <button
                 type="button"
                 onClick={() => handleSaveQuestionToggle(selectedQuestion.id)}
-                className={`flex-1 py-3 rounded-xl font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 border cursor-pointer ${
-                  selectedQuestion.isSaved
+                className={`flex-1 py-3 rounded-xl font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 border cursor-pointer ${selectedQuestion.isSaved
                     ? 'bg-dash-success-green border-dash-success-green text-dash-white-card shadow-sm hover:opacity-90'
                     : 'bg-dash-primary-purple border-dash-primary-purple text-dash-white-card shadow-md hover:bg-dash-dark-purple hover:border-dash-dark-purple shadow-[0_4px_12px_rgba(87,82,170,0.15)]'
-                }`}
+                  }`}
               >
                 <Save size={13} />
                 <span>{selectedQuestion.isSaved ? 'Question Saved' : 'Save Question'}</span>
@@ -2700,6 +2769,512 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
         )}
       </div>
     </div>
+  );
+};
+
+// ==========================================
+// 9. ASSESSMENTS MANAGER COMPONENT
+// ==========================================
+const AssessmentsManager = ({
+  savedAssessments,
+  setSavedAssessments,
+  showToast,
+  setActiveTab,
+  setSelectedAssessmentForView
+}) => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [assigningId, setAssigningId] = useState(null);
+  const [candidateEmail, setCandidateEmail] = useState('');
+
+  const handleDeleteAssessment = async (id, name) => {
+    const confirmDelete = window.confirm(`Are you sure you want to delete "${name}"?`);
+    if (!confirmDelete) return;
+
+    try {
+      await api.delete(`/api/assessment/${id}`);
+      setSavedAssessments(prev => prev.filter(asm => asm.id !== id));
+      showToast(`Assessment "${name}" deleted successfully.`);
+    } catch (err) {
+      console.error("Failed to delete assessment from backend:", err);
+      showToast("Error deleting assessment.");
+    }
+  };
+
+  const handleStartAssign = (id) => {
+    setAssigningId(id);
+    setCandidateEmail('');
+  };
+
+  const handleConfirmAssign = async (e, id, name) => {
+    e.preventDefault();
+    const email = candidateEmail.trim();
+    if (!email) return;
+
+    // Validate email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      alert('Please enter a valid email address.');
+      return;
+    }
+
+    try {
+      const response = await api.post(`/api/assessment/${id}/assign`, { email });
+      if (response.data) {
+        setSavedAssessments(prev => prev.map(asm => asm.id === id ? response.data : asm));
+        showToast(`Successfully assigned "${name}" and sent invite to ${email}!`);
+      }
+    } catch (err) {
+      console.error("Failed to assign assessment on backend:", err);
+      showToast("Error assigning assessment.");
+    } finally {
+      setAssigningId(null);
+      setCandidateEmail('');
+    }
+  };
+
+  const filteredAssessments = savedAssessments.filter(asm => {
+    const query = searchQuery.toLowerCase();
+    const nameMatch = asm.name.toLowerCase().includes(query);
+    const subjectMatch = asm.subjects.some(sub => sub.toLowerCase().includes(query));
+    return nameMatch || subjectMatch;
+  });
+
+  const getSubjectBadgeClass = (subject) => {
+    switch (subject.toLowerCase()) {
+      case 'python':
+        return 'bg-dash-primary-purple/10 text-dash-primary-purple border-dash-primary-purple/20';
+      case 'sql':
+        return 'bg-blue-50 text-blue-600 border-blue-200/50';
+      case 'aptitude':
+        return 'bg-amber-50 text-amber-600 border-amber-200/50';
+      default:
+        return 'bg-gray-50 text-gray-600 border-gray-200';
+    }
+  };
+
+  const getDifficultyColor = (diff) => {
+    switch (diff) {
+      case 'Easy':
+        return 'text-green-600 bg-green-50 border-green-200/50';
+      case 'Medium':
+        return 'text-amber-600 bg-amber-50 border-amber-200/50';
+      case 'Hard':
+        return 'text-rose-600 bg-rose-50 border-rose-200/50';
+      default:
+        return 'text-gray-600 bg-gray-50 border-gray-200';
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-6 w-full">
+      {/* Search & Actions Bar */}
+      <div className="bg-dash-white-card border border-dash-border-gray rounded-[24px] p-5 shadow-sm flex flex-col sm:flex-row gap-4 items-center justify-between">
+        <div className="relative w-full sm:max-w-md group">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-dash-light-purple transition-colors duration-300 group-focus-within:text-dash-primary-purple" size={16} />
+          <input
+            type="text"
+            placeholder="Search saved assessments by name or subject..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2.5 pl-10 pr-4 text-xs font-semibold text-dash-dark-purple placeholder-dash-light-purple/60 focus:outline-none focus:border-dash-primary-purple transition-all"
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery('')} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-dash-light-purple hover:text-dash-dark-purple">
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
+        <button
+          onClick={() => setActiveTab('create-assessment')}
+          className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-dash-primary-purple border border-dash-primary-purple text-dash-white-card font-bold text-xs hover:bg-dash-dark-purple transition-all duration-200 shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+        >
+          <Plus size={14} strokeWidth={2.5} />
+          <span>New Assessment</span>
+        </button>
+      </div>
+
+      {/* Grid of Saved Assessments */}
+      {filteredAssessments.length === 0 ? (
+        <div className="bg-dash-white-card border border-dash-border-gray rounded-[24px] p-12 text-center flex flex-col items-center justify-center min-h-[350px] shadow-sm">
+          <div className="p-4 rounded-full bg-dash-light-blue-bg text-dash-primary-purple mb-4">
+            <BookOpen size={36} className="animate-pulse" />
+          </div>
+          <h3 className="font-plus-jakarta font-extrabold text-base text-dash-dark-purple">
+            No Assessments Found
+          </h3>
+          <p className="text-xs text-dash-light-purple font-medium mt-2 max-w-sm leading-relaxed">
+            {searchQuery
+              ? `No assessments match "${searchQuery}". Try refining your search query.`
+              : 'You have not saved any AI generated assessments yet. Create one using the AI Generator.'}
+          </p>
+          {!searchQuery && (
+            <button
+              onClick={() => setActiveTab('create-assessment')}
+              className="mt-5 px-4.5 py-2.5 rounded-xl bg-dash-primary-purple text-dash-white-card font-bold text-xs hover:bg-dash-dark-purple transition-all cursor-pointer border-none shadow-md"
+            >
+              Get Started with AI
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {filteredAssessments.map((asm) => {
+            const isAssigning = assigningId === asm.id;
+            return (
+              <motion.div
+                key={asm.id}
+                layout
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="bg-dash-white-card border border-dash-border-gray hover:border-dash-primary-purple/40 rounded-[24px] p-6 shadow-sm flex flex-col justify-between gap-5 transition-all duration-300 relative group"
+              >
+                <div>
+                  {/* Card Header */}
+                  <div className="flex items-start justify-between gap-3 mb-2.5">
+                    <h4 className="font-outfit font-extrabold text-base text-dash-dark-purple leading-snug group-hover:text-dash-primary-purple transition-colors duration-200 truncate max-w-[200px]" title={asm.name}>
+                      {asm.name}
+                    </h4>
+                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md border shrink-0 uppercase tracking-wider ${getDifficultyColor(asm.difficulty)}`}>
+                      {asm.difficulty}
+                    </span>
+                  </div>
+
+                  {/* Creation Date */}
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-dash-light-purple mb-4">
+                    <Calendar size={12} />
+                    <span>Created: {asm.createdDate}</span>
+                  </div>
+
+                  {/* Subject Badges */}
+                  <div className="flex flex-wrap gap-1.5 mb-4.5">
+                    {asm.subjects.map(sub => (
+                      <span key={sub} className={`text-[9px] font-extrabold uppercase tracking-widest px-2.5 py-1 rounded-full border ${getSubjectBadgeClass(sub)}`}>
+                        {sub}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* Meta items */}
+                  <div className="grid grid-cols-2 gap-3.5 bg-dash-light-blue-bg/25 border border-dash-border-gray/30 p-3 rounded-xl mb-4 text-xs font-semibold text-dash-dark-purple">
+                    <div className="flex items-center gap-2">
+                      <Clock size={14} className="text-dash-primary-purple" />
+                      <span>{asm.duration}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <BookOpen size={14} className="text-dash-primary-purple" />
+                      <span>{asm.questionsCount} Questions</span>
+                    </div>
+                  </div>
+
+                  {/* Candidates Assigned Status */}
+                  <div className="flex items-center gap-2 text-xs font-semibold text-dash-light-purple">
+                    <div className={`w-1.5 h-1.5 rounded-full ${asm.candidatesAssigned > 0 ? 'bg-dash-success-green' : 'bg-dash-primary-purple/40'}`} />
+                    <span>
+                      {asm.candidatesAssigned > 0
+                        ? `Assigned to ${asm.candidatesAssigned} Candidate(s)`
+                        : 'Not assigned to candidates yet'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Card Actions / Inline Assign Form */}
+                <div className="border-t border-dash-border-gray/30 pt-4 mt-1">
+                  {isAssigning ? (
+                    <form
+                      onSubmit={(e) => handleConfirmAssign(e, asm.id, asm.name)}
+                      className="flex items-center gap-2 w-full animate-fade-in"
+                    >
+                      <input
+                        type="email"
+                        placeholder="Candidate email..."
+                        value={candidateEmail}
+                        onChange={(e) => setCandidateEmail(e.target.value)}
+                        className="flex-1 bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple"
+                        autoFocus
+                        required
+                      />
+                      <button
+                        type="submit"
+                        className="p-2.5 rounded-xl bg-dash-primary-purple hover:bg-dash-dark-purple text-dash-white-card transition-all flex items-center justify-center border-none cursor-pointer"
+                        title="Send Invite"
+                      >
+                        <Send size={12} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAssigningId(null)}
+                        className="p-2.5 rounded-xl bg-dash-border-gray/25 hover:bg-dash-border-gray/50 text-dash-dark-purple transition-all flex items-center justify-center border-none cursor-pointer"
+                        title="Cancel"
+                      >
+                        <X size={12} />
+                      </button>
+                    </form>
+                  ) : (
+                    <div className="flex items-center justify-between gap-2.5 w-full">
+                      <button
+                        onClick={() => setSelectedAssessmentForView(asm)}
+                        className="flex-1 py-2.5 rounded-xl border border-dash-border-gray/80 hover:bg-dash-soft-pink text-dash-dark-purple font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer bg-dash-white-card"
+                      >
+                        <Eye size={13} />
+                        <span>View Questions</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleStartAssign(asm.id)}
+                        className="flex-1 py-2.5 rounded-xl bg-dash-primary-purple/10 border border-dash-primary-purple/20 hover:bg-dash-primary-purple/20 text-dash-primary-purple font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <UserPlus size={13} />
+                        <span>Assign</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleDeleteAssessment(asm.id, asm.name)}
+                        className="p-2.5 rounded-xl border border-red-100 hover:border-red-200 bg-red-50/30 hover:bg-red-50 text-red-600 transition-all duration-200 flex items-center justify-center cursor-pointer"
+                        title="Delete Assessment"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ==========================================
+// 10. ASSESSMENT DETAILS DRAWER COMPONENT
+// ==========================================
+const AssessmentDetailsDrawer = ({ assessment, onClose, showToast }) => {
+  const [copiedId, setCopiedId] = useState(null);
+
+  const handleCopyCode = (code, qId) => {
+    navigator.clipboard.writeText(code);
+    setCopiedId(qId);
+    showToast("Answer copied to clipboard!");
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  return (
+    <>
+      {/* Backdrop */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 0.4 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="fixed inset-0 bg-dash-dark-purple/40 z-40"
+      />
+
+      {/* Drawer */}
+      <motion.div
+        initial={{ x: '100%' }}
+        animate={{ x: 0 }}
+        exit={{ x: '100%' }}
+        transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
+        className="fixed top-0 bottom-0 right-0 w-full sm:w-[500px] bg-dash-white-card border-l border-dash-border-gray shadow-2xl z-50 p-6 flex flex-col justify-between overflow-hidden"
+      >
+        <div className="flex flex-col h-full overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center justify-between pb-4 border-b border-dash-border-gray mb-6 shrink-0">
+            <div>
+              <span className="text-[10px] text-dash-primary-purple font-extrabold tracking-widest uppercase block mb-1">
+                Assessment Questions Pool
+              </span>
+              <h3 className="text-base font-bold text-dash-dark-purple font-outfit mt-0.5 truncate max-w-[380px]">
+                {assessment.name}
+              </h3>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg hover:bg-dash-soft-pink text-dash-light-purple hover:text-dash-dark-purple transition-all duration-200 cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* Metadata Grid */}
+          <div className="grid grid-cols-3 gap-3 bg-dash-light-blue-bg/30 border border-dash-border-gray/30 p-3.5 rounded-xl mb-6 shrink-0 text-center">
+            <div>
+              <span className="text-[9px] font-bold text-dash-light-purple uppercase block mb-0.5">Difficulty</span>
+              <span className="text-xs font-bold text-dash-dark-purple">{assessment.difficulty}</span>
+            </div>
+            <div>
+              <span className="text-[9px] font-bold text-dash-light-purple uppercase block mb-0.5">Duration</span>
+              <span className="text-xs font-bold text-dash-dark-purple">{assessment.duration}</span>
+            </div>
+            <div>
+              <span className="text-[9px] font-bold text-dash-light-purple uppercase block mb-0.5">Total Questions</span>
+              <span className="text-xs font-bold text-dash-dark-purple">{assessment.questionsCount}</span>
+            </div>
+          </div>
+
+          {/* Scrollable Questions list */}
+          <div className="flex-1 overflow-y-auto pr-1 space-y-5 dashboard-scrollbar">
+            {assessment.questions && assessment.questions.length > 0 ? (
+              assessment.questions.map((q, idx) => {
+                const isCoding = q.type === 'SCENARIO' || q.type === 'SCENARIO_CODING' || q.type?.includes('CODING');
+                return (
+                  <div key={q.id || idx} className="bg-dash-light-blue-bg/15 border border-dash-border-gray/40 rounded-2xl p-4.5 space-y-3.5 shadow-sm text-left">
+                    {/* Info bar */}
+                    <div className="flex items-center justify-between text-[10px] font-extrabold uppercase tracking-wide border-b border-dash-border-gray/25 pb-2">
+                      <span className="text-dash-primary-purple font-outfit">
+                        {isCoding ? 'Scenario Coding' : 'MCQ'} #{idx + 1}
+                      </span>
+                      <span className="bg-dash-white-card border border-dash-border-gray/30 px-2 py-0.5 rounded text-dash-dark-purple/70 font-semibold">
+                        {q.subject}
+                      </span>
+                    </div>
+
+                    {/* Question text */}
+                    <div className="space-y-1.5">
+                      <span className="text-[9px] font-bold text-dash-light-purple uppercase tracking-wider block">Question</span>
+                      <p className="text-xs font-semibold text-dash-dark-purple leading-relaxed bg-dash-white-card/50 p-3 rounded-xl border border-dash-border-gray/30 select-text">
+                        {q.question || q.problemStatement || q.scenario}
+                      </p>
+                    </div>
+
+                    {/* MCQ Options */}
+                    {!isCoding && q.options && q.options.length > 0 && (
+                      <div className="space-y-1.5">
+                        <span className="text-[9px] font-bold text-dash-light-purple uppercase tracking-wider block">Options</span>
+                        <div className="grid grid-cols-1 gap-1.5">
+                          {q.options.map((opt, oIdx) => {
+                            const isCorrect = opt === q.correctAnswer;
+                            const optLabel = ['A', 'B', 'C', 'D'][oIdx] || '';
+                            return (
+                              <div
+                                key={oIdx}
+                                className={`p-2.5 rounded-xl border flex items-center gap-2.5 text-xs ${isCorrect
+                                    ? 'border-green-400 bg-green-50/40 text-green-700 font-bold'
+                                    : 'border-dash-border-gray/30 bg-dash-white-card/50 text-dash-dark-purple'
+                                  }`}
+                              >
+                                {isCorrect ? (
+                                  <CheckCircle className="w-3.5 h-3.5 text-green-600 shrink-0" />
+                                ) : (
+                                  <div className="w-3.5 h-3.5 rounded-full border border-dash-light-purple/40 shrink-0 flex items-center justify-center font-bold text-[8px] text-dash-light-purple">
+                                    {optLabel}
+                                  </div>
+                                )}
+                                <span>{opt}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Scenario Input/Output */}
+                    {isCoding && (
+                      <div className="grid grid-cols-2 gap-3 text-[10px]">
+                        <div className="space-y-1">
+                          <span className="font-bold text-dash-light-purple uppercase tracking-wider">Input</span>
+                          <div className="bg-dash-white-card/50 border border-dash-border-gray/30 rounded-lg p-2 font-mono text-[9px] text-dash-dark-purple whitespace-pre-wrap select-text">
+                            {q.exampleInput || 'N/A'}
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <span className="font-bold text-dash-light-purple uppercase tracking-wider">Output</span>
+                          <div className="bg-dash-white-card/50 border border-dash-border-gray/30 rounded-lg p-2 font-mono text-[9px] text-dash-dark-purple whitespace-pre-wrap select-text">
+                            {q.exampleOutput || 'N/A'}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Scenario Constraints */}
+                    {isCoding && q.constraints && q.constraints.length > 0 && (
+                      <div className="space-y-1">
+                        <span className="text-[9px] font-bold text-dash-light-purple uppercase tracking-wider block">Constraints</span>
+                        <div className="bg-amber-50/30 border border-amber-200/40 rounded-xl p-2.5 space-y-1">
+                          {q.constraints.map((c, cIdx) => (
+                            <div key={cIdx} className="flex items-center gap-1.5 text-[9px] font-semibold text-dash-dark-purple">
+                              <div className="w-1 h-1 rounded-full bg-amber-500 shrink-0" />
+                              <span>{c}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Expected Answer */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] font-bold text-dash-light-purple uppercase tracking-wider">
+                          {isCoding ? 'Expected Code' : 'Correct Answer'}
+                        </span>
+                        {isCoding && q.expectedAnswer && (
+                          <button
+                            onClick={() => handleCopyCode(q.expectedAnswer, q.id)}
+                            className="px-2 py-0.5 rounded border border-dash-border-gray/80 text-[8px] font-bold text-dash-primary-purple hover:bg-dash-soft-pink transition-all flex items-center gap-1 cursor-pointer"
+                          >
+                            {copiedId === q.id ? (
+                              <>
+                                <Check size={8} strokeWidth={3} className="text-green-600" />
+                                <span className="text-green-600">Copied!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy size={8} />
+                                <span>Copy</span>
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
+
+                      {!isCoding ? (
+                        <div className="bg-green-50/40 border border-green-200/50 text-green-700 rounded-xl p-2.5 font-semibold text-xs flex items-center gap-1.5">
+                          <CheckCircle className="text-green-600 shrink-0" size={14} />
+                          <span>{q.correctAnswer}</span>
+                        </div>
+                      ) : (
+                        <div className="bg-[#fafafc] border border-dash-border-gray/40 rounded-xl p-3.5 font-mono text-[9px] text-[#0f172a] whitespace-pre overflow-x-auto relative select-text border-l-2 border-l-dash-primary-purple">
+                          <SyntaxHighlighter
+                            code={q.expectedAnswer}
+                            language={q.subject.toLowerCase() === 'sql' ? 'sql' : 'python'}
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Explanation */}
+                    {q.explanation && (
+                      <div className="space-y-1 pb-1">
+                        <span className="text-[9px] font-bold text-dash-light-purple uppercase tracking-wider block">Explanation</span>
+                        <p className="text-[10px] font-medium text-dash-light-purple leading-relaxed bg-dash-white-card/30 p-2.5 rounded-xl border border-dash-border-gray/20 select-text">
+                          {q.explanation}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            ) : (
+              <div className="py-12 text-center text-xs text-dash-light-purple italic">
+                No questions included in this assessment.
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="pt-4 border-t border-dash-border-gray mt-6 shrink-0">
+          <button
+            onClick={onClose}
+            className="w-full py-3 rounded-xl bg-dash-primary-purple text-dash-white-card font-bold text-xs hover:bg-dash-dark-purple transition-all duration-200 flex items-center justify-center cursor-pointer border-none shadow-sm"
+          >
+            <span>Close Preview</span>
+          </button>
+        </div>
+      </motion.div>
+    </>
   );
 };
 

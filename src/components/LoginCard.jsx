@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Lock, LogIn, Check, User, Phone } from 'lucide-react';
+import { Mail, Lock, LogIn, Check, User, Phone, Loader2 } from 'lucide-react';
 import RoleSwitcher from './RoleSwitcher';
 import InputField from './InputField';
 import logo from '../assets/logo.svg';
+import api from '../api';
 
 const MicrosoftIcon = () => (
   <svg width="18" height="18" viewBox="0 0 23 23" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -28,50 +29,208 @@ const LoginCard = ({ role, setRole, onRecruiterLogin, onLogin }) => {
   const [phone, setPhone] = useState('');
   const [agreeTerms, setAgreeTerms] = useState(false);
 
+  // Loading and Error states
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
   const isRecruiter = role === 'recruiter';
 
-  // Reset candidate mode when switching roles
+  // Reset states when switching roles
   useEffect(() => {
     setCandidateMode('login');
+    setError('');
   }, [role]);
 
-  const handleLoginSubmit = (e) => {
+  useEffect(() => {
+    setError('');
+  }, [candidateMode]);
+
+  const handleLoginSubmit = async (e) => {
     e.preventDefault();
-    console.log(`Signing in as ${role}:`, { email, password, rememberMe });
-    if (onLogin) {
-      onLogin();
-    } else if (onRecruiterLogin) {
-      onRecruiterLogin();
+    setError('');
+
+    if (!email || !password) {
+      setError('Please enter both email and password.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await api.post('/api/auth/login', {
+        email: email.trim(),
+        password: password
+      });
+
+      const { access_token, refresh_token, user, role: userRole } = response.data;
+
+      // Store tokens and user details
+      localStorage.setItem('recruitai_access_token', access_token);
+      localStorage.setItem('recruitai_refresh_token', refresh_token);
+      localStorage.setItem('recruitai_user', JSON.stringify(user));
+
+      if (userRole === 'candidate') {
+        // Build compatibility object for CandidateDashboard
+        const storedCandidates = localStorage.getItem('recruitai_candidates');
+        let candidatesList = [];
+        if (storedCandidates) {
+          try {
+            candidatesList = JSON.parse(storedCandidates);
+          } catch (err) {
+            console.error(err);
+          }
+        }
+        
+        let candidate = candidatesList.find(c => c.email.toLowerCase() === email.toLowerCase());
+        if (!candidate) {
+          candidate = {
+            id: user.id,
+            name: user.full_name || user.name || 'New Candidate',
+            email: user.email,
+            role: 'Data Analyst',
+            date: new Date().toISOString().split('T')[0],
+            resume: 0,
+            python: 0,
+            sql: 0,
+            aptitude: 0,
+            english: 0,
+            final: 0,
+            recommendation: 'Not Ready',
+            status: 'In Progress'
+          };
+          candidatesList.unshift(candidate);
+          localStorage.setItem('recruitai_candidates', JSON.stringify(candidatesList));
+        }
+        localStorage.setItem('current_candidate', JSON.stringify(candidate));
+      }
+
+      if (onLogin) {
+        onLogin(userRole);
+      }
+    } catch (err) {
+      console.error("Login failed:", err);
+      let detailMsg = 'An unexpected error occurred. Please try again later.';
+      if (!err.response) {
+        detailMsg = 'Unable to connect to the backend server. Please verify the server is running and the database is reachable.';
+      } else if (err.response.status === 500) {
+        detailMsg = 'Server Error: Database connection timed out or failed. Please check your DATABASE_URL.';
+      } else if (err.response.data?.errors) {
+        detailMsg = err.response.data.errors.map(e => `${e.field}: ${e.message}`).join(' | ');
+      } else if (err.response.data?.detail) {
+        detailMsg = err.response.data.detail;
+      } else {
+        detailMsg = 'Invalid email or password. Please try again.';
+      }
+      setError(detailMsg);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleRegisterSubmit = (e) => {
+  const handleRegisterSubmit = async (e) => {
     e.preventDefault();
-    if (!agreeTerms) {
-      alert("You must agree to the Terms & Conditions.");
+    setError('');
+
+    if (!fullName || !email || !password) {
+      setError('Please fill in all required fields.');
       return;
     }
-    console.log("Candidate Registering:", {
-      fullName,
-      email,
-      phone,
-      password,
-      agreeTerms
-    });
-    alert(`Successfully registered account for ${fullName}! Proceeding to Login.`);
-    setCandidateMode('login');
+
+    if (!agreeTerms) {
+      setError('You must agree to the Terms & Conditions.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await api.post('/api/auth/register', {
+        name: fullName.trim(),
+        email: email.trim(),
+        phone: phone ? phone.trim() : null,
+        password: password
+      });
+
+      const { access_token, refresh_token, user, role: userRole } = response.data;
+
+      // Store tokens and user details
+      localStorage.setItem('recruitai_access_token', access_token);
+      localStorage.setItem('recruitai_refresh_token', refresh_token);
+      localStorage.setItem('recruitai_user', JSON.stringify(user));
+
+      // Build compatibility object for dashboards
+      const storedCandidates = localStorage.getItem('recruitai_candidates');
+      let candidatesList = [];
+      if (storedCandidates) {
+        try {
+          candidatesList = JSON.parse(storedCandidates);
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      const newCandidate = {
+        id: user.id,
+        name: user.full_name || user.name,
+        email: user.email,
+        role: 'Data Analyst',
+        date: new Date().toISOString().split('T')[0],
+        resume: 0,
+        python: 0,
+        sql: 0,
+        aptitude: 0,
+        english: 0,
+        final: 0,
+        recommendation: 'Not Ready',
+        status: 'In Progress'
+      };
+
+      candidatesList.unshift(newCandidate);
+      localStorage.setItem('recruitai_candidates', JSON.stringify(candidatesList));
+      localStorage.setItem('current_candidate', JSON.stringify(newCandidate));
+
+      alert(`Successfully registered account for ${user.full_name}!`);
+
+      if (onLogin) {
+        onLogin(userRole);
+      }
+    } catch (err) {
+      console.error("Registration failed:", err);
+      let detailMsg = 'An unexpected error occurred. Please try again later.';
+      if (!err.response) {
+        detailMsg = 'Unable to connect to the backend server. Please verify the server is running and the database is reachable.';
+      } else if (err.response.status === 500) {
+        detailMsg = 'Server Error: Database connection timed out or failed. Please check your DATABASE_URL.';
+      } else if (err.response.data?.errors) {
+        detailMsg = err.response.data.errors.map(e => `${e.field}: ${e.message}`).join(' | ');
+      } else if (err.response.data?.detail) {
+        detailMsg = err.response.data.detail;
+      } else {
+        detailMsg = 'Registration failed. Email might already be registered.';
+      }
+      setError(detailMsg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleMicrosoftLogin = () => {
-    console.log('Microsoft login clicked');
+    // Statically log in as a recruiter (completely on frontend, no auth API call)
+    const mockRecruiter = {
+      id: "f3b3970b-689e-4e4b-91ef-a5d6f1bfd8c1",
+      full_name: "Admin Recruiter",
+      name: "Admin Recruiter",
+      email: "recruiter@recruitai.com",
+      role: "recruiter"
+    };
+
+    localStorage.setItem('recruitai_access_token', 'mock_recruiter_access_token');
+    localStorage.setItem('recruitai_refresh_token', 'mock_recruiter_refresh_token');
+    localStorage.setItem('recruitai_user', JSON.stringify(mockRecruiter));
+
     if (onLogin) {
-      onLogin();
-    } else if (onRecruiterLogin) {
-      onRecruiterLogin();
-    } else {
-      alert('Microsoft Entra ID corporate login initiated.');
+      onLogin('recruiter');
     }
   };
+
 
   // Dynamic Header contents
   const getHeaderContent = () => {
@@ -112,6 +271,17 @@ const LoginCard = ({ role, setRole, onRecruiterLogin, onLogin }) => {
 
       {/* Role Switcher */}
       <RoleSwitcher role={role} setRole={setRole} />
+
+      {/* Error Banner */}
+      {error && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-red-50 border border-red-200 text-red-600 rounded-xl p-3 text-sm my-4 text-left font-medium"
+        >
+          {error}
+        </motion.div>
+      )}
 
       {/* Dynamic Title and Subtitle with Framer Motion AnimatePresence */}
       <div className="text-center mb-6">
@@ -240,12 +410,13 @@ const LoginCard = ({ role, setRole, onRecruiterLogin, onLogin }) => {
               {/* Submit button with icon */}
               <motion.button
                 type="submit"
-                className="w-full border-none font-inter text-[0.95rem] font-semibold text-white cursor-pointer flex items-center justify-center gap-2.5 transition-all duration-200 active:scale-[0.98] bg-candidate-primary rounded-xl p-3.5 shadow-[0_4px_14px_rgba(124,58,237,0.08)] hover:bg-candidate-primary-hover hover:shadow-[0_6px_18px_rgba(124,58,237,0.18)]"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                disabled={loading}
+                className={`w-full border-none font-inter text-[0.95rem] font-semibold text-white cursor-pointer flex items-center justify-center gap-2.5 transition-all duration-200 active:scale-[0.98] bg-candidate-primary rounded-xl p-3.5 shadow-[0_4px_14px_rgba(124,58,237,0.08)] hover:bg-candidate-primary-hover hover:shadow-[0_6px_18px_rgba(124,58,237,0.18)] ${loading ? 'opacity-75 cursor-not-allowed' : ''}`}
+                whileHover={{ scale: loading ? 1 : 1.02 }}
+                whileTap={{ scale: loading ? 1 : 0.98 }}
               >
-                <LogIn size={18} />
-                <span>Sign In</span>
+                {loading ? <Loader2 className="animate-spin" size={18} /> : <LogIn size={18} />}
+                <span>{loading ? 'Signing In...' : 'Sign In'}</span>
               </motion.button>
             </form>
 
@@ -359,11 +530,13 @@ const LoginCard = ({ role, setRole, onRecruiterLogin, onLogin }) => {
               {/* Create Account Action */}
               <motion.button
                 type="submit"
-                className="w-full border-none font-inter text-[0.95rem] font-semibold text-white cursor-pointer flex items-center justify-center gap-2.5 transition-all duration-200 active:scale-[0.98] bg-candidate-primary rounded-xl p-3 shadow-[0_4px_14px_rgba(124,58,237,0.08)] hover:bg-candidate-primary-hover hover:shadow-[0_6px_18px_rgba(124,58,237,0.18)]"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                disabled={loading}
+                className={`w-full border-none font-inter text-[0.95rem] font-semibold text-white cursor-pointer flex items-center justify-center gap-2.5 transition-all duration-200 active:scale-[0.98] bg-candidate-primary rounded-xl p-3 shadow-[0_4px_14px_rgba(124,58,237,0.08)] hover:bg-candidate-primary-hover hover:shadow-[0_6px_18px_rgba(124,58,237,0.18)] ${loading ? 'opacity-75 cursor-not-allowed' : ''}`}
+                whileHover={{ scale: loading ? 1 : 1.02 }}
+                whileTap={{ scale: loading ? 1 : 0.98 }}
               >
-                <span>Create Account</span>
+                {loading ? <Loader2 className="animate-spin" size={18} /> : null}
+                <span>{loading ? 'Creating Account...' : 'Create Account'}</span>
               </motion.button>
             </form>
 

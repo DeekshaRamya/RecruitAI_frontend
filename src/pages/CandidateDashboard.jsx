@@ -26,6 +26,37 @@ const CandidateDashboard = ({ onLogout }) => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [toastMessage, setToastMessage] = useState('');
 
+  const [candidate] = useState(() => {
+    const saved = localStorage.getItem('current_candidate');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Error parsing current_candidate:", e);
+      }
+    }
+    return {
+      id: 3,
+      name: 'Arjun Sharma',
+      email: 'arjun.sharma@recruitai.com',
+      role: 'Python Developer',
+      date: '2026-07-06',
+      resume: 84,
+      python: 78,
+      sql: 82,
+      aptitude: 74,
+      english: 88,
+      final: 82,
+      recommendation: 'Strong Hire',
+      status: 'Completed'
+    };
+  });
+
+  const handleSignOut = () => {
+    localStorage.removeItem('current_candidate');
+    onLogout();
+  };
+
   const showToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => {
@@ -33,13 +64,15 @@ const CandidateDashboard = ({ onLogout }) => {
     }, 4000);
   };
 
+  const firstName = candidate.name.split(' ')[0];
+
   const getHeaderContent = () => {
     switch (activeTab) {
       case 'dashboard':
         return {
           title: 'Candidate Dashboard',
           tag: 'Portal',
-          subtitle: 'Welcome back, Arjun. Track your assessment progress here.'
+          subtitle: `Welcome back, ${firstName}. Track your assessment progress here.`
         };
       case 'resume':
         return {
@@ -71,15 +104,15 @@ const CandidateDashboard = ({ onLogout }) => {
   const stats = [
     {
       label: 'Resume',
-      value: 'Uploaded',
-      subtext: 'Arjun_Sharma_CV.pdf',
+      value: candidate.resume > 0 ? 'Uploaded' : 'Pending',
+      subtext: candidate.resume > 0 ? `${candidate.name.replace(/\s+/g, '_')}_CV.pdf` : 'No file uploaded',
       icon: FileText,
       colorClass: 'text-white bg-white/20',
       cardBg: 'bg-gradient-to-br from-[#5E80B4] to-[#4D6D9E] text-white border-0 shadow-md'
     },
     {
       label: 'Avg Skill Match',
-      value: '78%',
+      value: candidate.final > 0 ? `${candidate.final}%` : '—',
       subtext: 'Across 4 categories',
       icon: Award,
       colorClass: 'text-white bg-white/20',
@@ -87,7 +120,7 @@ const CandidateDashboard = ({ onLogout }) => {
     },
     {
       label: 'Assessment',
-      value: '1 / 3',
+      value: `${[candidate.python, candidate.sql, candidate.aptitude, candidate.english].filter(s => s > 0).length} / 4`,
       subtext: 'Modules completed',
       icon: Briefcase,
       colorClass: 'text-white bg-white/20',
@@ -95,8 +128,8 @@ const CandidateDashboard = ({ onLogout }) => {
     },
     {
       label: 'Final Score',
-      value: '—',
-      subtext: 'Complete all to unlock',
+      value: candidate.final > 0 ? `${candidate.final}%` : '—',
+      subtext: candidate.final > 0 ? 'Unlock complete' : 'Complete all to unlock',
       icon: TrendingUp,
       colorClass: 'text-white bg-white/20',
       cardBg: 'bg-gradient-to-br from-[#768CB5] to-[#5C7CAE] text-white border-0 shadow-md'
@@ -107,40 +140,48 @@ const CandidateDashboard = ({ onLogout }) => {
   const journeySteps = [
     {
       title: 'Resume Upload',
-      description: 'Arjun_Sharma_CV.pdf uploaded successfully',
-      status: 'Completed',
-      statusColor: 'text-dash-success-green bg-dash-success-green/10 border-dash-success-green/20'
+      description: candidate.resume > 0 ? `${candidate.name.replace(/\s+/g, '_')}_CV.pdf uploaded successfully` : 'Upload your resume to begin',
+      status: candidate.resume > 0 ? 'Completed' : 'Pending',
+      statusColor: candidate.resume > 0 ? 'text-dash-success-green bg-dash-success-green/10 border-dash-success-green/20' : 'text-dash-light-purple bg-dash-border-gray/30 border-dash-border-gray/40'
     },
     {
       title: 'AI Analysis',
-      description: 'Skills extracted & matched against 4 categories',
-      status: 'Completed',
-      statusColor: 'text-dash-success-green bg-dash-success-green/10 border-dash-success-green/20'
+      description: candidate.resume > 0 ? 'Skills extracted & matched against 4 categories' : 'Awaiting resume upload',
+      status: candidate.resume > 0 ? 'Completed' : 'Pending',
+      statusColor: candidate.resume > 0 ? 'text-dash-success-green bg-dash-success-green/10 border-dash-success-green/20' : 'text-dash-light-purple bg-dash-border-gray/30 border-dash-border-gray/40'
     },
     {
       title: 'Technical Assessment',
       description: '30 questions · 60 min · Python, SQL, Aptitude',
-      status: 'In Progress',
-      statusColor: 'text-dash-primary-purple bg-dash-primary-purple/10 border-dash-primary-purple/20'
+      status: (candidate.python > 0 || candidate.sql > 0 || candidate.aptitude > 0)
+        ? ((candidate.python > 0 && candidate.sql > 0 && candidate.aptitude > 0) ? 'Completed' : 'In Progress')
+        : 'Pending',
+      statusColor: (candidate.python > 0 && candidate.sql > 0 && candidate.aptitude > 0)
+        ? 'text-dash-success-green bg-dash-success-green/10 border-dash-success-green/20'
+        : (candidate.python > 0 || candidate.sql > 0 || candidate.aptitude > 0)
+          ? 'text-dash-primary-purple bg-dash-primary-purple/10 border-dash-primary-purple/20'
+          : 'text-dash-light-purple bg-dash-border-gray/30 border-dash-border-gray/40'
     },
     {
       title: 'English Speaking',
       description: '5 AI-generated resume-based questions',
-      status: 'Pending',
-      statusColor: 'text-dash-light-purple bg-dash-border-gray/30 border-dash-border-gray/40'
+      status: candidate.english > 0 ? 'Completed' : 'Pending',
+      statusColor: candidate.english > 0
+        ? 'text-dash-success-green bg-dash-success-green/10 border-dash-success-green/20'
+        : 'text-dash-light-purple bg-dash-border-gray/30 border-dash-border-gray/40'
     }
   ];
 
   // Skills progress based on mock
   const skills = [
-    { name: 'Python', percent: 82, colorClass: 'bg-gradient-to-r from-[#5E80B4] to-[#4D6D9E]' },
-    { name: 'SQL', percent: 76, colorClass: 'bg-gradient-to-r from-[#8B95C9] to-[#7380BD]' },
-    { name: 'Aptitude', percent: 68, colorClass: 'bg-gradient-to-r from-[#E57E88] to-[#D06774]' },
-    { name: 'English', percent: 88, colorClass: 'bg-gradient-to-r from-[#768CB5] to-[#5C7CAE]' }
+    { name: 'Python', percent: candidate.python || 0, colorClass: 'bg-gradient-to-r from-[#5E80B4] to-[#4D6D9E]' },
+    { name: 'SQL', percent: candidate.sql || 0, colorClass: 'bg-gradient-to-r from-[#8B95C9] to-[#7380BD]' },
+    { name: 'Aptitude', percent: candidate.aptitude || 0, colorClass: 'bg-gradient-to-r from-[#E57E88] to-[#D06774]' },
+    { name: 'English', percent: candidate.english || 0, colorClass: 'bg-gradient-to-r from-[#768CB5] to-[#5C7CAE]' }
   ];
 
   // Strengths tags
-  const strengths = ['Python', 'Django', 'PostgreSQL', 'ML', 'Docker'];
+  const strengths = candidate.resume > 0 ? ['Python', 'SQL', 'Aptitude', 'English'] : ['Pending Assessment'];
 
   return (
     <div className="candidate-dashboard-theme bg-dash-light-blue-bg text-dash-dark-purple min-h-screen relative overflow-hidden font-inter flex w-full">
@@ -221,17 +262,17 @@ const CandidateDashboard = ({ onLogout }) => {
           <div className="border-t border-dash-border-gray/25 pt-4 px-2">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-full bg-dash-primary-purple flex items-center justify-center font-semibold text-dash-white-card">
-                AS
+                {candidate.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
               </div>
               <div className="overflow-hidden">
-                <h4 className="text-xs font-semibold text-dash-dark-purple truncate">Arjun Sharma</h4>
+                <h4 className="text-xs font-semibold text-dash-dark-purple truncate">{candidate.name}</h4>
                 <span className="text-[10px] text-dash-light-purple truncate block">Candidate</span>
               </div>
             </div>
           </div>
 
           <button
-            onClick={onLogout}
+            onClick={handleSignOut}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-dash-light-purple hover:bg-dash-primary-purple/20 transition-all duration-200 cursor-pointer"
           >
             <LogOut size={16} />
@@ -323,17 +364,17 @@ const CandidateDashboard = ({ onLogout }) => {
             <div className="border-t border-dash-border-gray/25 pt-4 space-y-3 mr-4">
               <div className="flex items-center gap-3 px-2">
                 <div className="w-9 h-9 rounded-full bg-dash-primary-purple flex items-center justify-center font-semibold text-dash-white-card">
-                  AS
+                  {candidate.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
                 </div>
                 <div>
-                  <h4 className="text-xs font-semibold text-dash-dark-purple">Arjun Sharma</h4>
+                  <h4 className="text-xs font-semibold text-dash-dark-purple">{candidate.name}</h4>
                   <span className="text-[10px] text-dash-light-purple">Candidate</span>
                 </div>
               </div>
               <button
                 onClick={() => {
                   setSidebarOpen(false);
-                  onLogout();
+                  handleSignOut();
                 }}
                 className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-dash-light-purple hover:bg-dash-primary-purple/20 transition-all duration-200"
               >

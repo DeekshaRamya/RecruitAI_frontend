@@ -1,25 +1,43 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import LoginCard from '../components/LoginCard';
 import RecruiterAnimation from '../components/RecruiterAnimation';
 import CandidateAnimation from '../components/CandidateAnimation';
-import RecruiterDashboard from './RecruiterDashboard';
-import CandidateDashboard from './CandidateDashboard';
 import logo from '../assets/logo.svg';
 
 const Login = () => {
   const [role, setRole] = useState('recruiter'); // 'recruiter' or 'candidate'
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const navigate = useNavigate();
 
   const isRecruiter = role === 'recruiter';
 
-  if (isLoggedIn) {
-    if (isRecruiter) {
-      return <RecruiterDashboard onLogout={() => setIsLoggedIn(false)} />;
-    } else {
-      return <CandidateDashboard onLogout={() => setIsLoggedIn(false)} />;
+  // Check for existing valid sessions on load
+  useEffect(() => {
+    const token = localStorage.getItem('recruitai_access_token');
+    const userStr = localStorage.getItem('recruitai_user');
+    if (token && userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        if (user.role === 'candidate') {
+          navigate('/candidate/dashboard', { replace: true });
+        } else if (user.role === 'recruiter') {
+          navigate('/recruiter/dashboard', { replace: true });
+        }
+      } catch (err) {
+        console.error("Error parsing user from localStorage:", err);
+      }
     }
-  }
+  }, [navigate]);
+
+  const handleLoginSuccess = (userRole) => {
+    if (userRole === 'candidate') {
+      navigate('/candidate/dashboard', { replace: true });
+    } else if (userRole === 'recruiter') {
+      navigate('/recruiter/dashboard', { replace: true });
+    }
+  };
+
 
   return (
     <div
@@ -92,7 +110,7 @@ const Login = () => {
             : 'md:basis-2/5 bg-white border-l border-candidate-card-border shadow-[-10px_0_30px_rgba(124,58,237,0.01)] max-md:bg-candidate-bg'
           }`}
       >
-        <LoginCard role={role} setRole={setRole} onLogin={() => setIsLoggedIn(true)} />
+        <LoginCard role={role} setRole={setRole} onLogin={handleLoginSuccess} />
       </div>
     </div>
   );
