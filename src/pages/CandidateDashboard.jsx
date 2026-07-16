@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
+import api from '../api';
 import {
   Briefcase,
   Users,
@@ -18,13 +19,112 @@ import {
   CheckCircle2,
   Clock,
   ChevronRight,
-  UploadCloud
+  ChevronLeft,
+  UploadCloud,
+  Play,
+  ArrowLeft,
+  ArrowRight,
+  Check
 } from 'lucide-react';
 
 const CandidateDashboard = ({ onLogout }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [toastMessage, setToastMessage] = useState('');
+
+  const [assignments, setAssignments] = useState([]);
+  const [loadingAssignments, setLoadingAssignments] = useState(true);
+  const [activeAssignment, setActiveAssignment] = useState(null);
+  const [examState, setExamState] = useState({
+    currentQuestionIndex: 0,
+    answers: {},
+    timeLeft: 0,
+    submitted: false
+  });
+
+  const fetchAssignments = async () => {
+    try {
+      setLoadingAssignments(true);
+      const response = await api.get('/api/assignments/candidate');
+      setAssignments(response.data);
+    } catch (err) {
+      console.error("Failed to fetch assignments:", err);
+    } finally {
+      setLoadingAssignments(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAssignments();
+  }, []);
+
+  const parseDuration = (durStr) => {
+    const parsed = parseInt(durStr.replace(/\D/g, ''), 10);
+    return isNaN(parsed) ? 30 : parsed;
+  };
+
+  const formatTime = (seconds) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    if (h > 0) {
+      return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const handleStartExam = async (assignment) => {
+    try {
+      if (assignment.status === 'ASSIGNED') {
+        await api.patch(`/api/assignments/${assignment.id}/status`, { status: 'IN_PROGRESS' });
+        // Update local list
+        setAssignments(prev => prev.map(a => a.id === assignment.id ? { ...a, status: 'IN_PROGRESS' } : a));
+      }
+      setActiveAssignment(assignment);
+      setExamState({
+        currentQuestionIndex: 0,
+        answers: {},
+        timeLeft: parseDuration(assignment.assessment.duration) * 60,
+        submitted: false
+      });
+    } catch (err) {
+      console.error("Failed to start assessment:", err);
+      showToast("Error starting assessment. Please try again.");
+    }
+  };
+
+  const handleSubmitExam = async (assignmentIdOverride) => {
+    const targetId = assignmentIdOverride || activeAssignment?.id;
+    if (!targetId) return;
+
+    try {
+      await api.patch(`/api/assignments/${targetId}/status`, { status: 'COMPLETED' });
+      setExamState(prev => ({ ...prev, submitted: true }));
+      await fetchAssignments();
+    } catch (err) {
+      console.error("Failed to submit exam:", err);
+      showToast("Error submitting assessment. Please try again.");
+    }
+  };
+
+  useEffect(() => {
+    if (!activeAssignment || examState.submitted || examState.timeLeft <= 0) return;
+
+    const timer = setInterval(() => {
+      setExamState((prev) => {
+        if (prev.timeLeft <= 1) {
+          clearInterval(timer);
+          setTimeout(() => {
+            handleSubmitExam(activeAssignment.id);
+          }, 0);
+          return { ...prev, timeLeft: 0 };
+        }
+        return { ...prev, timeLeft: prev.timeLeft - 1 };
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [activeAssignment, examState.submitted, examState.timeLeft]);
 
   const [candidate] = useState(() => {
     const saved = localStorage.getItem('current_candidate');
@@ -230,7 +330,7 @@ const CandidateDashboard = ({ onLogout }) => {
                   key={item.id}
                   onClick={() => {
                     setActiveTab(item.id);
-                    if (item.id !== 'dashboard') {
+                    if (item.id !== 'dashboard' && item.id !== 'resume' && item.id !== 'technical') {
                       showToast(`"${item.label}" feature is coming soon!`);
                     }
                   }}
@@ -335,7 +435,7 @@ const CandidateDashboard = ({ onLogout }) => {
                     onClick={() => {
                       setActiveTab(item.id);
                       setSidebarOpen(false);
-                      if (item.id !== 'dashboard') {
+                      if (item.id !== 'dashboard' && item.id !== 'resume' && item.id !== 'technical') {
                         showToast(`"${item.label}" feature is coming soon!`);
                       }
                     }}
@@ -619,61 +719,358 @@ const CandidateDashboard = ({ onLogout }) => {
           </div>
         )}
 
-        {activeTab === 'technical' && (
-          <div className="flex justify-center items-center py-6 animate-fade-in w-full">
-            <div className="w-full max-w-2xl bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-8 shadow-[0_4px_25px_rgba(87,82,170,0.02)] flex flex-col items-center text-center gap-6">
-              {/* Header Icon */}
-              <div className="w-16 h-16 rounded-full bg-dash-primary-purple/10 flex items-center justify-center text-dash-primary-purple">
-                <Terminal size={32} />
+        {activeTab === 'technical' && !activeAssignment && (
+          <div className="w-full flex flex-col gap-6 animate-fade-in">
+            {loadingAssignments ? (
+              <div className="flex flex-col items-center justify-center py-20 gap-4">
+                <div className="w-12 h-12 rounded-full border-4 border-dash-primary-purple border-t-transparent animate-spin" />
+                <p className="text-sm font-semibold text-dash-light-purple">Loading your assessments...</p>
               </div>
-
-              {/* Title & Description */}
-              <div>
-                <h3 className="font-plus-jakarta font-extrabold text-xl text-dash-dark-purple tracking-tight">
-                  Ready to Begin?
+            ) : assignments.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] shadow-sm max-w-2xl mx-auto w-full text-center p-8">
+                <div className="w-16 h-16 rounded-full bg-dash-primary-purple/10 flex items-center justify-center text-dash-primary-purple mb-4">
+                  <Terminal size={32} />
+                </div>
+                <h3 className="font-plus-jakarta font-extrabold text-xl text-dash-dark-purple">
+                  No Assessments Assigned Yet
                 </h3>
-                <p className="text-sm text-dash-light-purple font-semibold mt-2 max-w-md mx-auto leading-relaxed">
-                  9 AI-generated questions across Python, SQL, and Aptitude. You have 60 minutes to complete the test.
+                <p className="text-sm text-dash-light-purple font-semibold mt-2 max-w-md">
+                  Your recruiter will assign technical assessments for you to take here. Check back soon!
                 </p>
               </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {assignments.map((assignment) => {
+                  const asm = assignment.assessment;
+                  const isCompleted = assignment.status === 'COMPLETED';
+                  const isInProgress = assignment.status === 'IN_PROGRESS';
+                  const isAssigned = assignment.status === 'ASSIGNED';
 
-              {/* Three Metrics Grid */}
-              <div className="grid grid-cols-3 gap-4 w-full">
-                {[
-                  { value: '9', label: 'Questions' },
-                  { value: '60 min', label: 'Duration' },
-                  { value: '3', label: 'Subjects' }
-                ].map((item) => (
-                  <div key={item.label} className="bg-dash-soft-pink border border-dash-border-gray/50 rounded-2xl p-4 flex flex-col items-center justify-center gap-1 hover:bg-dash-border-gray transition-all">
-                    <span className="font-plus-jakarta font-extrabold text-lg text-dash-dark-purple">{item.value}</span>
-                    <span className="text-[10px] font-bold text-dash-light-purple uppercase tracking-wider">{item.label}</span>
-                  </div>
-                ))}
+                  return (
+                    <div 
+                      key={assignment.id} 
+                      className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-6 shadow-[0_4px_25px_rgba(87,82,170,0.02)] flex flex-col justify-between gap-5 hover:shadow-md transition-all duration-300 relative overflow-hidden"
+                    >
+                      {/* Top Badges */}
+                      <div className="flex items-center justify-between">
+                        <span className="px-3 py-1.5 rounded-full text-[10px] font-extrabold tracking-wide uppercase border bg-dash-soft-pink border-dash-border-gray/50 text-dash-dark-purple">
+                          {asm.difficulty}
+                        </span>
+                        
+                        {/* Status Badge */}
+                        <span className={`px-3 py-1.5 rounded-full text-[10px] font-bold tracking-wide uppercase border ${
+                          isCompleted 
+                            ? 'text-[#22c55e] bg-[#22c55e]/10 border-[#22c55e]/20'
+                            : isInProgress
+                              ? 'text-[#f97316] bg-[#f97316]/10 border-[#f97316]/20'
+                              : 'text-[#3b82f6] bg-[#3b82f6]/10 border-[#3b82f6]/20'
+                        }`}>
+                          {assignment.status}
+                        </span>
+                      </div>
+
+                      {/* Title & Subjects */}
+                      <div>
+                        <h4 className="font-plus-jakarta font-extrabold text-lg text-dash-dark-purple tracking-tight line-clamp-1">
+                          {asm.name}
+                        </h4>
+                        <p className="text-xs font-bold text-dash-light-purple mt-1 font-mono">
+                          Subjects: {asm.subjects ? (Array.isArray(asm.subjects) ? asm.subjects.join(', ') : asm.subjects) : ''}
+                        </p>
+                      </div>
+
+                      {/* Detail Metrics Grid */}
+                      <div className="grid grid-cols-2 gap-3 w-full bg-dash-light-blue-bg/40 border border-dash-border-gray/30 rounded-2xl p-4">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-[10px] font-bold text-dash-light-purple uppercase tracking-wider">Duration</span>
+                          <span className="font-plus-jakarta font-extrabold text-sm text-dash-dark-purple">{asm.duration}</span>
+                        </div>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-[10px] font-bold text-dash-light-purple uppercase tracking-wider">Questions</span>
+                          <span className="font-plus-jakarta font-extrabold text-sm text-dash-dark-purple">{asm.questionsCount} items</span>
+                        </div>
+                        <div className="flex flex-col gap-0.5 col-span-2 border-t border-dash-border-gray/25 pt-2 mt-1">
+                          <span className="text-[10px] font-bold text-dash-light-purple uppercase tracking-wider">Assigned Date</span>
+                          <span className="font-semibold text-xs text-dash-dark-purple">
+                            {new Date(assignment.assignedAt).toLocaleString()}
+                          </span>
+                        </div>
+                        {assignment.dueDate && (
+                          <div className="flex flex-col gap-0.5 col-span-2 border-t border-dash-border-gray/25 pt-2">
+                            <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider">Due Date</span>
+                            <span className="font-semibold text-xs text-red-600">
+                              {new Date(assignment.dueDate).toLocaleString()}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Action Button */}
+                      {isCompleted ? (
+                        <div className="w-full py-3 rounded-xl bg-dash-success-green/10 text-dash-success-green text-center font-bold text-sm border border-dash-success-green/20 flex items-center justify-center gap-2">
+                          <CheckCircle2 size={16} />
+                          <span>Completed</span>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => handleStartExam(assignment)}
+                          className="w-full py-3 rounded-xl bg-dash-primary-purple text-dash-white-card font-bold text-sm hover:bg-dash-dark-purple transition-all duration-200 shadow-md cursor-pointer border-0 flex items-center justify-center gap-2"
+                        >
+                          <Play size={14} />
+                          <span>{isInProgress ? 'Resume Assessment' : 'Start Assessment'}</span>
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
+            )}
+          </div>
+        )}
 
-              {/* Warning Instructions Box */}
-              <div className="w-full bg-dash-soft-pink/50 border border-dash-accent-brown/40 rounded-2xl p-5 text-left flex flex-col gap-2">
-                <h4 className="text-xs font-bold text-dash-accent-brown uppercase tracking-wider flex items-center gap-1.5">
-                  Before you start:
-                </h4>
-                <ul className="text-xs font-semibold text-dash-accent-brown/90 space-y-1.5 list-disc list-inside">
-                  <li>Do not refresh or navigate away during the test.</li>
-                  <li>All answers are saved automatically.</li>
-                  <li>Submit when done — you cannot re-attempt.</li>
-                </ul>
+        {activeTab === 'technical' && activeAssignment && examState.submitted && (
+          <div className="flex justify-center items-center py-12 animate-fade-in w-full">
+            <div className="w-full max-w-2xl bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-10 shadow-[0_4px_25px_rgba(87,82,170,0.02)] flex flex-col items-center text-center gap-6">
+              <div className="w-20 h-20 rounded-full bg-dash-success-green/10 flex items-center justify-center text-dash-success-green mb-2 animate-bounce">
+                <Check size={40} />
               </div>
-
-              {/* CTA Button */}
+              <div>
+                <h3 className="font-plus-jakarta font-extrabold text-2xl text-dash-dark-purple tracking-tight">
+                  Assessment Completed!
+                </h3>
+                <p className="text-sm text-dash-light-purple font-semibold mt-3 max-w-md mx-auto leading-relaxed">
+                  Thank you for taking the assessment. Your response has been securely saved and submitted to your recruiter.
+                </p>
+              </div>
               <button
-                onClick={() => showToast('Technical Assessment started')}
-                className="w-full py-3.5 rounded-xl bg-dash-primary-purple text-dash-white-card font-bold text-sm hover:bg-dash-dark-purple transition-all duration-200 shadow-md cursor-pointer border-0 flex items-center justify-center gap-2"
+                onClick={() => setActiveAssignment(null)}
+                className="px-8 py-3 rounded-xl bg-dash-primary-purple text-dash-white-card font-bold text-sm hover:bg-dash-dark-purple transition-all duration-200 shadow-md cursor-pointer border-0"
               >
-                <Terminal size={16} />
-                <span>Start Assessment</span>
+                Return to Assessment List
               </button>
             </div>
           </div>
         )}
+
+        {activeTab === 'technical' && activeAssignment && !examState.submitted && (() => {
+          const questions = activeAssignment.assessment.questions || [];
+          const currentIdx = examState.currentQuestionIndex;
+          const question = questions[currentIdx];
+
+          if (!question) {
+            return (
+              <div className="text-center py-20 bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-8 max-w-2xl mx-auto w-full">
+                <p className="text-sm font-semibold text-red-500 mb-4">Error: No questions found in this assessment.</p>
+                <button onClick={() => setActiveAssignment(null)} className="px-4 py-2 bg-dash-primary-purple text-white rounded-lg border-0 cursor-pointer">Go Back</button>
+              </div>
+            );
+          }
+
+          const hasPrev = currentIdx > 0;
+          const hasNext = currentIdx < questions.length - 1;
+
+          return (
+            <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 items-start animate-fade-in w-full">
+              
+              {/* LEFT: Navigator & Progress Side */}
+              <div className="xl:col-span-1 bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-5 shadow-[0_4px_20px_rgba(87,82,170,0.02)] flex flex-col gap-6">
+                
+                {/* Header Timer */}
+                <div className="flex flex-col gap-1 text-center bg-dash-soft-pink border border-dash-border-gray/50 rounded-2xl p-4">
+                  <span className="text-[10px] font-bold text-dash-light-purple uppercase tracking-wider">Time Remaining</span>
+                  <span className="font-plus-jakarta font-extrabold text-2xl text-red-600 font-mono tracking-wider">
+                    {formatTime(examState.timeLeft)}
+                  </span>
+                </div>
+
+                {/* Questions Grid Selector */}
+                <div>
+                  <h4 className="text-xs font-bold text-dash-dark-purple uppercase tracking-wider mb-3">Questions</h4>
+                  <div className="grid grid-cols-4 gap-2">
+                    {questions.map((_, idx) => {
+                      const isCurrent = idx === currentIdx;
+                      const isAnswered = examState.answers[idx] !== undefined && examState.answers[idx] !== '';
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => setExamState(prev => ({ ...prev, currentQuestionIndex: idx }))}
+                          className={`w-10 h-10 rounded-xl font-extrabold text-xs flex items-center justify-center cursor-pointer border transition-all duration-200 ${
+                            isCurrent
+                              ? 'bg-dash-primary-purple text-white border-dash-primary-purple shadow-sm'
+                              : isAnswered
+                                ? 'bg-dash-success-green/10 text-dash-success-green border-[#22c55e]/20 hover:bg-dash-success-green/20'
+                                : 'bg-dash-soft-pink border border-dash-border-gray/50 text-dash-light-purple hover:bg-dash-border-gray'
+                          }`}
+                        >
+                          {idx + 1}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Progress Stats */}
+                <div className="border-t border-dash-border-gray/25 pt-4 flex flex-col gap-2">
+                  <div className="flex justify-between text-xs font-bold text-dash-light-purple">
+                    <span>Progress</span>
+                    <span className="text-dash-dark-purple">
+                      {Object.keys(examState.answers).length} / {questions.length} Done
+                    </span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-dash-light-blue-bg overflow-hidden">
+                    <div 
+                      className="h-full bg-dash-primary-purple rounded-full transition-all duration-300"
+                      style={{ width: `${(Object.keys(examState.answers).length / questions.length) * 100}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Emergency Submit */}
+                <button
+                  onClick={() => {
+                    if (window.confirm("Are you sure you want to submit your assessment? You cannot make any changes after submission.")) {
+                      handleSubmitExam();
+                    }
+                  }}
+                  className="w-full py-2.5 rounded-xl border border-red-200 bg-red-50 text-red-600 font-bold text-xs hover:bg-red-100 transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <CheckCircle2 size={14} />
+                  <span>Submit Assessment</span>
+                </button>
+              </div>
+
+              {/* RIGHT: Active Question Display */}
+              <div className="xl:col-span-3 flex flex-col gap-6">
+                
+                {/* Question Info Header */}
+                <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-6 shadow-[0_4px_20px_rgba(87,82,170,0.02)] flex flex-col gap-4">
+                  <div className="flex items-center justify-between border-b border-dash-border-gray/25 pb-3">
+                    <span className="text-xs font-bold text-dash-light-purple uppercase tracking-wider">
+                      Question {currentIdx + 1} of {questions.length}
+                    </span>
+                    <span className="px-3 py-1 rounded-full text-[10px] font-extrabold tracking-wide uppercase bg-dash-soft-pink border border-dash-border-gray/50 text-dash-primary-purple">
+                      {question.options && question.options.length > 0 ? 'MCQ' : 'SCENARIO'}
+                    </span>
+                  </div>
+
+                  {/* Question Scenario if SCENARIO type */}
+                  {question.scenario && (
+                    <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-2xl p-5">
+                      <h5 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Scenario Context:</h5>
+                      <p className="text-sm font-semibold text-slate-800 leading-relaxed whitespace-pre-line">
+                        {question.scenario}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Question text */}
+                  <div>
+                    <h3 className="font-plus-jakarta font-extrabold text-lg text-dash-dark-purple leading-relaxed">
+                      {question.question}
+                    </h3>
+                  </div>
+
+                  {/* Options (MCQ) or Textarea (Scenario) */}
+                  {question.options && question.options.length > 0 ? (
+                    <div className="flex flex-col gap-3 mt-2">
+                      {question.options.map((option, optIdx) => {
+                        const isSelected = examState.answers[currentIdx] === option;
+                        return (
+                          <button
+                            key={optIdx}
+                            onClick={() => setExamState(prev => ({
+                              ...prev,
+                              answers: { ...prev.answers, [currentIdx]: option }
+                            }))}
+                            className={`w-full text-left p-4 rounded-2xl border font-semibold text-sm transition-all duration-200 cursor-pointer flex items-between items-center group ${
+                              isSelected
+                                ? 'bg-dash-primary-purple/10 border-dash-primary-purple text-dash-dark-purple shadow-sm'
+                                : 'bg-dash-soft-pink border-dash-border-gray/50 text-dash-light-purple hover:bg-dash-border-gray hover:text-dash-dark-purple'
+                            }`}
+                          >
+                            <span className="flex-1 pr-4">{option}</span>
+                            <div className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-all ${
+                              isSelected
+                                ? 'border-dash-primary-purple bg-dash-primary-purple text-white'
+                                : 'border-dash-border-gray/60 group-hover:border-dash-light-purple'
+                            }`}>
+                              {isSelected && <Check size={12} strokeWidth={3} />}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-3 mt-2">
+                      {question.exampleInput && (
+                        <div className="grid grid-cols-2 gap-4 bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-mono text-slate-700">
+                          <div>
+                            <span className="block font-bold text-slate-400 uppercase tracking-wider text-[9px] mb-1">Example Input:</span>
+                            <span className="block">{question.exampleInput}</span>
+                          </div>
+                          <div>
+                            <span className="block font-bold text-slate-400 uppercase tracking-wider text-[9px] mb-1">Example Output:</span>
+                            <span className="block">{question.exampleOutput}</span>
+                          </div>
+                        </div>
+                      )}
+                      <textarea
+                        value={examState.answers[currentIdx] || ''}
+                        onChange={(e) => setExamState(prev => ({
+                          ...prev,
+                          answers: { ...prev.answers, [currentIdx]: e.target.value }
+                        }))}
+                        placeholder="Write your code or answer explanation here..."
+                        rows={10}
+                        className="w-full p-4 rounded-2xl border border-dash-border-gray/50 bg-[#fafafa] font-mono text-sm focus:outline-none focus:ring-2 focus:ring-dash-primary-purple/40 focus:border-dash-primary-purple transition-all resize-y"
+                      />
+                    </div>
+                  )}
+
+                  {/* Navigation Buttons */}
+                  <div className="flex items-center justify-between border-t border-dash-border-gray/25 pt-5 mt-3">
+                    <button
+                      onClick={() => setExamState(prev => ({ ...prev, currentQuestionIndex: currentIdx - 1 }))}
+                      disabled={!hasPrev}
+                      className={`px-5 py-2.5 rounded-xl border border-dash-border-gray/50 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
+                        hasPrev 
+                          ? 'bg-dash-soft-pink text-dash-dark-purple hover:bg-dash-border-gray'
+                          : 'opacity-50 cursor-not-allowed text-dash-light-purple bg-transparent'
+                      }`}
+                    >
+                      <ChevronLeft size={16} />
+                      <span>Previous</span>
+                    </button>
+
+                    {hasNext ? (
+                      <button
+                        onClick={() => setExamState(prev => ({ ...prev, currentQuestionIndex: currentIdx + 1 }))}
+                        className="px-6 py-2.5 rounded-xl bg-dash-primary-purple text-dash-white-card font-bold text-xs hover:bg-dash-dark-purple transition-all flex items-center gap-1.5 cursor-pointer border-0"
+                      >
+                        <span>Next</span>
+                        <ChevronRight size={16} />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          if (window.confirm("Are you sure you want to submit your assessment? You cannot make any changes after submission.")) {
+                            handleSubmitExam();
+                          }
+                        }}
+                        className="px-6 py-2.5 rounded-xl bg-[#22c55e] text-white font-bold text-xs hover:bg-[#16a34a] transition-all flex items-center gap-1.5 cursor-pointer border-0"
+                      >
+                        <CheckCircle2 size={16} />
+                        <span>Finish & Submit</span>
+                      </button>
+                    )}
+                  </div>
+
+                </div>
+              </div>
+
+            </div>
+          );
+        })()}
 
         {activeTab === 'english' && (
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start animate-fade-in">

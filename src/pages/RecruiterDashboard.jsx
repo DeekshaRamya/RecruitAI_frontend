@@ -150,7 +150,10 @@ const RecruiterDashboard = ({ onLogout }) => {
     const saved = localStorage.getItem('recruitai_candidates');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed;
+        }
       } catch (e) {
         console.error("Error parsing candidates from localStorage:", e);
       }
@@ -257,12 +260,12 @@ const RecruiterDashboard = ({ onLogout }) => {
   const [savedAssessments, setSavedAssessments] = useState([]);
   const [selectedAssessmentForView, setSelectedAssessmentForView] = useState(null);
 
-  // Fetch assessments from backend on mount
+  // Fetch assessments and candidates from backend on mount
   useEffect(() => {
     const fetchAssessments = async () => {
       try {
         const response = await api.get('/api/assessment');
-        if (response.data) {
+        if (response.data && Array.isArray(response.data)) {
           setSavedAssessments(response.data);
         }
       } catch (err) {
@@ -270,7 +273,21 @@ const RecruiterDashboard = ({ onLogout }) => {
         showToast("Error loading assessments from server.");
       }
     };
+
+    const fetchCandidates = async () => {
+      try {
+        const response = await api.get('/api/candidates');
+        if (response.data && Array.isArray(response.data)) {
+          setCandidates(response.data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch candidates from backend:", err);
+        showToast("Error loading candidates from server.");
+      }
+    };
+
     fetchAssessments();
+    fetchCandidates();
   }, []);
 
   // Sidebar navigation state
@@ -284,6 +301,24 @@ const RecruiterDashboard = ({ onLogout }) => {
 
   // Interactive UI Drawer states
   const [selectedCandidate, setSelectedCandidate] = useState(null);
+
+  // Candidate Pagination & Dropdown states
+  const [candidatePage, setCandidatePage] = useState(1);
+  const [assignSearch, setAssignSearch] = useState('');
+  const [selectedAssignCandidate, setSelectedAssignCandidate] = useState(null);
+  const [showAssignDropdown, setShowAssignDropdown] = useState(false);
+
+  useEffect(() => {
+    setCandidatePage(1);
+  }, [searchQuery, selectedStatus, candidates.length]);
+
+  useEffect(() => {
+    if (assigningAssessment) {
+      setAssignSearch('');
+      setSelectedAssignCandidate(null);
+      setShowAssignDropdown(false);
+    }
+  }, [assigningAssessment]);
 
   // Subjects and topics dataset as state so recruiters can dynamically add/edit topics
   const [subjectsData, setSubjectsData] = useState({
@@ -586,6 +621,7 @@ const RecruiterDashboard = ({ onLogout }) => {
 
   // Dynamic states for active assessments metric count
   const [activeAssessmentsCount, setActiveAssessmentsCount] = useState(18);
+  const [assigningAssessment, setAssigningAssessment] = useState(null);
 
   // AI-generated questions list (starts with default demo questions, updated on AI generation)
   const [generatedQuestions, setGeneratedQuestions] = useState([
@@ -659,7 +695,7 @@ const RecruiterDashboard = ({ onLogout }) => {
 
   // Statistics data (dynamic active assessments)
   const stats = [
-    { label: 'Total Candidates', value: candidates.length.toString(), change: '+12% this week', icon: Users },
+    { label: 'Total Candidates', value: (Array.isArray(candidates) ? candidates.length : 0).toString(), change: '+12% this week', icon: Users },
     { label: 'Active Assessments', value: activeAssessmentsCount.toString(), change: '+2 new today', icon: Briefcase },
     { label: 'Completion Rate', value: '84.5%', change: '+3% avg. rate', icon: TrendingUp },
     { label: 'Average Score', value: '78.2%', change: '+1.4% improvement', icon: Award },
@@ -669,19 +705,23 @@ const RecruiterDashboard = ({ onLogout }) => {
   const statuses = ['All Statuses', 'Completed', 'In Progress', 'Under Review', 'Failed'];
 
   // Handle Search, Filters, and Sorting
-  const filteredCandidates = candidates
+  const filteredCandidates = (Array.isArray(candidates) ? candidates : [])
     .filter(candidate => {
-      const matchesSearch = candidate.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        candidate.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        candidate.role.toLowerCase().includes(searchQuery.toLowerCase());
+      const nameVal = (candidate.full_name || candidate.name || '').toLowerCase();
+      const emailVal = (candidate.email || '').toLowerCase();
 
-      const matchesStatus = selectedStatus === 'All Statuses' || candidate.status === selectedStatus;
+      const matchesSearch = nameVal.includes(searchQuery.toLowerCase()) ||
+        emailVal.includes(searchQuery.toLowerCase());
+
+      const matchesStatus = selectedStatus === 'All Statuses' || (candidate.status || 'Active') === selectedStatus;
 
       return matchesSearch && matchesStatus;
     })
     .sort((a, b) => {
       if (sortBy === 'newest') {
-        return new Date(b.date) - new Date(a.date);
+        const dateB = b.created_at ? new Date(b.created_at) : new Date(b.date || 0);
+        const dateA = a.created_at ? new Date(a.created_at) : new Date(a.date || 0);
+        return dateB - dateA;
       }
       if (sortBy === 'score-high') {
         return (b.final || 0) - (a.final || 0);
@@ -691,6 +731,13 @@ const RecruiterDashboard = ({ onLogout }) => {
       }
       return 0;
     });
+
+  const candidatesPerPage = 5;
+  const totalPages = Math.ceil(filteredCandidates.length / candidatesPerPage) || 1;
+  const paginatedCandidates = filteredCandidates.slice(
+    (candidatePage - 1) * candidatesPerPage,
+    candidatePage * candidatesPerPage
+  );
 
   // Action: Create Assessment (legacy submit)
   const handleCreateAssessmentSubmit = (e) => {
@@ -769,7 +816,7 @@ const RecruiterDashboard = ({ onLogout }) => {
     }
   };
 
-  const handleSaveAndAssign = async () => {
+  const handleSaveAssessment = async (andAssign = false) => {
     const subjectsInQuestions = [...new Set(generatedQuestions.map(q => q.subject))].filter(Boolean);
     const activeSubjects = subjectsInQuestions.length > 0 ? subjectsInQuestions : ['General'];
     const name = `${activeSubjects.join(' & ')} Technical Test`;
@@ -778,7 +825,7 @@ const RecruiterDashboard = ({ onLogout }) => {
       name: name,
       subjects: activeSubjects,
       difficulty: difficulty || 'Medium',
-      duration: duration || '45 minutes',
+      duration: duration || '60 minutes',
       questionsCount: generatedQuestions.length,
       createdDate: new Date().toISOString().split('T')[0],
       status: 'Active',
@@ -789,7 +836,8 @@ const RecruiterDashboard = ({ onLogout }) => {
     try {
       const response = await api.post('/api/assessment', payload);
       if (response.data) {
-        setSavedAssessments(prev => [response.data, ...prev]);
+        const savedAsm = response.data;
+        setSavedAssessments(prev => [savedAsm, ...prev]);
         showToast('Assessment saved successfully!');
         setActiveAssessmentsCount(prev => prev + 1);
         setSelectedTopics({
@@ -797,11 +845,50 @@ const RecruiterDashboard = ({ onLogout }) => {
           SQL: [],
           Aptitude: []
         });
-        setActiveTab('assessments');
+
+        if (andAssign) {
+          setAssigningAssessment(savedAsm);
+          setActiveTab('assessments');
+        } else {
+          setActiveTab('assessments');
+        }
       }
     } catch (err) {
       console.error("Failed to save assessment to backend:", err);
       showToast("Error saving assessment to database.");
+    }
+  };
+
+  const handleConfirmAssign = async (email, dueDate) => {
+    if (!assigningAssessment) return;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      alert('Please enter a valid email address.');
+      return;
+    }
+
+    try {
+      const payload = {
+        assessmentId: assigningAssessment.id,
+        candidateEmail: email,
+        dueDate: dueDate ? new Date(dueDate).toISOString() : null
+      };
+
+      const response = await api.post('/api/assignments', payload);
+      if (response.data) {
+        showToast("Assessment assigned successfully.");
+        // Refresh saved assessments
+        const assessmentsRes = await api.get('/api/assessment');
+        if (assessmentsRes.data) {
+          setSavedAssessments(assessmentsRes.data);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to assign assessment:", err);
+      const errMsg = err.response?.data?.detail || "Error assigning assessment. Verify candidate exists.";
+      showToast(errMsg);
+    } finally {
+      setAssigningAssessment(null);
     }
   };
 
@@ -1078,10 +1165,17 @@ const RecruiterDashboard = ({ onLogout }) => {
                 >
                   <span>← Back</span>
                 </button>
+                <button
+                  onClick={() => handleSaveAssessment(false)}
+                  className="px-4 py-2 rounded-xl border border-dash-primary-purple text-dash-primary-purple text-xs font-bold hover:bg-dash-primary-purple/5 transition-all duration-200 cursor-pointer flex items-center gap-2 bg-dash-white-card"
+                >
+                  <Save size={14} />
+                  <span>Save</span>
+                </button>
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={handleSaveAndAssign}
+                  onClick={() => handleSaveAssessment(true)}
                   className="px-4.5 py-2.5 rounded-xl bg-dash-primary-purple border border-dash-primary-purple text-dash-white-card font-bold text-sm cursor-pointer shadow-md hover:bg-dash-dark-purple hover:border-dash-dark-purple transition-all duration-300 flex items-center gap-2"
                 >
                   <Check size={16} strokeWidth={2.5} />
@@ -1242,49 +1336,28 @@ const RecruiterDashboard = ({ onLogout }) => {
                 <table className="w-full min-w-[900px] border-collapse text-left text-sm">
                   <thead>
                     <tr className="bg-dash-soft-pink border-b border-dash-border-gray text-[10px] font-extrabold text-dash-dark-purple tracking-widest uppercase">
-                      <th className="px-6 py-4.5">Candidate</th>
-                      <th className="px-6 py-4.5">Resume</th>
-                      <th className="px-6 py-4.5">Python</th>
-                      <th className="px-6 py-4.5">SQL</th>
-                      <th className="px-6 py-4.5">Aptitude</th>
-                      <th className="px-6 py-4.5">English</th>
-                      <th className="px-6 py-4.5">Final</th>
-                      <th className="px-6 py-4.5">AI Recommendation</th>
+                      <th className="px-6 py-4.5">Full Name</th>
+                      <th className="px-6 py-4.5">Email Address</th>
+                      <th className="px-6 py-4.5">Phone Number</th>
+                      <th className="px-6 py-4.5">Registration Date</th>
                       <th className="px-6 py-4.5">Status</th>
                       <th className="px-6 py-4.5"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-dash-border-gray">
                     <AnimatePresence mode="popLayout">
-                      {filteredCandidates.map((candidate) => {
-                        const getScoreColor = (val) => {
-                          if (val >= 80) return '#149470';
-                          if (val >= 60) return '#d97706';
-                          return '#84492D';
-                        };
+                      {paginatedCandidates.map((candidate) => {
+                        const regDate = candidate.created_at
+                          ? new Date(candidate.created_at).toLocaleDateString(undefined, {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric'
+                            })
+                          : (candidate.date || 'N/A');
 
-                        let statusColor = '';
-                        let statusBg = '';
-                        if (candidate.status === 'Completed') {
-                          statusColor = '#149470';
-                          statusBg = 'rgba(20, 148, 112, 0.1)';
-                        } else {
-                          statusColor = '#5752AA'; // Purple/Blue for In Progress
-                          statusBg = 'rgba(87, 82, 170, 0.1)';
-                        }
-
-                        let recColor = '';
-                        let recPrefix = '';
-                        if (candidate.recommendation === 'Strong Hire') {
-                          recColor = '#149470';
-                          recPrefix = '✓ ';
-                        } else if (candidate.recommendation === 'Moderate') {
-                          recColor = '#d97706';
-                          recPrefix = '~ ';
-                        } else {
-                          recColor = '#84492D';
-                          recPrefix = 'X ';
-                        }
+                        const isCompleted = candidate.status === 'Completed';
+                        let statusColor = isCompleted ? '#149470' : '#5752AA';
+                        let statusBg = isCompleted ? 'rgba(20, 148, 112, 0.1)' : 'rgba(87, 82, 170, 0.1)';
 
                         return (
                           <motion.tr
@@ -1296,51 +1369,26 @@ const RecruiterDashboard = ({ onLogout }) => {
                             transition={{ duration: 0.3 }}
                             className="bg-dash-white-card hover:bg-dash-soft-pink transition-colors duration-200 group"
                           >
-                            {/* Candidate info (name and role) */}
+                            {/* Full Name */}
                             <td className="px-6 py-4">
-                              <div>
-                                <h4 className="text-xs font-bold text-dash-dark-purple group-hover:text-dash-primary-purple transition-colors duration-200">
-                                  {candidate.name}
-                                </h4>
-                                <span className="text-[10px] text-dash-light-purple font-medium">
-                                  {candidate.role}
-                                </span>
-                              </div>
+                              <h4 className="text-xs font-bold text-dash-dark-purple group-hover:text-dash-primary-purple transition-colors duration-200">
+                                {candidate.full_name || candidate.name}
+                              </h4>
                             </td>
 
-                            {/* Resume score */}
-                            <td className="px-6 py-4 text-xs font-bold" style={{ color: getScoreColor(candidate.resume) }}>
-                              {candidate.resume}%
+                            {/* Email Address */}
+                            <td className="px-6 py-4 text-xs font-semibold text-dash-dark-purple">
+                              {candidate.email}
                             </td>
 
-                            {/* Python score */}
-                            <td className="px-6 py-4 text-xs font-bold" style={{ color: getScoreColor(candidate.python) }}>
-                              {candidate.python}%
+                            {/* Phone Number */}
+                            <td className="px-6 py-4 text-xs font-semibold text-dash-light-purple">
+                              {candidate.phone || 'N/A'}
                             </td>
 
-                            {/* SQL score */}
-                            <td className="px-6 py-4 text-xs font-bold" style={{ color: getScoreColor(candidate.sql) }}>
-                              {candidate.sql}%
-                            </td>
-
-                            {/* Aptitude score */}
-                            <td className="px-6 py-4 text-xs font-bold" style={{ color: getScoreColor(candidate.aptitude) }}>
-                              {candidate.aptitude}%
-                            </td>
-
-                            {/* English score */}
-                            <td className="px-6 py-4 text-xs font-bold" style={{ color: getScoreColor(candidate.english) }}>
-                              {candidate.english}%
-                            </td>
-
-                            {/* Final score */}
-                            <td className="px-6 py-4 text-xs font-bold" style={{ color: getScoreColor(candidate.final) }}>
-                              {candidate.final}%
-                            </td>
-
-                            {/* AI Recommendation */}
-                            <td className="px-6 py-4 text-xs font-bold" style={{ color: recColor }}>
-                              {recPrefix}{candidate.recommendation}
+                            {/* Registration Date */}
+                            <td className="px-6 py-4 text-xs font-semibold text-dash-light-purple">
+                              {regDate}
                             </td>
 
                             {/* Status */}
@@ -1357,7 +1405,7 @@ const RecruiterDashboard = ({ onLogout }) => {
                                   className="w-1.5 h-1.5 rounded-full"
                                   style={{ backgroundColor: statusColor }}
                                 />
-                                {candidate.status}
+                                {candidate.status || 'Active'}
                               </span>
                             </td>
 
@@ -1389,9 +1437,48 @@ const RecruiterDashboard = ({ onLogout }) => {
               </div>
 
               {/* TABLE FOOTER */}
-              <div className="p-4 border-t border-dash-border-gray bg-dash-white-card flex items-center justify-between text-[11px] text-dash-light-purple font-semibold px-6">
-                <span>Showing {filteredCandidates.length} of {candidates.length} candidates</span>
-                <span>Total 18 assessments listed in workspace</span>
+              <div className="p-4 border-t border-dash-border-gray bg-dash-white-card flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-dash-light-purple font-semibold px-6">
+                <span>
+                  Showing {filteredCandidates.length > 0 ? (candidatePage - 1) * candidatesPerPage + 1 : 0} to{' '}
+                  {Math.min(filteredCandidates.length, candidatePage * candidatesPerPage)} of{' '}
+                  {filteredCandidates.length} candidates
+                  {filteredCandidates.length !== (Array.isArray(candidates) ? candidates.length : 0) && ` (filtered from ${(Array.isArray(candidates) ? candidates.length : 0)})`}
+                </span>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      disabled={candidatePage === 1}
+                      onClick={() => setCandidatePage(prev => Math.max(prev - 1, 1))}
+                      className="px-2.5 py-1.5 rounded-lg border border-dash-border-gray bg-dash-white-card hover:bg-dash-soft-pink text-dash-dark-purple disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                    >
+                      Prev
+                    </button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                      <button
+                        key={page}
+                        onClick={() => setCandidatePage(page)}
+                        className={`w-7.5 h-7.5 rounded-lg flex items-center justify-center font-bold text-xs border transition-colors cursor-pointer ${
+                          candidatePage === page
+                            ? 'bg-dash-primary-purple border-dash-primary-purple text-dash-white-card'
+                            : 'bg-dash-white-card border-dash-border-gray text-dash-dark-purple hover:bg-dash-soft-pink'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                    <button
+                      disabled={candidatePage === totalPages}
+                      onClick={() => setCandidatePage(prev => Math.min(prev + 1, totalPages))}
+                      className="px-2.5 py-1.5 rounded-lg border border-dash-border-gray bg-dash-white-card hover:bg-dash-soft-pink text-dash-dark-purple disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+
+                <span>Total {savedAssessments.length} assessments listed in workspace</span>
               </div>
 
             </section>
@@ -1666,17 +1753,13 @@ const RecruiterDashboard = ({ onLogout }) => {
                   <label className="text-xs font-bold text-dash-light-purple uppercase tracking-wider">
                     Duration
                   </label>
-                  <select
+                  <input
+                    type="text"
                     value={duration}
                     onChange={(e) => setDuration(e.target.value)}
-                    className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2.5 px-4 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple cursor-pointer transition-all"
-                  >
-                    <option value="30 minutes">30 minutes</option>
-                    <option value="45 minutes">45 minutes</option>
-                    <option value="60 minutes">60 minutes</option>
-                    <option value="90 minutes">90 minutes</option>
-                    <option value="120 minutes">120 minutes</option>
-                  </select>
+                    placeholder="e.g. 60 minutes"
+                    className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2.5 px-4 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple transition-all"
+                  />
                 </div>
 
               </div>
@@ -1745,6 +1828,8 @@ const RecruiterDashboard = ({ onLogout }) => {
             generatedQuestions={generatedQuestions}
             setGeneratedQuestions={setGeneratedQuestions}
             showToast={showToast}
+            onSave={() => handleSaveAssessment(false)}
+            onSaveAndAssign={() => handleSaveAssessment(true)}
           />
         )}
 
@@ -1756,6 +1841,7 @@ const RecruiterDashboard = ({ onLogout }) => {
             showToast={showToast}
             setActiveTab={setActiveTab}
             setSelectedAssessmentForView={setSelectedAssessmentForView}
+            onAssignClick={setAssigningAssessment}
           />
         )}
       </main>
@@ -1920,7 +2006,161 @@ const RecruiterDashboard = ({ onLogout }) => {
         )}
       </AnimatePresence>
 
+      {/* Modal for Assigning Assessment */}
+      <AnimatePresence>
+        {assigningAssessment && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.4 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setAssigningAssessment(null)}
+              className="fixed inset-0 bg-dash-dark-purple/40 z-50"
+            />
+            {/* Modal Body */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed inset-0 m-auto w-full max-w-md h-fit bg-dash-white-card border border-dash-border-gray rounded-[24px] shadow-2xl z-50 p-6 flex flex-col gap-5"
+            >
+              <div className="flex items-center justify-between border-b border-dash-border-gray/25 pb-3">
+                <div>
+                  <span className="text-[10px] text-dash-primary-purple font-extrabold tracking-widest uppercase">
+                    Assign Assessment
+                  </span>
+                  <h3 className="text-base font-bold text-dash-dark-purple font-outfit mt-0.5 truncate max-w-[280px]">
+                    {assigningAssessment.name}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setAssigningAssessment(null)}
+                  className="p-1.5 rounded-lg hover:bg-dash-soft-pink text-dash-light-purple hover:text-dash-dark-purple transition-all duration-200 cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
 
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!selectedAssignCandidate) {
+                    alert('Please select a candidate from the dropdown.');
+                    return;
+                  }
+                  const email = selectedAssignCandidate.email;
+                  const dueDate = e.target.dueDate.value;
+                  await handleConfirmAssign(email, dueDate);
+                }}
+                className="flex flex-col gap-4"
+              >
+                <div className="flex flex-col gap-1.5 relative">
+                  <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider">
+                    Select Candidate
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search candidate by name or email..."
+                      value={assignSearch}
+                      onChange={(e) => {
+                        setAssignSearch(e.target.value);
+                        setSelectedAssignCandidate(null);
+                        setShowAssignDropdown(true);
+                      }}
+                      onFocus={() => setShowAssignDropdown(true)}
+                      className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2.5 px-4 text-xs font-semibold text-dash-dark-purple placeholder-dash-light-purple/50 focus:outline-none focus:border-dash-primary-purple transition-all"
+                      required={!selectedAssignCandidate}
+                    />
+                    {selectedAssignCandidate && (
+                      <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-dash-success-green bg-dash-success-green/10 border border-dash-success-green/20 px-2 py-0.5 rounded-full">
+                        Selected
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Dropdown Overlay */}
+                  <AnimatePresence>
+                    {showAssignDropdown && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setShowAssignDropdown(false)} />
+                        <motion.div
+                          initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                          transition={{ duration: 0.15 }}
+                          className="absolute left-0 right-0 top-full mt-1.5 max-h-48 overflow-y-auto bg-dash-white-card border border-dash-border-gray rounded-xl shadow-xl z-50 p-1 flex flex-col gap-0.5 dashboard-scrollbar"
+                        >
+                          {(Array.isArray(candidates) ? candidates : [])
+                            .filter(c => {
+                              const nameStr = (c.full_name || c.name || '').toLowerCase();
+                              const emailStr = (c.email || '').toLowerCase();
+                              const query = assignSearch.toLowerCase();
+                              return nameStr.includes(query) || emailStr.includes(query);
+                            })
+                            .map(c => (
+                              <button
+                                key={c.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedAssignCandidate(c);
+                                  setAssignSearch(`${c.full_name || c.name} (${c.email})`);
+                                  setShowAssignDropdown(false);
+                                }}
+                                className="w-full text-left px-3 py-2 text-xs font-semibold rounded-lg hover:bg-dash-soft-pink hover:text-dash-primary-purple text-dash-dark-purple transition-colors cursor-pointer border-none flex flex-col gap-0.5"
+                              >
+                                <span className="font-bold">{c.full_name || c.name}</span>
+                                <span className="text-[10px] text-dash-light-purple">{c.email}</span>
+                              </button>
+                            ))}
+                          {(Array.isArray(candidates) ? candidates : []).filter(c => {
+                            const nameStr = (c.full_name || c.name || '').toLowerCase();
+                            const emailStr = (c.email || '').toLowerCase();
+                            const query = assignSearch.toLowerCase();
+                            return nameStr.includes(query) || emailStr.includes(query);
+                          }).length === 0 && (
+                            <div className="p-3 text-center text-xs font-semibold text-dash-light-purple">
+                              No candidates found.
+                            </div>
+                          )}
+                        </motion.div>
+                      </>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider">
+                    Due Date (Optional)
+                  </label>
+                  <input
+                    name="dueDate"
+                    type="datetime-local"
+                    className="w-full bg-[#f8fafc] border border-dash-border-gray rounded-xl py-2.5 px-4 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple transition-all"
+                  />
+                </div>
+
+                <div className="flex items-center gap-3 pt-3 border-t border-dash-border-gray/25 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setAssigningAssessment(null)}
+                    className="flex-1 py-3 rounded-xl border border-dash-border-gray text-xs font-bold text-dash-dark-purple hover:bg-dash-soft-pink transition-colors cursor-pointer bg-dash-white-card"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-3 rounded-xl bg-dash-primary-purple text-dash-white-card text-xs font-bold hover:bg-dash-dark-purple transition-colors cursor-pointer shadow-md"
+                  >
+                    Assign Assessment
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
     </div>
   );
@@ -1988,7 +2228,7 @@ const SyntaxHighlighter = ({ code, language }) => {
   return <pre className="font-mono text-xs leading-relaxed overflow-x-auto whitespace-pre-wrap text-[#0f172a]">{code}</pre>;
 };
 
-const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToast }) => {
+const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToast, onSave, onSaveAndAssign }) => {
   const [selectedId, setSelectedId] = useState(generatedQuestions[0]?.id || null);
   const [isEditing, setIsEditing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -2174,7 +2414,36 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
   });
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch w-full">
+    <div className="flex flex-col gap-6 w-full animate-fade-in">
+      {/* Assessment Action Bar */}
+      <div className="bg-dash-white-card border border-dash-border-gray rounded-[24px] p-5 shadow-sm flex flex-col sm:flex-row gap-4 items-center justify-between">
+        <div>
+          <h3 className="font-outfit font-extrabold text-base text-dash-dark-purple">
+            Confirm AI Assessment Question Pool
+          </h3>
+          <p className="text-xs text-dash-light-purple font-medium mt-1">
+            Review the questions generated by AI. Save the assessment to make it available for candidates.
+          </p>
+        </div>
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <button
+            onClick={onSave}
+            className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl border border-dash-primary-purple text-dash-primary-purple font-bold text-xs hover:bg-dash-primary-purple/5 transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 bg-dash-white-card"
+          >
+            <Save size={14} />
+            <span>Save Assessment</span>
+          </button>
+          <button
+            onClick={onSaveAndAssign}
+            className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-dash-primary-purple border border-dash-primary-purple text-dash-white-card font-bold text-xs hover:bg-dash-dark-purple transition-all duration-200 shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <UserPlus size={14} />
+            <span>Save & Assign</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch w-full">
       {/* LEFT PANEL: QUESTION LIST POOL */}
       <div className="lg:col-span-4 bg-dash-white-card border border-dash-border-gray rounded-[24px] p-5 shadow-[0_4px_20px_rgba(87,82,170,0.02)] flex flex-col gap-4 min-h-[450px] lg:h-[720px]">
         <div className="flex items-center justify-between border-b border-dash-border-gray/25 pb-3">
@@ -2769,6 +3038,7 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
         )}
       </div>
     </div>
+  </div>
   );
 };
 
@@ -2780,11 +3050,10 @@ const AssessmentsManager = ({
   setSavedAssessments,
   showToast,
   setActiveTab,
-  setSelectedAssessmentForView
+  setSelectedAssessmentForView,
+  onAssignClick
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [assigningId, setAssigningId] = useState(null);
-  const [candidateEmail, setCandidateEmail] = useState('');
 
   const handleDeleteAssessment = async (id, name) => {
     const confirmDelete = window.confirm(`Are you sure you want to delete "${name}"?`);
@@ -2797,38 +3066,6 @@ const AssessmentsManager = ({
     } catch (err) {
       console.error("Failed to delete assessment from backend:", err);
       showToast("Error deleting assessment.");
-    }
-  };
-
-  const handleStartAssign = (id) => {
-    setAssigningId(id);
-    setCandidateEmail('');
-  };
-
-  const handleConfirmAssign = async (e, id, name) => {
-    e.preventDefault();
-    const email = candidateEmail.trim();
-    if (!email) return;
-
-    // Validate email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      alert('Please enter a valid email address.');
-      return;
-    }
-
-    try {
-      const response = await api.post(`/api/assessment/${id}/assign`, { email });
-      if (response.data) {
-        setSavedAssessments(prev => prev.map(asm => asm.id === id ? response.data : asm));
-        showToast(`Successfully assigned "${name}" and sent invite to ${email}!`);
-      }
-    } catch (err) {
-      console.error("Failed to assign assessment on backend:", err);
-      showToast("Error assigning assessment.");
-    } finally {
-      setAssigningId(null);
-      setCandidateEmail('');
     }
   };
 
@@ -2920,7 +3157,6 @@ const AssessmentsManager = ({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {filteredAssessments.map((asm) => {
-            const isAssigning = assigningId === asm.id;
             return (
               <motion.div
                 key={asm.id}
@@ -2978,65 +3214,33 @@ const AssessmentsManager = ({
                   </div>
                 </div>
 
-                {/* Card Actions / Inline Assign Form */}
+                {/* Card Actions */}
                 <div className="border-t border-dash-border-gray/30 pt-4 mt-1">
-                  {isAssigning ? (
-                    <form
-                      onSubmit={(e) => handleConfirmAssign(e, asm.id, asm.name)}
-                      className="flex items-center gap-2 w-full animate-fade-in"
+                  <div className="flex items-center justify-between gap-2.5 w-full">
+                    <button
+                      onClick={() => setSelectedAssessmentForView(asm)}
+                      className="flex-1 py-2.5 rounded-xl border border-dash-border-gray/80 hover:bg-dash-soft-pink text-dash-dark-purple font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer bg-dash-white-card"
                     >
-                      <input
-                        type="email"
-                        placeholder="Candidate email..."
-                        value={candidateEmail}
-                        onChange={(e) => setCandidateEmail(e.target.value)}
-                        className="flex-1 bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple"
-                        autoFocus
-                        required
-                      />
-                      <button
-                        type="submit"
-                        className="p-2.5 rounded-xl bg-dash-primary-purple hover:bg-dash-dark-purple text-dash-white-card transition-all flex items-center justify-center border-none cursor-pointer"
-                        title="Send Invite"
-                      >
-                        <Send size={12} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setAssigningId(null)}
-                        className="p-2.5 rounded-xl bg-dash-border-gray/25 hover:bg-dash-border-gray/50 text-dash-dark-purple transition-all flex items-center justify-center border-none cursor-pointer"
-                        title="Cancel"
-                      >
-                        <X size={12} />
-                      </button>
-                    </form>
-                  ) : (
-                    <div className="flex items-center justify-between gap-2.5 w-full">
-                      <button
-                        onClick={() => setSelectedAssessmentForView(asm)}
-                        className="flex-1 py-2.5 rounded-xl border border-dash-border-gray/80 hover:bg-dash-soft-pink text-dash-dark-purple font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer bg-dash-white-card"
-                      >
-                        <Eye size={13} />
-                        <span>View Questions</span>
-                      </button>
+                      <Eye size={13} />
+                      <span>View Questions</span>
+                    </button>
 
-                      <button
-                        onClick={() => handleStartAssign(asm.id)}
-                        className="flex-1 py-2.5 rounded-xl bg-dash-primary-purple/10 border border-dash-primary-purple/20 hover:bg-dash-primary-purple/20 text-dash-primary-purple font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer"
-                      >
-                        <UserPlus size={13} />
-                        <span>Assign</span>
-                      </button>
+                    <button
+                      onClick={() => onAssignClick(asm)}
+                      className="flex-1 py-2.5 rounded-xl bg-dash-primary-purple/10 border border-dash-primary-purple/20 hover:bg-dash-primary-purple/20 text-dash-primary-purple font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <UserPlus size={13} />
+                      <span>Assign</span>
+                    </button>
 
-                      <button
-                        onClick={() => handleDeleteAssessment(asm.id, asm.name)}
-                        className="p-2.5 rounded-xl border border-red-100 hover:border-red-200 bg-red-50/30 hover:bg-red-50 text-red-600 transition-all duration-200 flex items-center justify-center cursor-pointer"
-                        title="Delete Assessment"
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  )}
+                    <button
+                      onClick={() => handleDeleteAssessment(asm.id, asm.name)}
+                      className="p-2.5 rounded-xl border border-red-100 hover:border-red-200 bg-red-50/30 hover:bg-red-50 text-red-600 transition-all duration-200 flex items-center justify-center cursor-pointer"
+                      title="Delete Assessment"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
                 </div>
               </motion.div>
             );
