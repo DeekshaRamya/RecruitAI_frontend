@@ -13,31 +13,31 @@
   --color-candidate-text-muted: #94a3b8;
   --color-candidate-button-shadow: rgba(124, 58, 237, 0.08);
 
-  --color-recruiter-bg: #fafafc;
+  --color-recruiter-bg: #f8fafc;
   --color-recruiter-card-bg: #ffffff;
-  --color-recruiter-card-border: rgba(15, 23, 42, 0.08);
-  --color-recruiter-primary: #0f172a;
-  --color-recruiter-primary-hover: #1e293b;
+  --color-recruiter-card-border: rgba(79, 70, 229, 0.12);
+  --color-recruiter-primary: #4f46e5;
+  --color-recruiter-primary-hover: #4338ca;
   --color-recruiter-accent: #2563eb;
   --color-recruiter-text-main: #0f172a;
   --color-recruiter-text-sub: #475569;
   --color-recruiter-text-muted: #94a3b8;
-  --color-recruiter-button-shadow: rgba(15, 23, 42, 0.08);
+  --color-recruiter-button-shadow: rgba(79, 70, 229, 0.15);
 
   --color-input-bg-light: #ffffff;
   --color-input-border-light: #e2e8f0;
 
-  --color-dash-primary-purple: #5752AA;
-  --color-dash-dark-purple: #3C1541;
-  --color-dash-light-purple: #A49ECE;
-  --color-dash-soft-pink: #F9EAF6;
-  --color-dash-light-blue-bg: #E2EAFB;
-  --color-dash-white-card: #FEFEFE;
-  --color-dash-success-green: #149470;
-  --color-dash-light-green: #7CB08D;
-  --color-dash-border-gray: #CEC5DD;
-  --color-dash-accent-brown: #84492D;
-  --color-dash-sidebar-bg: #5A55B0;
+  --color-dash-primary-purple: #4F46E5;
+  --color-dash-dark-purple: #0F172A;
+  --color-dash-light-purple: #6366F1;
+  --color-dash-soft-pink: #EEF2FF;
+  --color-dash-light-blue-bg: #F8FAFC;
+  --color-dash-white-card: #FFFFFF;
+  --color-dash-success-green: #10B981;
+  --color-dash-light-green: #D1FAE5;
+  --color-dash-border-gray: #E2E8F0;
+  --color-dash-accent-brown: #4338CA;
+  --color-dash-sidebar-bg: #0F172A;
 
   --font-inter: 'Inter', sans-serif;
   --font-outfit: 'Outfit', sans-serif;
@@ -199,4 +199,40 @@
 
 .candidate-dashboard-theme button.bg-dash-primary-purple:hover {
   background-color: #172554 !important;
+}
+
+/* Universal button loading indicator */
+.btn-loading {
+  position: relative !important;
+  pointer-events: none !important;
+}
+
+.btn-loading>* {
+  opacity: 0 !important;
+}
+
+.btn-loading::after {
+  content: "" !important;
+  position: absolute !important;
+  width: 18px !important;
+  height: 18px !important;
+  top: 50% !important;
+  left: 50% !important;
+  margin-top: -9px !important;
+  margin-left: -9px !important;
+  border: 2.5px solid currentColor !important;
+  border-top-color: transparent !important;
+  border-radius: 50% !important;
+  animation: button-spinner-spin 0.6s linear infinite !important;
+  z-index: 1000 !important;
+}
+
+@keyframes button-spinner-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }

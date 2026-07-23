@@ -150,7 +150,10 @@ const RecruiterDashboard = ({ onLogout }) => {
     const saved = localStorage.getItem('recruitai_candidates');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed;
+        }
       } catch (e) {
         console.error("Error parsing candidates from localStorage:", e);
       }
@@ -257,12 +260,12 @@ const RecruiterDashboard = ({ onLogout }) => {
   const [savedAssessments, setSavedAssessments] = useState([]);
   const [selectedAssessmentForView, setSelectedAssessmentForView] = useState(null);
 
-  // Fetch assessments from backend on mount
+  // Fetch assessments and candidates from backend on mount
   useEffect(() => {
     const fetchAssessments = async () => {
       try {
         const response = await api.get('/api/assessment');
-        if (response.data) {
+        if (response.data && Array.isArray(response.data)) {
           setSavedAssessments(response.data);
         }
       } catch (err) {
@@ -270,7 +273,21 @@ const RecruiterDashboard = ({ onLogout }) => {
         showToast("Error loading assessments from server.");
       }
     };
+
+    const fetchCandidates = async () => {
+      try {
+        const response = await api.get('/api/candidates');
+        if (response.data && Array.isArray(response.data)) {
+          setCandidates(response.data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch candidates from backend:", err);
+        showToast("Error loading candidates from server.");
+      }
+    };
+
     fetchAssessments();
+    fetchCandidates();
   }, []);
 
   // Sidebar navigation state
@@ -284,6 +301,51 @@ const RecruiterDashboard = ({ onLogout }) => {
 
   // Interactive UI Drawer states
   const [selectedCandidate, setSelectedCandidate] = useState(null);
+
+  // Candidate Pagination & Dropdown states
+  const [candidatePage, setCandidatePage] = useState(1);
+  const [assignSearch, setAssignSearch] = useState('');
+  const [selectedAssignCandidate, setSelectedAssignCandidate] = useState(null);
+  const [showAssignDropdown, setShowAssignDropdown] = useState(false);
+  const [assigningAssessment, setAssigningAssessment] = useState(null);
+
+  // Group states
+  const [selectedCandidateIds, setSelectedCandidateIds] = useState([]);
+  const [candidateGroups, setCandidateGroups] = useState(() => {
+    const saved = localStorage.getItem('recruitai_candidate_groups');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
+  const [groupName, setGroupName] = useState('');
+  const [assigningGroup, setAssigningGroup] = useState(null);
+
+  // Assign to group states in assessment modal
+  const [assignType, setAssignType] = useState('individual'); // 'individual' | 'group'
+  const [selectedAssignGroup, setSelectedAssignGroup] = useState(null);
+
+  // Sync groups to localStorage
+  useEffect(() => {
+    localStorage.setItem('recruitai_candidate_groups', JSON.stringify(candidateGroups));
+  }, [candidateGroups]);
+
+  useEffect(() => {
+    setCandidatePage(1);
+  }, [searchQuery, selectedStatus, candidates.length]);
+
+  useEffect(() => {
+    if (assigningAssessment) {
+      setAssignSearch('');
+      setSelectedAssignCandidate(null);
+      setShowAssignDropdown(false);
+      if (assigningGroup) {
+        setAssignType('group');
+        setSelectedAssignGroup(assigningGroup);
+      } else {
+        setAssignType('individual');
+        setSelectedAssignGroup(null);
+      }
+    }
+  }, [assigningAssessment, assigningGroup]);
 
   // Subjects and topics dataset as state so recruiters can dynamically add/edit topics
   const [subjectsData, setSubjectsData] = useState({
@@ -659,7 +721,7 @@ const RecruiterDashboard = ({ onLogout }) => {
 
   // Statistics data (dynamic active assessments)
   const stats = [
-    { label: 'Total Candidates', value: candidates.length.toString(), change: '+12% this week', icon: Users },
+    { label: 'Total Candidates', value: (Array.isArray(candidates) ? candidates.length : 0).toString(), change: '+12% this week', icon: Users },
     { label: 'Active Assessments', value: activeAssessmentsCount.toString(), change: '+2 new today', icon: Briefcase },
     { label: 'Completion Rate', value: '84.5%', change: '+3% avg. rate', icon: TrendingUp },
     { label: 'Average Score', value: '78.2%', change: '+1.4% improvement', icon: Award },
@@ -669,19 +731,23 @@ const RecruiterDashboard = ({ onLogout }) => {
   const statuses = ['All Statuses', 'Completed', 'In Progress', 'Under Review', 'Failed'];
 
   // Handle Search, Filters, and Sorting
-  const filteredCandidates = candidates
+  const filteredCandidates = (Array.isArray(candidates) ? candidates : [])
     .filter(candidate => {
-      const matchesSearch = candidate.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        candidate.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        candidate.role.toLowerCase().includes(searchQuery.toLowerCase());
+      const nameVal = (candidate.full_name || candidate.name || '').toLowerCase();
+      const emailVal = (candidate.email || '').toLowerCase();
 
-      const matchesStatus = selectedStatus === 'All Statuses' || candidate.status === selectedStatus;
+      const matchesSearch = nameVal.includes(searchQuery.toLowerCase()) ||
+        emailVal.includes(searchQuery.toLowerCase());
+
+      const matchesStatus = selectedStatus === 'All Statuses' || (candidate.status || 'Active') === selectedStatus;
 
       return matchesSearch && matchesStatus;
     })
     .sort((a, b) => {
       if (sortBy === 'newest') {
-        return new Date(b.date) - new Date(a.date);
+        const dateB = b.created_at ? new Date(b.created_at) : new Date(b.date || 0);
+        const dateA = a.created_at ? new Date(a.created_at) : new Date(a.date || 0);
+        return dateB - dateA;
       }
       if (sortBy === 'score-high') {
         return (b.final || 0) - (a.final || 0);
@@ -691,6 +757,13 @@ const RecruiterDashboard = ({ onLogout }) => {
       }
       return 0;
     });
+
+  const candidatesPerPage = 5;
+  const totalPages = Math.ceil(filteredCandidates.length / candidatesPerPage) || 1;
+  const paginatedCandidates = filteredCandidates.slice(
+    (candidatePage - 1) * candidatesPerPage,
+    candidatePage * candidatesPerPage
+  );
 
   // Action: Create Assessment (legacy submit)
   const handleCreateAssessmentSubmit = (e) => {
@@ -748,7 +821,9 @@ const RecruiterDashboard = ({ onLogout }) => {
           correctAnswer: q.correctAnswer,
           expectedAnswer: q.type === 'SCENARIO' ? q.correctAnswer : '',
           exampleInput: q.exampleInput || '',
-          exampleOutput: q.exampleOutput || ''
+          exampleOutput: q.exampleOutput || '',
+          databaseSchema: q.databaseSchema || null,
+          sampleData: q.sampleData || null
         }));
         setGeneratedQuestions(formatted);
         showToast(`Successfully generated assessment containing ${formatted.length} questions across ${totalSelectedTopics} topics!`);
@@ -769,7 +844,7 @@ const RecruiterDashboard = ({ onLogout }) => {
     }
   };
 
-  const handleSaveAndAssign = async () => {
+  const handleSaveAssessment = async (andAssign = false) => {
     const subjectsInQuestions = [...new Set(generatedQuestions.map(q => q.subject))].filter(Boolean);
     const activeSubjects = subjectsInQuestions.length > 0 ? subjectsInQuestions : ['General'];
     const name = `${activeSubjects.join(' & ')} Technical Test`;
@@ -778,7 +853,7 @@ const RecruiterDashboard = ({ onLogout }) => {
       name: name,
       subjects: activeSubjects,
       difficulty: difficulty || 'Medium',
-      duration: duration || '45 minutes',
+      duration: duration || '60 minutes',
       questionsCount: generatedQuestions.length,
       createdDate: new Date().toISOString().split('T')[0],
       status: 'Active',
@@ -789,7 +864,8 @@ const RecruiterDashboard = ({ onLogout }) => {
     try {
       const response = await api.post('/api/assessment', payload);
       if (response.data) {
-        setSavedAssessments(prev => [response.data, ...prev]);
+        const savedAsm = response.data;
+        setSavedAssessments(prev => [savedAsm, ...prev]);
         showToast('Assessment saved successfully!');
         setActiveAssessmentsCount(prev => prev + 1);
         setSelectedTopics({
@@ -797,11 +873,64 @@ const RecruiterDashboard = ({ onLogout }) => {
           SQL: [],
           Aptitude: []
         });
-        setActiveTab('assessments');
+
+        if (andAssign) {
+          setAssigningAssessment(savedAsm);
+          setActiveTab('assessments');
+        } else {
+          setActiveTab('assessments');
+        }
       }
     } catch (err) {
       console.error("Failed to save assessment to backend:", err);
       showToast("Error saving assessment to database.");
+    }
+  };
+
+  const handleConfirmAssign = async (email, dueDate, startTime, skipReset = false) => {
+    if (!assigningAssessment) return;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      alert('Please enter a valid email address.');
+      return;
+    }
+    if (!startTime) {
+      alert('Please set a start time.');
+      return;
+    }
+
+    try {
+      const payload = {
+        assessmentId: assigningAssessment.id,
+        candidateEmail: email,
+        dueDate: dueDate ? new Date(dueDate).toISOString() : null,
+        startDate: startTime.split('T')[0],
+        startTime: startTime.split('T')[1]
+      };
+
+      const response = await api.post('/api/assignments', payload);
+      if (response.data) {
+        if (!skipReset) {
+          showToast("Assessment assigned successfully.");
+          // Refresh saved assessments
+          const assessmentsRes = await api.get('/api/assessment');
+          if (assessmentsRes.data) {
+            setSavedAssessments(assessmentsRes.data);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Failed to assign assessment:", err);
+      const errMsg = err.response?.data?.detail || "Error assigning assessment. Verify candidate exists.";
+      if (!skipReset) {
+        showToast(errMsg);
+      } else {
+        throw new Error(errMsg);
+      }
+    } finally {
+      if (!skipReset) {
+        setAssigningAssessment(null);
+      }
     }
   };
 
@@ -885,6 +1014,8 @@ const RecruiterDashboard = ({ onLogout }) => {
               { id: 'create-assessment', label: 'Create Assessment', icon: Plus },
               { id: 'preview-questions', label: 'Preview Questions', icon: FileText },
               { id: 'assessments', label: 'Assessments', icon: Save },
+              { id: 'results', label: 'Results', icon: Award },
+              { id: 'groups', label: 'Candidate Groups', icon: Users },
             ].map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
@@ -998,6 +1129,8 @@ const RecruiterDashboard = ({ onLogout }) => {
                 { id: 'create-assessment', label: 'Create Assessment', icon: Plus },
                 { id: 'preview-questions', label: 'Preview Questions', icon: FileText },
                 { id: 'assessments', label: 'Assessments', icon: Save },
+                { id: 'results', label: 'Results', icon: Award },
+                { id: 'groups', label: 'Candidate Groups', icon: Users },
               ].map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
@@ -1078,10 +1211,17 @@ const RecruiterDashboard = ({ onLogout }) => {
                 >
                   <span>← Back</span>
                 </button>
+                <button
+                  onClick={() => handleSaveAssessment(false)}
+                  className="px-4 py-2 rounded-xl border border-dash-primary-purple text-dash-primary-purple text-xs font-bold hover:bg-dash-primary-purple/5 transition-all duration-200 cursor-pointer flex items-center gap-2 bg-dash-white-card"
+                >
+                  <Save size={14} />
+                  <span>Save</span>
+                </button>
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={handleSaveAndAssign}
+                  onClick={() => handleSaveAssessment(true)}
                   className="px-4.5 py-2.5 rounded-xl bg-dash-primary-purple border border-dash-primary-purple text-dash-white-card font-bold text-sm cursor-pointer shadow-md hover:bg-dash-dark-purple hover:border-dash-dark-purple transition-all duration-300 flex items-center gap-2"
                 >
                   <Check size={16} strokeWidth={2.5} />
@@ -1233,6 +1373,20 @@ const RecruiterDashboard = ({ onLogout }) => {
                     <option value="score-low">Score: Low to High</option>
                   </select>
 
+                  {selectedCandidateIds.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGroupName('');
+                        setShowCreateGroupModal(true);
+                      }}
+                      className="px-3.5 py-2 rounded-lg bg-dash-primary-purple text-white text-xs font-bold flex items-center gap-2 hover:bg-dash-dark-purple transition-all duration-200 cursor-pointer shadow-md border-none"
+                    >
+                      <Users size={13} />
+                      <span>Create Group ({selectedCandidateIds.length})</span>
+                    </button>
+                  )}
+
                 </div>
 
               </div>
@@ -1242,49 +1396,52 @@ const RecruiterDashboard = ({ onLogout }) => {
                 <table className="w-full min-w-[900px] border-collapse text-left text-sm">
                   <thead>
                     <tr className="bg-dash-soft-pink border-b border-dash-border-gray text-[10px] font-extrabold text-dash-dark-purple tracking-widest uppercase">
-                      <th className="px-6 py-4.5">Candidate</th>
-                      <th className="px-6 py-4.5">Resume</th>
-                      <th className="px-6 py-4.5">Python</th>
-                      <th className="px-6 py-4.5">SQL</th>
-                      <th className="px-6 py-4.5">Aptitude</th>
-                      <th className="px-6 py-4.5">English</th>
-                      <th className="px-6 py-4.5">Final</th>
-                      <th className="px-6 py-4.5">AI Recommendation</th>
+                      <th className="px-4 py-4.5 w-12 text-center">
+                        <input
+                          type="checkbox"
+                          checked={
+                            paginatedCandidates.length > 0 &&
+                            paginatedCandidates.every((c) => selectedCandidateIds.includes(c.id))
+                          }
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              const newSelects = [...selectedCandidateIds];
+                              paginatedCandidates.forEach((c) => {
+                                if (!newSelects.includes(c.id)) newSelects.push(c.id);
+                              });
+                              setSelectedCandidateIds(newSelects);
+                            } else {
+                              const pageIds = paginatedCandidates.map((c) => c.id);
+                              setSelectedCandidateIds((prev) =>
+                                prev.filter((id) => !pageIds.includes(id))
+                              );
+                            }
+                          }}
+                          className="rounded text-dash-primary-purple focus:ring-dash-primary-purple cursor-pointer"
+                        />
+                      </th>
+                      <th className="px-6 py-4.5">Full Name</th>
+                      <th className="px-6 py-4.5">Email Address</th>
+                      <th className="px-6 py-4.5">Phone Number</th>
+                      <th className="px-6 py-4.5">Registration Date</th>
                       <th className="px-6 py-4.5">Status</th>
                       <th className="px-6 py-4.5"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-dash-border-gray">
                     <AnimatePresence mode="popLayout">
-                      {filteredCandidates.map((candidate) => {
-                        const getScoreColor = (val) => {
-                          if (val >= 80) return '#149470';
-                          if (val >= 60) return '#d97706';
-                          return '#84492D';
-                        };
+                      {paginatedCandidates.map((candidate) => {
+                        const regDate = candidate.created_at
+                          ? new Date(candidate.created_at).toLocaleDateString(undefined, {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric'
+                            })
+                          : (candidate.date || 'N/A');
 
-                        let statusColor = '';
-                        let statusBg = '';
-                        if (candidate.status === 'Completed') {
-                          statusColor = '#149470';
-                          statusBg = 'rgba(20, 148, 112, 0.1)';
-                        } else {
-                          statusColor = '#5752AA'; // Purple/Blue for In Progress
-                          statusBg = 'rgba(87, 82, 170, 0.1)';
-                        }
-
-                        let recColor = '';
-                        let recPrefix = '';
-                        if (candidate.recommendation === 'Strong Hire') {
-                          recColor = '#149470';
-                          recPrefix = '✓ ';
-                        } else if (candidate.recommendation === 'Moderate') {
-                          recColor = '#d97706';
-                          recPrefix = '~ ';
-                        } else {
-                          recColor = '#84492D';
-                          recPrefix = 'X ';
-                        }
+                        const isCompleted = candidate.status === 'Completed';
+                        let statusColor = isCompleted ? '#149470' : '#5752AA';
+                        let statusBg = isCompleted ? 'rgba(20, 148, 112, 0.1)' : 'rgba(87, 82, 170, 0.1)';
 
                         return (
                           <motion.tr
@@ -1294,53 +1451,45 @@ const RecruiterDashboard = ({ onLogout }) => {
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95 }}
                             transition={{ duration: 0.3 }}
-                            className="bg-dash-white-card hover:bg-dash-soft-pink transition-colors duration-200 group"
+                            className={`hover:bg-dash-soft-pink transition-colors duration-200 group ${selectedCandidateIds.includes(candidate.id) ? 'bg-dash-soft-pink/60' : 'bg-dash-white-card'}`}
                           >
-                            {/* Candidate info (name and role) */}
+                            {/* Checkbox column */}
+                            <td className="px-4 py-4 w-12 text-center">
+                              <input
+                                type="checkbox"
+                                checked={selectedCandidateIds.includes(candidate.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedCandidateIds((prev) => [...prev, candidate.id]);
+                                  } else {
+                                    setSelectedCandidateIds((prev) =>
+                                      prev.filter((id) => id !== candidate.id)
+                                    );
+                                  }
+                                }}
+                                className="rounded text-dash-primary-purple focus:ring-dash-primary-purple cursor-pointer"
+                              />
+                            </td>
+                            {/* Full Name */}
                             <td className="px-6 py-4">
-                              <div>
-                                <h4 className="text-xs font-bold text-dash-dark-purple group-hover:text-dash-primary-purple transition-colors duration-200">
-                                  {candidate.name}
-                                </h4>
-                                <span className="text-[10px] text-dash-light-purple font-medium">
-                                  {candidate.role}
-                                </span>
-                              </div>
+                              <h4 className="text-xs font-bold text-dash-dark-purple group-hover:text-dash-primary-purple transition-colors duration-200">
+                                {candidate.full_name || candidate.name}
+                              </h4>
                             </td>
 
-                            {/* Resume score */}
-                            <td className="px-6 py-4 text-xs font-bold" style={{ color: getScoreColor(candidate.resume) }}>
-                              {candidate.resume}%
+                            {/* Email Address */}
+                            <td className="px-6 py-4 text-xs font-semibold text-dash-dark-purple">
+                              {candidate.email}
                             </td>
 
-                            {/* Python score */}
-                            <td className="px-6 py-4 text-xs font-bold" style={{ color: getScoreColor(candidate.python) }}>
-                              {candidate.python}%
+                            {/* Phone Number */}
+                            <td className="px-6 py-4 text-xs font-semibold text-dash-light-purple">
+                              {candidate.phone || 'N/A'}
                             </td>
 
-                            {/* SQL score */}
-                            <td className="px-6 py-4 text-xs font-bold" style={{ color: getScoreColor(candidate.sql) }}>
-                              {candidate.sql}%
-                            </td>
-
-                            {/* Aptitude score */}
-                            <td className="px-6 py-4 text-xs font-bold" style={{ color: getScoreColor(candidate.aptitude) }}>
-                              {candidate.aptitude}%
-                            </td>
-
-                            {/* English score */}
-                            <td className="px-6 py-4 text-xs font-bold" style={{ color: getScoreColor(candidate.english) }}>
-                              {candidate.english}%
-                            </td>
-
-                            {/* Final score */}
-                            <td className="px-6 py-4 text-xs font-bold" style={{ color: getScoreColor(candidate.final) }}>
-                              {candidate.final}%
-                            </td>
-
-                            {/* AI Recommendation */}
-                            <td className="px-6 py-4 text-xs font-bold" style={{ color: recColor }}>
-                              {recPrefix}{candidate.recommendation}
+                            {/* Registration Date */}
+                            <td className="px-6 py-4 text-xs font-semibold text-dash-light-purple">
+                              {regDate}
                             </td>
 
                             {/* Status */}
@@ -1357,7 +1506,7 @@ const RecruiterDashboard = ({ onLogout }) => {
                                   className="w-1.5 h-1.5 rounded-full"
                                   style={{ backgroundColor: statusColor }}
                                 />
-                                {candidate.status}
+                                {candidate.status || 'Active'}
                               </span>
                             </td>
 
@@ -1378,7 +1527,7 @@ const RecruiterDashboard = ({ onLogout }) => {
 
                     {filteredCandidates.length === 0 && (
                       <tr>
-                        <td colSpan={6} className="px-6 py-12 text-center text-sm text-dash-light-purple">
+                        <td colSpan={7} className="px-6 py-12 text-center text-sm text-dash-light-purple">
                           <AlertCircle className="mx-auto mb-3 text-dash-light-purple" size={32} />
                           No candidates found matching filters.
                         </td>
@@ -1389,9 +1538,48 @@ const RecruiterDashboard = ({ onLogout }) => {
               </div>
 
               {/* TABLE FOOTER */}
-              <div className="p-4 border-t border-dash-border-gray bg-dash-white-card flex items-center justify-between text-[11px] text-dash-light-purple font-semibold px-6">
-                <span>Showing {filteredCandidates.length} of {candidates.length} candidates</span>
-                <span>Total 18 assessments listed in workspace</span>
+              <div className="p-4 border-t border-dash-border-gray bg-dash-white-card flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-dash-light-purple font-semibold px-6">
+                <span>
+                  Showing {filteredCandidates.length > 0 ? (candidatePage - 1) * candidatesPerPage + 1 : 0} to{' '}
+                  {Math.min(filteredCandidates.length, candidatePage * candidatesPerPage)} of{' '}
+                  {filteredCandidates.length} candidates
+                  {filteredCandidates.length !== (Array.isArray(candidates) ? candidates.length : 0) && ` (filtered from ${(Array.isArray(candidates) ? candidates.length : 0)})`}
+                </span>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      disabled={candidatePage === 1}
+                      onClick={() => setCandidatePage(prev => Math.max(prev - 1, 1))}
+                      className="px-2.5 py-1.5 rounded-lg border border-dash-border-gray bg-dash-white-card hover:bg-dash-soft-pink text-dash-dark-purple disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                    >
+                      Prev
+                    </button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                      <button
+                        key={page}
+                        onClick={() => setCandidatePage(page)}
+                        className={`w-7.5 h-7.5 rounded-lg flex items-center justify-center font-bold text-xs border transition-colors cursor-pointer ${
+                          candidatePage === page
+                            ? 'bg-dash-primary-purple border-dash-primary-purple text-dash-white-card'
+                            : 'bg-dash-white-card border-dash-border-gray text-dash-dark-purple hover:bg-dash-soft-pink'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                    <button
+                      disabled={candidatePage === totalPages}
+                      onClick={() => setCandidatePage(prev => Math.min(prev + 1, totalPages))}
+                      className="px-2.5 py-1.5 rounded-lg border border-dash-border-gray bg-dash-white-card hover:bg-dash-soft-pink text-dash-dark-purple disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+
+                <span>Total {savedAssessments.length} assessments listed in workspace</span>
               </div>
 
             </section>
@@ -1666,17 +1854,13 @@ const RecruiterDashboard = ({ onLogout }) => {
                   <label className="text-xs font-bold text-dash-light-purple uppercase tracking-wider">
                     Duration
                   </label>
-                  <select
+                  <input
+                    type="text"
                     value={duration}
                     onChange={(e) => setDuration(e.target.value)}
-                    className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2.5 px-4 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple cursor-pointer transition-all"
-                  >
-                    <option value="30 minutes">30 minutes</option>
-                    <option value="45 minutes">45 minutes</option>
-                    <option value="60 minutes">60 minutes</option>
-                    <option value="90 minutes">90 minutes</option>
-                    <option value="120 minutes">120 minutes</option>
-                  </select>
+                    placeholder="e.g. 60 minutes"
+                    className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2.5 px-4 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple transition-all"
+                  />
                 </div>
 
               </div>
@@ -1745,6 +1929,8 @@ const RecruiterDashboard = ({ onLogout }) => {
             generatedQuestions={generatedQuestions}
             setGeneratedQuestions={setGeneratedQuestions}
             showToast={showToast}
+            onSave={() => handleSaveAssessment(false)}
+            onSaveAndAssign={() => handleSaveAssessment(true)}
           />
         )}
 
@@ -1756,6 +1942,26 @@ const RecruiterDashboard = ({ onLogout }) => {
             showToast={showToast}
             setActiveTab={setActiveTab}
             setSelectedAssessmentForView={setSelectedAssessmentForView}
+            onAssignClick={setAssigningAssessment}
+          />
+        )}
+
+        {/* 9. RESULTS TAB SCREEN */}
+        {activeTab === 'results' && (
+          <ResultsManager
+            showToast={showToast}
+          />
+        )}
+
+        {/* 10. CANDIDATE GROUPS TAB SCREEN */}
+        {activeTab === 'groups' && (
+          <GroupsManager
+            candidateGroups={candidateGroups}
+            setCandidateGroups={setCandidateGroups}
+            candidates={candidates}
+            showToast={showToast}
+            setAssigningGroup={setAssigningGroup}
+            setActiveTab={setActiveTab}
           />
         )}
       </main>
@@ -1920,7 +2126,381 @@ const RecruiterDashboard = ({ onLogout }) => {
         )}
       </AnimatePresence>
 
+      {/* Modal for Group Creation */}
+      <AnimatePresence>
+        {showCreateGroupModal && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.4 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowCreateGroupModal(false)}
+              className="fixed inset-0 bg-dash-dark-purple/40 z-50"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed inset-0 m-auto w-full max-w-md h-fit bg-dash-white-card border border-dash-border-gray rounded-[24px] shadow-2xl z-50 p-6 flex flex-col gap-5"
+            >
+              <div className="flex items-center justify-between border-b border-dash-border-gray/25 pb-3">
+                <div>
+                  <span className="text-[10px] text-dash-primary-purple font-extrabold tracking-widest uppercase">
+                    Create Candidate Group
+                  </span>
+                  <h3 className="text-base font-bold text-dash-dark-purple font-outfit mt-0.5">
+                    New Group
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateGroupModal(false)}
+                  className="p-1.5 rounded-lg hover:bg-dash-soft-pink text-dash-light-purple hover:text-dash-dark-purple transition-all duration-200 cursor-pointer border-none bg-transparent"
+                >
+                  <X size={18} />
+                </button>
+              </div>
 
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!groupName.trim()) {
+                    alert('Please enter a group name.');
+                    return;
+                  }
+                  const newGroup = {
+                    id: Math.random().toString(36).substring(2, 9),
+                    name: groupName.trim(),
+                    candidateIds: selectedCandidateIds,
+                    createdAt: Date.now()
+                  };
+                  setCandidateGroups(prev => [newGroup, ...prev]);
+                  setSelectedCandidateIds([]);
+                  setShowCreateGroupModal(false);
+                  showToast(`Group "${newGroup.name}" created successfully.`);
+                }}
+                className="flex flex-col gap-4"
+              >
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider">
+                    Group Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Python Developers Group"
+                    value={groupName}
+                    onChange={(e) => setGroupName(e.target.value)}
+                    className="w-full bg-[#f8fafc] border border-dash-border-gray rounded-xl py-2.5 px-4 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple transition-all"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider">
+                    Selected Candidates ({selectedCandidateIds.length})
+                  </label>
+                  <div className="max-h-32 overflow-y-auto space-y-1.5 border border-dash-border-gray/65 rounded-xl p-3 bg-slate-50/50 dashboard-scrollbar">
+                    {candidates
+                      .filter(c => selectedCandidateIds.includes(c.id))
+                      .map(c => (
+                        <div key={c.id} className="text-xs font-bold text-dash-dark-purple flex items-center justify-between">
+                          <span>{c.full_name || c.name}</span>
+                          <span className="text-[9px] font-medium text-dash-light-purple">{c.email}</span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+
+                <div className="flex gap-3 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateGroupModal(false)}
+                    className="flex-1 py-3 rounded-xl border border-dash-border-gray hover:bg-dash-soft-pink text-dash-light-purple font-bold text-xs cursor-pointer transition-colors bg-transparent"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-3 rounded-xl bg-dash-primary-purple hover:bg-dash-dark-purple text-white font-bold text-xs cursor-pointer border-none shadow-md"
+                  >
+                    Create Group
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Modal for Assigning Assessment */}
+      <AnimatePresence>
+        {assigningAssessment && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.4 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                setAssigningAssessment(null);
+                setAssigningGroup(null);
+              }}
+              className="fixed inset-0 bg-dash-dark-purple/40 z-50"
+            />
+            {/* Modal Body */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed inset-0 m-auto w-full max-w-md h-fit bg-dash-white-card border border-dash-border-gray rounded-[24px] shadow-2xl z-50 p-6 flex flex-col gap-5"
+            >
+              <div className="flex items-center justify-between border-b border-dash-border-gray/25 pb-3">
+                <div>
+                  <span className="text-[10px] text-dash-primary-purple font-extrabold tracking-widest uppercase">
+                    Assign Assessment
+                  </span>
+                  <h3 className="text-base font-bold text-dash-dark-purple font-outfit mt-0.5 truncate max-w-[280px]">
+                    {assigningAssessment.name}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => {
+                    setAssigningAssessment(null);
+                    setAssigningGroup(null);
+                  }}
+                  className="p-1.5 rounded-lg hover:bg-dash-soft-pink text-dash-light-purple hover:text-dash-dark-purple transition-all duration-200 cursor-pointer border-none bg-transparent"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Type Switcher */}
+              <div className="flex bg-slate-100 p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setAssignType('individual')}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg cursor-pointer border-none transition-all ${assignType === 'individual' ? 'bg-white text-dash-primary-purple shadow-sm font-extrabold' : 'bg-transparent text-dash-light-purple'}`}
+                >
+                  Individual Candidate
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAssignType('group')}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg cursor-pointer border-none transition-all ${assignType === 'group' ? 'bg-white text-dash-primary-purple shadow-sm font-extrabold' : 'bg-transparent text-dash-light-purple'}`}
+                >
+                  Candidate Group
+                </button>
+              </div>
+
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const dueDate = e.target.dueDate.value;
+                  const startTime = e.target.startTime.value;
+
+                  if (assignType === 'group') {
+                    if (!selectedAssignGroup) {
+                      alert('Please select a candidate group.');
+                      return;
+                    }
+
+                    const groupMemberEmails = (Array.isArray(candidates) ? candidates : [])
+                      .filter(c => selectedAssignGroup.candidateIds.includes(c.id))
+                      .map(c => c.email);
+
+                    if (groupMemberEmails.length === 0) {
+                      alert('This group has no members.');
+                      return;
+                    }
+
+                    let successCount = 0;
+                    let failedCount = 0;
+                    for (const email of groupMemberEmails) {
+                      try {
+                        await handleConfirmAssign(email, dueDate, startTime, true);
+                        successCount++;
+                      } catch (err) {
+                        failedCount++;
+                        console.error(`Failed to assign to ${email}:`, err);
+                      }
+                    }
+
+                    showToast(`Successfully assigned to ${successCount} candidates. ${failedCount > 0 ? `Failed: ${failedCount}.` : ''}`);
+                    
+                    // Refresh saved assessments
+                    try {
+                      const assessmentsRes = await api.get('/api/assessment');
+                      if (assessmentsRes.data) {
+                        setSavedAssessments(assessmentsRes.data);
+                      }
+                    } catch (err) {
+                      console.error(err);
+                    }
+                    
+                    setAssigningAssessment(null);
+                    setAssigningGroup(null);
+                  } else {
+                    if (!selectedAssignCandidate) {
+                      alert('Please select a candidate from the dropdown.');
+                      return;
+                    }
+                    const email = selectedAssignCandidate.email;
+                    await handleConfirmAssign(email, dueDate, startTime);
+                  }
+                }}
+                className="flex flex-col gap-4"
+              >
+                {assignType === 'individual' ? (
+                  <div className="flex flex-col gap-1.5 relative">
+                    <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider">
+                      Select Candidate
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Search candidate by name or email..."
+                        value={assignSearch}
+                        onChange={(e) => {
+                          setAssignSearch(e.target.value);
+                          setSelectedAssignCandidate(null);
+                          setShowAssignDropdown(true);
+                        }}
+                        onFocus={() => setShowAssignDropdown(true)}
+                        className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2.5 px-4 text-xs font-semibold text-dash-dark-purple placeholder-dash-light-purple/50 focus:outline-none focus:border-dash-primary-purple transition-all"
+                        required={assignType === 'individual' && !selectedAssignCandidate}
+                      />
+                      {selectedAssignCandidate && (
+                        <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-dash-success-green bg-dash-success-green/10 border border-dash-success-green/20 px-2 py-0.5 rounded-full">
+                          Selected
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Dropdown Overlay */}
+                    <AnimatePresence>
+                      {showAssignDropdown && (
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setShowAssignDropdown(false)} />
+                          <motion.div
+                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                            transition={{ duration: 0.15 }}
+                            className="absolute left-0 right-0 top-full mt-1.5 max-h-48 overflow-y-auto bg-dash-white-card border border-dash-border-gray rounded-xl shadow-xl z-50 p-1 flex flex-col gap-0.5 dashboard-scrollbar"
+                          >
+                            {(Array.isArray(candidates) ? candidates : [])
+                              .filter(c => {
+                                const nameStr = (c.full_name || c.name || '').toLowerCase();
+                                const emailStr = (c.email || '').toLowerCase();
+                                const query = assignSearch.toLowerCase();
+                                return nameStr.includes(query) || emailStr.includes(query);
+                              })
+                              .map(c => (
+                                <button
+                                  key={c.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedAssignCandidate(c);
+                                    setAssignSearch(`${c.full_name || c.name} (${c.email})`);
+                                    setShowAssignDropdown(false);
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-xs font-semibold rounded-lg hover:bg-dash-soft-pink hover:text-dash-primary-purple text-dash-dark-purple transition-colors cursor-pointer border-none flex flex-col gap-0.5"
+                                >
+                                  <span className="font-bold">{c.full_name || c.name}</span>
+                                  <span className="text-[10px] text-dash-light-purple">{c.email}</span>
+                                </button>
+                              ))}
+                            {(Array.isArray(candidates) ? candidates : []).filter(c => {
+                              const nameStr = (c.full_name || c.name || '').toLowerCase();
+                              const emailStr = (c.email || '').toLowerCase();
+                              const query = assignSearch.toLowerCase();
+                              return nameStr.includes(query) || emailStr.includes(query);
+                            }).length === 0 && (
+                              <div className="p-3 text-center text-xs font-semibold text-dash-light-purple">
+                                No candidates found.
+                              </div>
+                            )}
+                          </motion.div>
+                        </>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider">
+                      Select Candidate Group
+                    </label>
+                    {candidateGroups.length === 0 ? (
+                      <div className="p-3 border border-dashed border-dash-border-gray rounded-xl text-center text-xs font-semibold text-dash-light-purple">
+                        No groups created yet.
+                      </div>
+                    ) : (
+                      <select
+                        value={selectedAssignGroup ? selectedAssignGroup.id : ''}
+                        onChange={(e) => {
+                          const group = candidateGroups.find(g => g.id === e.target.value);
+                          setSelectedAssignGroup(group || null);
+                        }}
+                        required={assignType === 'group'}
+                        className="w-full bg-[#f8fafc] border border-dash-border-gray rounded-xl py-2.5 px-4 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple transition-all"
+                      >
+                        <option value="">-- Choose a Group --</option>
+                        {candidateGroups.map(g => (
+                          <option key={g.id} value={g.id}>
+                            {g.name} ({g.candidateIds?.length || 0} members)
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider">
+                    Start Time (Required)
+                  </label>
+                  <input
+                    name="startTime"
+                    type="datetime-local"
+                    required
+                    className="w-full bg-[#f8fafc] border border-dash-border-gray rounded-xl py-2.5 px-4 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple transition-all"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider">
+                    Due Date (Optional)
+                  </label>
+                  <input
+                    name="dueDate"
+                    type="datetime-local"
+                    className="w-full bg-[#f8fafc] border border-dash-border-gray rounded-xl py-2.5 px-4 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple transition-all"
+                  />
+                </div>
+
+                <div className="flex items-center gap-3 pt-3 border-t border-dash-border-gray/25 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAssigningAssessment(null);
+                      setAssigningGroup(null);
+                    }}
+                    className="flex-1 py-3 rounded-xl border border-dash-border-gray text-xs font-bold text-dash-dark-purple hover:bg-dash-soft-pink transition-colors cursor-pointer bg-dash-white-card bg-transparent"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-3 rounded-xl bg-dash-primary-purple text-dash-white-card text-xs font-bold hover:bg-dash-dark-purple transition-colors cursor-pointer border-none shadow-md animate-pulse"
+                  >
+                    Assign Assessment
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
     </div>
   );
@@ -1988,7 +2568,7 @@ const SyntaxHighlighter = ({ code, language }) => {
   return <pre className="font-mono text-xs leading-relaxed overflow-x-auto whitespace-pre-wrap text-[#0f172a]">{code}</pre>;
 };
 
-const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToast }) => {
+const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToast, onSave, onSaveAndAssign }) => {
   const [selectedId, setSelectedId] = useState(generatedQuestions[0]?.id || null);
   const [isEditing, setIsEditing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -1999,6 +2579,7 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
   const [editForm, setEditForm] = useState({
     subject: '',
     topic: '',
+    type: 'MCQ',
     difficulty: '',
     estimatedTime: '',
     problemStatement: '',
@@ -2009,7 +2590,13 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
     explanation: '',
     question: '',
     options: '',
-    correctAnswer: ''
+    correctAnswer: '',
+    inputFormat: '',
+    outputFormat: '',
+    sampleInput: '',
+    sampleOutput: '',
+    hiddenTestCases: '[]',
+    marks: 10
   });
 
   const selectedQuestion = generatedQuestions.find(q => q.id === selectedId);
@@ -2021,6 +2608,7 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
       setEditForm({
         subject: selectedQuestion.subject || '',
         topic: selectedQuestion.topic || '',
+        type: selectedQuestion.type || 'MCQ',
         difficulty: selectedQuestion.difficulty || 'Medium',
         estimatedTime: selectedQuestion.estimatedTime || (isCoding ? '15 Minutes' : '5 Minutes'),
         problemStatement: selectedQuestion.problemStatement || selectedQuestion.question || selectedQuestion.scenario || '',
@@ -2031,7 +2619,13 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
         explanation: selectedQuestion.explanation || '',
         question: selectedQuestion.question || '',
         options: selectedQuestion.options ? selectedQuestion.options.join(', ') : '',
-        correctAnswer: selectedQuestion.correctAnswer || ''
+        correctAnswer: selectedQuestion.correctAnswer || '',
+        inputFormat: selectedQuestion.inputFormat || '',
+        outputFormat: selectedQuestion.outputFormat || '',
+        sampleInput: selectedQuestion.sampleInput || '',
+        sampleOutput: selectedQuestion.sampleOutput || '',
+        hiddenTestCases: selectedQuestion.hiddenTestCases ? JSON.stringify(selectedQuestion.hiddenTestCases, null, 2) : '[]',
+        marks: selectedQuestion.marks || 10
       });
       setIsEditing(false);
     }
@@ -2139,13 +2733,27 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
 
   const handleSaveChanges = (e) => {
     e.preventDefault();
+    
+    let parsedHiddenTestCases = [];
+    try {
+      parsedHiddenTestCases = JSON.parse(editForm.hiddenTestCases || '[]');
+      if (!Array.isArray(parsedHiddenTestCases)) {
+        showToast("Hidden test cases must be a JSON array.");
+        return;
+      }
+    } catch (err) {
+      showToast("Invalid JSON syntax in Hidden Test Cases.");
+      return;
+    }
+
     setGeneratedQuestions(prev => prev.map(q => {
       if (q.id === selectedId) {
-        const isCoding = q.type?.includes('CODING') || q.type === 'SCENARIO_CODING' || q.type === 'SCENARIO';
+        const isCoding = editForm.type?.includes('CODING') || editForm.type === 'SCENARIO_CODING' || editForm.type === 'SCENARIO';
         return {
           ...q,
           subject: editForm.subject,
           topic: editForm.topic,
+          type: editForm.type,
           difficulty: editForm.difficulty,
           estimatedTime: editForm.estimatedTime,
           question: isCoding ? editForm.problemStatement : editForm.question,
@@ -2156,7 +2764,13 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
           expectedAnswer: editForm.expectedAnswer,
           explanation: editForm.explanation,
           options: editForm.options ? editForm.options.split(',').map(s => s.trim()).filter(Boolean) : [],
-          correctAnswer: editForm.correctAnswer
+          correctAnswer: editForm.correctAnswer,
+          inputFormat: editForm.inputFormat,
+          outputFormat: editForm.outputFormat,
+          sampleInput: editForm.sampleInput,
+          sampleOutput: editForm.sampleOutput,
+          hiddenTestCases: parsedHiddenTestCases,
+          marks: parseFloat(editForm.marks) || 10
         };
       }
       return q;
@@ -2174,7 +2788,36 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
   });
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch w-full">
+    <div className="flex flex-col gap-6 w-full animate-fade-in">
+      {/* Assessment Action Bar */}
+      <div className="bg-dash-white-card border border-dash-border-gray rounded-[24px] p-5 shadow-sm flex flex-col sm:flex-row gap-4 items-center justify-between">
+        <div>
+          <h3 className="font-outfit font-extrabold text-base text-dash-dark-purple">
+            Confirm AI Assessment Question Pool
+          </h3>
+          <p className="text-xs text-dash-light-purple font-medium mt-1">
+            Review the questions generated by AI. Save the assessment to make it available for candidates.
+          </p>
+        </div>
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <button
+            onClick={onSave}
+            className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl border border-dash-primary-purple text-dash-primary-purple font-bold text-xs hover:bg-dash-primary-purple/5 transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 bg-dash-white-card"
+          >
+            <Save size={14} />
+            <span>Save Assessment</span>
+          </button>
+          <button
+            onClick={onSaveAndAssign}
+            className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-dash-primary-purple border border-dash-primary-purple text-dash-white-card font-bold text-xs hover:bg-dash-dark-purple transition-all duration-200 shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <UserPlus size={14} />
+            <span>Save & Assign</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch w-full">
       {/* LEFT PANEL: QUESTION LIST POOL */}
       <div className="lg:col-span-4 bg-dash-white-card border border-dash-border-gray rounded-[24px] p-5 shadow-[0_4px_20px_rgba(87,82,170,0.02)] flex flex-col gap-4 min-h-[450px] lg:h-[720px]">
         <div className="flex items-center justify-between border-b border-dash-border-gray/25 pb-3">
@@ -2205,6 +2848,39 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
             </button>
           )}
         </div>
+
+        {/* Add Custom Question Button */}
+        <button
+          onClick={() => {
+            const newQ = {
+              id: 'custom-' + Date.now(),
+              subject: 'Python',
+              topic: 'General',
+              type: 'PYTHON_CODING',
+              difficulty: 'Medium',
+              question: 'Write a Python function to...',
+              correctAnswer: 'def solution():\n    pass\n\nif __name__ == "__main__":\n    solution()',
+              exampleInput: '',
+              exampleOutput: '',
+              inputFormat: '',
+              outputFormat: '',
+              constraints: [],
+              sampleInput: '',
+              sampleOutput: '',
+              hiddenTestCases: [],
+              marks: 10,
+              isSaved: true
+            };
+            setGeneratedQuestions(prev => [...prev, newQ]);
+            setSelectedId(newQ.id);
+            setIsEditing(true);
+            showToast("Custom Python Coding question created!");
+          }}
+          className="w-full py-2 bg-dash-primary-purple/10 border border-dash-primary-purple/30 text-dash-primary-purple font-bold text-xs rounded-xl hover:bg-dash-primary-purple/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer border-dashed"
+        >
+          <Plus size={12} strokeWidth={3} />
+          <span>Add Custom Question</span>
+        </button>
 
         {/* Question List container */}
         <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 dashboard-scrollbar">
@@ -2309,7 +2985,7 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
               </div>
 
               {/* Form inputs grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 <div>
                   <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Category (Subject)</label>
                   <input
@@ -2329,6 +3005,18 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
                     className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
                     required
                   />
+                </div>
+                <div>
+                  <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Question Type</label>
+                  <select
+                    value={editForm.type}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, type: e.target.value }))}
+                    className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-bold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple"
+                  >
+                    <option value="MCQ">Multiple Choice (MCQ)</option>
+                    <option value="SCENARIO">Scenario Q&A (Text)</option>
+                    <option value="PYTHON_CODING">Python Coding (Sandbox)</option>
+                  </select>
                 </div>
                 <div>
                   <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Difficulty</label>
@@ -2352,6 +3040,17 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
                     placeholder="e.g. 15 Minutes"
                   />
                 </div>
+                <div>
+                  <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Marks</label>
+                  <input
+                    type="number"
+                    value={editForm.marks}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, marks: parseInt(e.target.value, 10) || 0 }))}
+                    className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
+                    min="1"
+                    max="100"
+                  />
+                </div>
               </div>
 
               {/* Problem statement / Question block */}
@@ -2367,7 +3066,7 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
               </div>
 
               {/* Conditional options for MCQ vs Coding */}
-              {!(selectedQuestion.type?.includes('CODING') || selectedQuestion.type === 'SCENARIO_CODING' || selectedQuestion.type === 'SCENARIO') ? (
+              {editForm.type === 'MCQ' ? (
                 /* MCQ EDIT FIELDS */
                 <div className="space-y-4">
                   <div>
@@ -2391,8 +3090,86 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
                     />
                   </div>
                 </div>
+              ) : editForm.type === 'PYTHON_CODING' ? (
+                /* PYTHON CODING EDIT FIELDS */
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Input Format</label>
+                      <input
+                        type="text"
+                        value={editForm.inputFormat}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, inputFormat: e.target.value }))}
+                        className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
+                        placeholder="e.g. A single string of characters"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Output Format</label>
+                      <input
+                        type="text"
+                        value={editForm.outputFormat}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, outputFormat: e.target.value }))}
+                        className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
+                        placeholder="e.g. Print True or False"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Sample Input</label>
+                      <textarea
+                        rows="2"
+                        value={editForm.sampleInput}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, sampleInput: e.target.value }))}
+                        className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10 resize-y"
+                        placeholder="madam"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Sample Output</label>
+                      <textarea
+                        rows="2"
+                        value={editForm.sampleOutput}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, sampleOutput: e.target.value }))}
+                        className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10 resize-y"
+                        placeholder="True"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Constraints (comma-separated list)</label>
+                    <input
+                      type="text"
+                      value={editForm.constraints}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, constraints: e.target.value }))}
+                      className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
+                      placeholder="e.g. Length <= 1000, ASCII only"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Expected Correct Code Solution</label>
+                    <textarea
+                      rows="4"
+                      value={editForm.expectedAnswer}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, expectedAnswer: e.target.value, correctAnswer: e.target.value }))}
+                      className="w-full bg-[#1e1e1e] border border-zinc-800 rounded-xl py-2.5 px-4 text-xs font-mono text-zinc-100 focus:outline-none focus:border-dash-primary-purple transition-all resize-y"
+                      placeholder="def solution(): ..."
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Hidden Test Cases (JSON Array of input/output objects)</label>
+                    <textarea
+                      rows="3"
+                      value={editForm.hiddenTestCases}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, hiddenTestCases: e.target.value }))}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-mono text-slate-700 focus:outline-none focus:border-dash-primary-purple resize-y"
+                      placeholder='[\n  {"input": "racecar", "output": "True"},\n  {"input": "hello", "output": "False"}\n]'
+                    />
+                  </div>
+                </div>
               ) : (
-                /* CODING SCENARIO EDIT FIELDS */
+                /* DEFAULTS TO SCENARIO EDIT FIELDS */
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -2487,7 +3264,7 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 border-b border-dash-border-gray/25 pb-3">
                 <div>
                   <span className="text-[10px] text-dash-primary-purple font-extrabold tracking-widest uppercase font-outfit">
-                    {selectedQuestion.type === 'MCQ' ? 'Multiple Choice Question' : 'Scenario Based Question'}
+                    {selectedQuestion.type === 'PYTHON_CODING' ? 'Python Coding Question' : (selectedQuestion.type === 'MCQ' ? 'Multiple Choice Question' : 'Scenario Based Question')}
                   </span>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="font-outfit font-extrabold text-base text-dash-dark-purple">
@@ -2622,7 +3399,36 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
                 )}
 
                 {/* Example Input / Output (only for coding scenario) */}
-                {(selectedQuestion.type?.includes('CODING') || selectedQuestion.type === 'SCENARIO_CODING' || selectedQuestion.type === 'SCENARIO') && (
+                {selectedQuestion.type === 'PYTHON_CODING' ? (
+                  <div className="space-y-3.5 bg-slate-50 border border-slate-200/50 rounded-2xl p-4 shadow-[0_2px_8px_rgba(87,82,170,0.01)]">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-b border-slate-200/40 pb-3">
+                      <div>
+                        <span className="block font-bold text-slate-400 uppercase tracking-wider text-[9px] mb-1">Input Format:</span>
+                        <p className="text-xs font-semibold text-slate-700">{selectedQuestion.inputFormat || "N/A"}</p>
+                      </div>
+                      <div>
+                        <span className="block font-bold text-slate-400 uppercase tracking-wider text-[9px] mb-1">Output Format:</span>
+                        <p className="text-xs font-semibold text-slate-700">{selectedQuestion.outputFormat || "N/A"}</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+                      <div className="space-y-1">
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Sample Input</span>
+                        <pre className="bg-white border border-slate-200 rounded-xl p-2.5 font-mono text-[11px] text-slate-700 whitespace-pre-wrap select-text">{selectedQuestion.sampleInput || "N/A"}</pre>
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Sample Output</span>
+                        <pre className="bg-white border border-slate-200 rounded-xl p-2.5 font-mono text-[11px] text-slate-700 whitespace-pre-wrap select-text">{selectedQuestion.sampleOutput || "N/A"}</pre>
+                      </div>
+                    </div>
+                    {selectedQuestion.hiddenTestCases && selectedQuestion.hiddenTestCases.length > 0 && (
+                      <div className="space-y-1 mt-2 border-t border-slate-200/40 pt-3">
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Hidden Test Cases Configured</span>
+                        <span className="text-xs font-bold text-dash-primary-purple bg-dash-primary-purple/10 px-3 py-1 rounded-md border border-dash-primary-purple/10">{selectedQuestion.hiddenTestCases.length} Test Cases</span>
+                      </div>
+                    )}
+                  </div>
+                ) : (selectedQuestion.type?.includes('CODING') || selectedQuestion.type === 'SCENARIO_CODING' || selectedQuestion.type === 'SCENARIO') ? (
                   <div className="space-y-2">
                     <h4 className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
                       Example
@@ -2646,7 +3452,7 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
                       </div>
                     </div>
                   </div>
-                )}
+                ) : null}
 
                 {/* Constraints (only for coding scenario) */}
                 {(selectedQuestion.type?.includes('CODING') || selectedQuestion.type === 'SCENARIO_CODING' || selectedQuestion.type === 'SCENARIO') && selectedQuestion.constraints && selectedQuestion.constraints.length > 0 && (
@@ -2769,6 +3575,7 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
         )}
       </div>
     </div>
+  </div>
   );
 };
 
@@ -2780,11 +3587,10 @@ const AssessmentsManager = ({
   setSavedAssessments,
   showToast,
   setActiveTab,
-  setSelectedAssessmentForView
+  setSelectedAssessmentForView,
+  onAssignClick
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [assigningId, setAssigningId] = useState(null);
-  const [candidateEmail, setCandidateEmail] = useState('');
 
   const handleDeleteAssessment = async (id, name) => {
     const confirmDelete = window.confirm(`Are you sure you want to delete "${name}"?`);
@@ -2797,38 +3603,6 @@ const AssessmentsManager = ({
     } catch (err) {
       console.error("Failed to delete assessment from backend:", err);
       showToast("Error deleting assessment.");
-    }
-  };
-
-  const handleStartAssign = (id) => {
-    setAssigningId(id);
-    setCandidateEmail('');
-  };
-
-  const handleConfirmAssign = async (e, id, name) => {
-    e.preventDefault();
-    const email = candidateEmail.trim();
-    if (!email) return;
-
-    // Validate email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      alert('Please enter a valid email address.');
-      return;
-    }
-
-    try {
-      const response = await api.post(`/api/assessment/${id}/assign`, { email });
-      if (response.data) {
-        setSavedAssessments(prev => prev.map(asm => asm.id === id ? response.data : asm));
-        showToast(`Successfully assigned "${name}" and sent invite to ${email}!`);
-      }
-    } catch (err) {
-      console.error("Failed to assign assessment on backend:", err);
-      showToast("Error assigning assessment.");
-    } finally {
-      setAssigningId(null);
-      setCandidateEmail('');
     }
   };
 
@@ -2920,7 +3694,6 @@ const AssessmentsManager = ({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {filteredAssessments.map((asm) => {
-            const isAssigning = assigningId === asm.id;
             return (
               <motion.div
                 key={asm.id}
@@ -2978,65 +3751,33 @@ const AssessmentsManager = ({
                   </div>
                 </div>
 
-                {/* Card Actions / Inline Assign Form */}
+                {/* Card Actions */}
                 <div className="border-t border-dash-border-gray/30 pt-4 mt-1">
-                  {isAssigning ? (
-                    <form
-                      onSubmit={(e) => handleConfirmAssign(e, asm.id, asm.name)}
-                      className="flex items-center gap-2 w-full animate-fade-in"
+                  <div className="flex items-center justify-between gap-2.5 w-full">
+                    <button
+                      onClick={() => setSelectedAssessmentForView(asm)}
+                      className="flex-1 py-2.5 rounded-xl border border-dash-border-gray/80 hover:bg-dash-soft-pink text-dash-dark-purple font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer bg-dash-white-card"
                     >
-                      <input
-                        type="email"
-                        placeholder="Candidate email..."
-                        value={candidateEmail}
-                        onChange={(e) => setCandidateEmail(e.target.value)}
-                        className="flex-1 bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple"
-                        autoFocus
-                        required
-                      />
-                      <button
-                        type="submit"
-                        className="p-2.5 rounded-xl bg-dash-primary-purple hover:bg-dash-dark-purple text-dash-white-card transition-all flex items-center justify-center border-none cursor-pointer"
-                        title="Send Invite"
-                      >
-                        <Send size={12} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setAssigningId(null)}
-                        className="p-2.5 rounded-xl bg-dash-border-gray/25 hover:bg-dash-border-gray/50 text-dash-dark-purple transition-all flex items-center justify-center border-none cursor-pointer"
-                        title="Cancel"
-                      >
-                        <X size={12} />
-                      </button>
-                    </form>
-                  ) : (
-                    <div className="flex items-center justify-between gap-2.5 w-full">
-                      <button
-                        onClick={() => setSelectedAssessmentForView(asm)}
-                        className="flex-1 py-2.5 rounded-xl border border-dash-border-gray/80 hover:bg-dash-soft-pink text-dash-dark-purple font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer bg-dash-white-card"
-                      >
-                        <Eye size={13} />
-                        <span>View Questions</span>
-                      </button>
+                      <Eye size={13} />
+                      <span>View Questions</span>
+                    </button>
 
-                      <button
-                        onClick={() => handleStartAssign(asm.id)}
-                        className="flex-1 py-2.5 rounded-xl bg-dash-primary-purple/10 border border-dash-primary-purple/20 hover:bg-dash-primary-purple/20 text-dash-primary-purple font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer"
-                      >
-                        <UserPlus size={13} />
-                        <span>Assign</span>
-                      </button>
+                    <button
+                      onClick={() => onAssignClick(asm)}
+                      className="flex-1 py-2.5 rounded-xl bg-dash-primary-purple/10 border border-dash-primary-purple/20 hover:bg-dash-primary-purple/20 text-dash-primary-purple font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <UserPlus size={13} />
+                      <span>Assign</span>
+                    </button>
 
-                      <button
-                        onClick={() => handleDeleteAssessment(asm.id, asm.name)}
-                        className="p-2.5 rounded-xl border border-red-100 hover:border-red-200 bg-red-50/30 hover:bg-red-50 text-red-600 transition-all duration-200 flex items-center justify-center cursor-pointer"
-                        title="Delete Assessment"
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  )}
+                    <button
+                      onClick={() => handleDeleteAssessment(asm.id, asm.name)}
+                      className="p-2.5 rounded-xl border border-red-100 hover:border-red-200 bg-red-50/30 hover:bg-red-50 text-red-600 transition-all duration-200 flex items-center justify-center cursor-pointer"
+                      title="Delete Assessment"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
                 </div>
               </motion.div>
             );
@@ -3278,4 +4019,1030 @@ const AssessmentDetailsDrawer = ({ assessment, onClose, showToast }) => {
   );
 };
 
+const ResultsManager = ({ showToast }) => {
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [scoreFilter, setScoreFilter] = useState('All');
+  const [sortBy, setSortBy] = useState('score-desc');
+  const [selectedResult, setSelectedResult] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [expandedQuestions, setExpandedQuestions] = useState({});
+  const [recalculating, setRecalculating] = useState(false);
+
+  useEffect(() => {
+    fetchResults();
+  }, []);
+
+  const fetchResults = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/api/recruiter/results');
+      setResults(response.data || []);
+    } catch (err) {
+      console.error("Failed to fetch recruiter results:", err);
+      showToast("Error loading evaluation results.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOpenDetail = async (assignmentId) => {
+    try {
+      setDetailLoading(true);
+      const response = await api.get(`/api/results/${assignmentId}`);
+      setSelectedResult(response.data);
+      const initialExpanded = {};
+      if (response.data?.questionsAnalysis) {
+        response.data.questionsAnalysis.forEach(q => {
+          initialExpanded[q.questionId] = true;
+        });
+      }
+      setExpandedQuestions(initialExpanded);
+    } catch (err) {
+      console.error("Failed to load result details:", err);
+      showToast("Error loading result details.");
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const handleReevaluate = async (assignmentId) => {
+    try {
+      setRecalculating(true);
+      showToast("Triggering AI re-evaluation. Please wait...");
+      const response = await api.post('/api/evaluation', { assignmentId });
+      setSelectedResult(response.data);
+      showToast("Assessment re-evaluated successfully!");
+      fetchResults();
+    } catch (err) {
+      console.error("Re-evaluation failed:", err);
+      showToast("Failed to re-evaluate assessment.");
+    } finally {
+      setRecalculating(false);
+    }
+  };
+
+  const toggleQuestionExpand = (qId) => {
+    setExpandedQuestions(prev => ({
+      ...prev,
+      [qId]: !prev[qId]
+    }));
+  };
+
+  const handleDownloadPDF = (result) => {
+    if (!result) return;
+    const printWindow = window.open('', '_blank');
+    const questionsHTML = (result.questionsAnalysis || []).map((q, idx) => `
+      <div class="question-card">
+        <div class="q-header">
+          <span class="q-num">Question ${idx + 1} (${q.type})</span>
+          <span class="badge badge-${q.status.toLowerCase().replace(/\s+/g, '-')}">${q.status}</span>
+        </div>
+        <div class="q-text">${q.questionText}</div>
+        
+        <div class="answer-section">
+          <div class="answer-row">
+            <span class="ans-label">Correct Answer:</span>
+            <span class="ans-val font-code">${q.correctAnswer}</span>
+          </div>
+          <div class="answer-row">
+            <span class="ans-label">Candidate Answer:</span>
+            <span class="ans-val font-code">${q.candidateAnswer || 'Not Answered'}</span>
+          </div>
+        </div>
+
+        <div class="ai-feedback-box">
+          <div class="ai-title"><span class="sparkle-icon">✨</span> AI Evaluation Details</div>
+          <div class="metric-grid">
+            <div class="metric-item">
+              <span class="metric-label">Semantic Similarity:</span>
+              <span class="metric-val">${q.similarityScore !== null && q.similarityScore !== undefined ? q.similarityScore : (q.status === 'Correct' ? 100 : 0)}%</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">Score Awarded:</span>
+              <span class="metric-val">${q.marksAwarded} / ${q.maxMarks}</span>
+            </div>
+          </div>
+          <div class="feedback-field">
+            <strong>Explanation:</strong> ${q.aiExplanation || q.feedback || 'N/A'}
+          </div>
+          <div class="feedback-field">
+            <strong>Strengths:</strong> ${q.strengths || 'N/A'}
+          </div>
+          <div class="feedback-field">
+            <strong>Missing Points:</strong> ${q.missingPoints || 'N/A'}
+          </div>
+          <div class="feedback-field">
+            <strong>Suggested Improvement:</strong> ${q.suggestedImprovement || q.improvements || 'N/A'}
+          </div>
+        </div>
+      </div>
+    `).join('');
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>RecruitAI Report - ${result.candidateName}</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@700;800&display=swap');
+            body {
+              font-family: 'Inter', sans-serif;
+              color: #1e1b4b;
+              padding: 40px;
+              line-height: 1.5;
+              background-color: #ffffff;
+            }
+            .header-container {
+              border-bottom: 3px solid #5752aa;
+              padding-bottom: 20px;
+              margin-bottom: 30px;
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-end;
+            }
+            .brand-title {
+              font-family: 'Plus Jakarta Sans', sans-serif;
+              font-size: 28px;
+              font-weight: 800;
+              color: #5752aa;
+              margin: 0;
+            }
+            .brand-sub {
+              font-size: 11px;
+              color: #94a3b8;
+              text-transform: uppercase;
+              letter-spacing: 0.15em;
+              font-weight: 700;
+            }
+            .report-title {
+              font-size: 16px;
+              font-weight: 700;
+              color: #475569;
+              text-transform: uppercase;
+              letter-spacing: 0.05em;
+            }
+            .meta-grid {
+              display: grid;
+              grid-template-columns: repeat(2, 1fr);
+              gap: 16px;
+              margin-bottom: 30px;
+            }
+            .meta-card {
+              background: #f8fafc;
+              border: 1px solid #e2e8f0;
+              padding: 16px;
+              border-radius: 12px;
+            }
+            .meta-label {
+              font-size: 10px;
+              font-weight: 700;
+              color: #64748b;
+              text-transform: uppercase;
+              letter-spacing: 0.05em;
+              display: block;
+              margin-bottom: 4px;
+            }
+            .meta-val {
+              font-size: 13px;
+              font-weight: 600;
+              color: #0f172a;
+            }
+            .overall-box {
+              background: linear-gradient(135deg, #fdf6fb 0%, #f6f5ff 100%);
+              border: 1px solid #e8dbfc;
+              border-radius: 16px;
+              padding: 24px;
+              margin-bottom: 40px;
+            }
+            .overall-title {
+              font-size: 18px;
+              font-weight: 800;
+              color: #5752aa;
+              margin-top: 0;
+              margin-bottom: 15px;
+            }
+            .overall-grid {
+              display: grid;
+              grid-template-columns: repeat(3, 1fr);
+              gap: 20px;
+              margin-bottom: 20px;
+              border-bottom: 1px solid #e2e8f0;
+              padding-bottom: 20px;
+            }
+            .overall-metric {
+              text-align: center;
+            }
+            .overall-num {
+              font-size: 32px;
+              font-weight: 800;
+              color: #5752aa;
+            }
+            .overall-label {
+              font-size: 11px;
+              font-weight: 600;
+              color: #64748b;
+              text-transform: uppercase;
+            }
+            .rec-badge {
+              display: inline-block;
+              padding: 6px 16px;
+              background-color: #5752aa;
+              color: #ffffff;
+              font-weight: 700;
+              font-size: 12px;
+              border-radius: 9999px;
+              text-transform: uppercase;
+              margin-top: 4px;
+            }
+            .overall-feedback-content {
+              font-size: 13px;
+              line-height: 1.6;
+              color: #334155;
+            }
+            .overall-feedback-content strong {
+              color: #0f172a;
+            }
+            .question-card {
+              border: 1px solid #e2e8f0;
+              border-radius: 16px;
+              padding: 20px;
+              margin-bottom: 25px;
+              page-break-inside: avoid;
+            }
+            .q-header {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-bottom: 12px;
+            }
+            .q-num {
+              font-size: 12px;
+              font-weight: 700;
+              color: #5752aa;
+              text-transform: uppercase;
+            }
+            .badge {
+              font-size: 10px;
+              font-weight: 700;
+              padding: 4px 10px;
+              border-radius: 9999px;
+              text-transform: uppercase;
+            }
+            .badge-correct { background-color: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+            .badge-partially-correct { background-color: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+            .badge-incorrect { background-color: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+            .q-text {
+              font-size: 15px;
+              font-weight: 700;
+              color: #0f172a;
+              margin-bottom: 15px;
+            }
+            .answer-section {
+              background-color: #f8fafc;
+              border-radius: 12px;
+              padding: 15px;
+              margin-bottom: 15px;
+              border: 1px solid #e2e8f0;
+            }
+            .answer-row {
+              margin-bottom: 8px;
+            }
+            .answer-row:last-child {
+              margin-bottom: 0;
+            }
+            .ans-label {
+              font-size: 11px;
+              font-weight: 700;
+              color: #64748b;
+              text-transform: uppercase;
+              display: block;
+              margin-bottom: 2px;
+            }
+            .ans-val {
+              font-size: 13px;
+              color: #334155;
+              display: block;
+            }
+            .font-code {
+              font-family: 'Courier New', Courier, monospace;
+              background-color: #f1f5f9;
+              padding: 8px 12px;
+              border-radius: 6px;
+              border: 1px solid #cbd5e1;
+              white-space: pre-wrap;
+              margin-top: 4px;
+            }
+            .ai-feedback-box {
+              background-color: #faf5ff;
+              border: 1px solid #ebd5ff;
+              border-radius: 12px;
+              padding: 15px;
+            }
+            .ai-title {
+              font-size: 12px;
+              font-weight: 700;
+              color: #7c3aed;
+              margin-bottom: 12px;
+              text-transform: uppercase;
+              letter-spacing: 0.05em;
+            }
+            .metric-grid {
+              display: grid;
+              grid-template-columns: repeat(2, 1fr);
+              gap: 12px;
+              margin-bottom: 12px;
+              background-color: #ffffff;
+              padding: 10px;
+              border-radius: 8px;
+              border: 1px solid #ebd5ff;
+            }
+            .metric-item {
+              display: flex;
+              flex-direction: column;
+            }
+            .metric-label {
+              font-size: 10px;
+              font-weight: 600;
+              color: #7c3aed;
+              text-transform: uppercase;
+            }
+            .metric-val {
+              font-size: 14px;
+              font-weight: 700;
+              color: #0f172a;
+            }
+            .feedback-field {
+              font-size: 12px;
+              color: #475569;
+              margin-bottom: 8px;
+              line-height: 1.5;
+            }
+            .feedback-field:last-child {
+              margin-bottom: 0;
+            }
+            .feedback-field strong {
+              color: #0f172a;
+            }
+            @media print {
+              body { padding: 0; }
+              .question-card { page-break-inside: avoid; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header-container">
+            <div>
+              <h1 class="brand-title">RecruitAI</h1>
+              <span class="brand-sub">Evaluation Report</span>
+            </div>
+            <div class="report-title">AI Assessment Result</div>
+          </div>
+
+          <div class="meta-grid">
+            <div class="meta-card">
+              <span class="meta-label">Candidate Name</span>
+              <span class="meta-val">${result.candidateName}</span>
+            </div>
+            <div class="meta-card">
+              <span class="meta-label">Candidate Email</span>
+              <span class="meta-val">${result.candidateEmail}</span>
+            </div>
+            <div class="meta-card">
+              <span class="meta-label">Assessment Name</span>
+              <span class="meta-val">${result.assessmentName}</span>
+            </div>
+            <div class="meta-card">
+              <span class="meta-label">Submission Date</span>
+              <span class="meta-val">${new Date(result.createdAt).toLocaleDateString()} ${new Date(result.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+            </div>
+          </div>
+
+          <div class="overall-box">
+            <h3 class="overall-title">Overall AI Summary</h3>
+            <div class="overall-grid">
+              <div class="overall-metric">
+                <div class="overall-num">${result.percentage}%</div>
+                <div class="overall-label">Final Score</div>
+              </div>
+              <div class="overall-metric">
+                <div class="overall-num">${result.correctAnswers} / ${result.totalQuestions}</div>
+                <div class="overall-label">Questions Correct</div>
+              </div>
+              <div class="overall-metric">
+                <div class="overall-num">
+                  <span class="rec-badge">${result.hiringRecommendation}</span>
+                </div>
+                <div class="overall-label" style="margin-top: 8px;">Hiring Recommendation</div>
+              </div>
+            </div>
+            <div class="overall-feedback-content">
+              <p><strong>AI Evaluation Summary:</strong> ${result.overallFeedback}</p>
+              <p><strong>Key Strengths:</strong> ${result.overallStrengths}</p>
+              <p><strong>Areas of Improvement:</strong> ${result.overallWeaknesses}</p>
+            </div>
+          </div>
+
+          <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; font-weight: 800; color: #5752aa; border-bottom: 2px solid #5752aa; padding-bottom: 8px; margin-bottom: 20px;">Question-by-Question AI Breakdown</h2>
+          
+          ${questionsHTML}
+
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+                window.close();
+              }, 600);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  const filteredAndSortedResults = results
+    .filter(res => {
+      const query = searchQuery.toLowerCase();
+      const nameMatch = res.candidateName?.toLowerCase().includes(query);
+      const emailMatch = res.candidateEmail?.toLowerCase().includes(query);
+      const asmMatch = res.assessmentName?.toLowerCase().includes(query);
+      return nameMatch || emailMatch || asmMatch;
+    })
+    .filter(res => {
+      if (scoreFilter === 'All') return true;
+      if (scoreFilter === 'Excellent') return res.percentage >= 80;
+      if (scoreFilter === 'Average') return res.percentage >= 50 && res.percentage < 80;
+      if (scoreFilter === 'NeedsImprovement') return res.percentage < 50;
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'score-desc') return b.percentage - a.percentage;
+      if (sortBy === 'score-asc') return a.percentage - b.percentage;
+      if (sortBy === 'date-desc') return new Date(b.createdAt) - new Date(a.createdAt);
+      if (sortBy === 'date-asc') return new Date(a.createdAt) - new Date(b.createdAt);
+      if (sortBy === 'name-asc') return a.candidateName.localeCompare(b.candidateName);
+      if (sortBy === 'name-desc') return b.candidateName.localeCompare(a.candidateName);
+      return 0;
+    });
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-dash-light-purple" size={18} />
+          <input
+            type="text"
+            placeholder="Search candidates or assessments..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-dash-white-card border border-dash-border-gray/50 rounded-2xl pl-11 pr-4 py-3 text-xs font-bold text-dash-dark-purple placeholder:text-dash-light-purple focus:border-dash-primary-purple outline-none transition-all duration-200"
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <SlidersHorizontal size={14} className="text-dash-light-purple" />
+            <select
+              value={scoreFilter}
+              onChange={(e) => setScoreFilter(e.target.value)}
+              className="px-2.5 py-2 rounded-lg bg-dash-white-card border border-dash-border-gray text-xs font-bold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple cursor-pointer hover:border-dash-primary-purple transition-all duration-200"
+            >
+              <option value="All">All Scores</option>
+              <option value="Excellent">Excellent (80%+)</option>
+              <option value="Average">Average (50%-79%)</option>
+              <option value="NeedsImprovement">Needs Improvement (&lt;50%)</option>
+            </select>
+          </div>
+
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="px-2.5 py-2 rounded-lg bg-dash-white-card border border-dash-border-gray text-xs font-bold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple cursor-pointer hover:border-dash-primary-purple transition-all duration-200"
+          >
+            <option value="score-desc">Score: Highest to Lowest</option>
+            <option value="score-asc">Score: Lowest to Highest</option>
+            <option value="date-desc">Date: Newest to Oldest</option>
+            <option value="date-asc">Date: Oldest to Newest</option>
+            <option value="name-asc">Candidate Name: A-Z</option>
+            <option value="name-desc">Candidate Name: Z-A</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] shadow-[0_4px_25px_rgba(87,82,170,0.02)] overflow-hidden flex flex-col min-h-[400px]">
+        {loading ? (
+          <div className="flex-1 flex flex-col justify-center items-center py-20 text-dash-light-purple gap-3">
+            <RefreshCw className="animate-spin text-dash-primary-purple" size={32} />
+            <span className="font-semibold text-xs">Loading assessment results...</span>
+          </div>
+        ) : (
+          <>
+            <div className="flex-1 overflow-x-auto dashboard-scrollbar">
+              <table className="w-full min-w-[900px] border-collapse text-left text-sm">
+                <thead>
+                  <tr className="bg-dash-soft-pink border-b border-dash-border-gray text-[10px] font-extrabold text-dash-dark-purple tracking-widest uppercase">
+                    <th className="px-6 py-4.5">Candidate Name</th>
+                    <th className="px-6 py-4.5">Assessment Name</th>
+                    <th className="px-6 py-4.5">Submission Date & Time</th>
+                    <th className="px-6 py-4.5">Score</th>
+                    <th className="px-6 py-4.5">AI Recommendation</th>
+                    <th className="px-6 py-4.5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-dash-border-gray">
+                  <AnimatePresence mode="popLayout">
+                    {filteredAndSortedResults.map((res) => {
+                      const scoreVal = res.percentage;
+                      let scoreColor = '#149470';
+                      let scoreBg = 'rgba(20, 148, 112, 0.1)';
+                      if (scoreVal < 50) {
+                        scoreColor = '#E11D48';
+                        scoreBg = 'rgba(225, 29, 72, 0.1)';
+                      } else if (scoreVal < 80) {
+                        scoreColor = '#D97706';
+                        scoreBg = 'rgba(217, 119, 6, 0.1)';
+                      }
+
+                      return (
+                        <motion.tr
+                          key={res.id}
+                          layout
+                          initial={{ opacity: 0, y: 15 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.95 }}
+                          transition={{ duration: 0.3 }}
+                          className="bg-dash-white-card hover:bg-dash-soft-pink transition-colors duration-200 group"
+                        >
+                          <td className="px-6 py-4">
+                            <h4 className="text-xs font-bold text-dash-dark-purple group-hover:text-dash-primary-purple transition-colors duration-200">
+                              {res.candidateName}
+                            </h4>
+                            <span className="text-[10px] font-semibold text-dash-light-purple block mt-0.5">{res.candidateEmail}</span>
+                          </td>
+
+                          <td className="px-6 py-4 text-xs font-bold text-dash-dark-purple">
+                            {res.assessmentName}
+                          </td>
+
+                          <td className="px-6 py-4">
+                            <span className="text-xs font-bold text-dash-dark-purple block">
+                              {new Date(res.createdAt).toLocaleDateString(undefined, {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric'
+                              })}
+                            </span>
+                            <span className="text-[10px] font-semibold text-dash-light-purple block mt-0.5">
+                              {new Date(res.createdAt).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                          </td>
+
+                          <td className="px-6 py-4">
+                            <span
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold border"
+                              style={{
+                                color: scoreColor,
+                                backgroundColor: scoreBg,
+                                borderColor: `${scoreColor}30`
+                              }}
+                            >
+                              {scoreVal}%
+                            </span>
+                          </td>
+
+                          <td className="px-6 py-4">
+                            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-dash-primary-purple bg-dash-primary-purple/5 border border-dash-primary-purple/20 px-3 py-1 rounded-full">
+                              <Sparkles size={12} className="text-dash-primary-purple" />
+                              {res.hiringRecommendation || "Recommended"}
+                            </span>
+                          </td>
+
+                          <td className="px-6 py-4 text-right">
+                            <button
+                              onClick={() => handleOpenDetail(res.assignmentId)}
+                              className="px-3 py-1.5 rounded-lg bg-dash-white-card border border-dash-border-gray hover:border-dash-primary-purple text-dash-primary-purple text-xs font-bold hover:bg-dash-soft-pink transition-all duration-300 flex items-center gap-1.5 ml-auto cursor-pointer"
+                            >
+                              <Eye size={13} />
+                              <span>View Details</span>
+                            </button>
+                          </td>
+                        </motion.tr>
+                      );
+                    })}
+                  </AnimatePresence>
+
+                  {filteredAndSortedResults.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-12 text-center text-sm text-dash-light-purple">
+                        <AlertCircle className="mx-auto mb-3 text-dash-light-purple" size={32} />
+                        No assessment evaluations found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="p-4 border-t border-dash-border-gray bg-dash-white-card flex items-center justify-between text-[11px] text-dash-light-purple font-semibold px-6">
+              <span>Showing {filteredAndSortedResults.length} evaluations</span>
+            </div>
+          </>
+        )}
+      </div>
+
+      <AnimatePresence>
+        {selectedResult && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.4 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedResult(null)}
+              className="fixed inset-0 bg-dash-dark-purple/40 z-45"
+            />
+
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
+              className="fixed top-0 bottom-0 right-0 w-full sm:w-[650px] bg-dash-white-card border-l border-dash-border-gray shadow-2xl z-50 p-6 flex flex-col justify-between overflow-y-auto"
+            >
+              <div>
+                <div className="flex items-center justify-between pb-4 border-b border-dash-border-gray mb-6">
+                  <div>
+                    <span className="text-[10px] text-dash-primary-purple font-extrabold tracking-widest uppercase">AI Assessment Report</span>
+                    <h3 className="text-base font-bold text-dash-dark-purple font-outfit mt-1">{selectedResult.candidateName}</h3>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleDownloadPDF(selectedResult)}
+                      className="p-2 rounded-lg bg-dash-soft-pink border border-dash-border-gray hover:border-dash-primary-purple text-dash-primary-purple transition-all cursor-pointer flex items-center gap-1.5"
+                      title="Download Report PDF"
+                    >
+                      <Download size={14} />
+                      <span className="text-xs font-bold">PDF</span>
+                    </button>
+                    <button
+                      onClick={() => setSelectedResult(null)}
+                      className="p-2 rounded-lg hover:bg-dash-soft-pink text-dash-light-purple hover:text-dash-dark-purple transition-all cursor-pointer"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div className="bg-dash-light-blue-bg/30 border border-dash-border-gray rounded-xl p-3.5">
+                    <span className="text-[10px] text-dash-light-purple font-bold uppercase tracking-wider block mb-1">Assessment</span>
+                    <span className="text-xs font-bold text-dash-dark-purple">{selectedResult.assessmentName}</span>
+                  </div>
+                  <div className="bg-dash-light-blue-bg/30 border border-dash-border-gray rounded-xl p-3.5">
+                    <span className="text-[10px] text-dash-light-purple font-bold uppercase tracking-wider block mb-1">Submitted On</span>
+                    <span className="text-xs font-semibold text-dash-dark-purple">
+                      {new Date(selectedResult.createdAt).toLocaleDateString()} {new Date(selectedResult.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-r from-dash-soft-pink to-dash-light-blue-bg/20 border border-dash-border-gray rounded-2xl p-5 mb-6">
+                  <h4 className="text-xs font-extrabold text-dash-primary-purple uppercase tracking-wider mb-3">Overall AI Evaluation</h4>
+                  
+                  <div className="grid grid-cols-3 gap-2 text-center border-b border-dash-border-gray/30 pb-4 mb-4">
+                    <div>
+                      <span className="text-2xl font-black text-dash-primary-purple">{selectedResult.percentage}%</span>
+                      <span className="text-[10px] font-bold text-dash-light-purple uppercase block mt-1">Final Score</span>
+                    </div>
+                    <div>
+                      <span className="text-2xl font-black text-dash-dark-purple">
+                        {selectedResult.correctAnswers} / {selectedResult.totalQuestions}
+                      </span>
+                      <span className="text-[10px] font-bold text-dash-light-purple uppercase block mt-1">Correct Qns</span>
+                    </div>
+                    <div>
+                      <span className="text-2xl font-black text-dash-dark-purple flex justify-center items-center gap-1">
+                        {selectedResult.wrongAnswers}
+                      </span>
+                      <span className="text-[10px] font-bold text-dash-light-purple uppercase block mt-1">Incorrect Qns</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3.5 text-xs text-dash-dark-purple select-text">
+                    <div className="bg-dash-white-card border border-dash-border-gray/40 rounded-xl p-3">
+                      <span className="text-[9px] font-extrabold text-dash-primary-purple uppercase tracking-wider block mb-1">Hiring Recommendation</span>
+                      <span className="inline-flex items-center gap-1 px-3 py-1 bg-dash-primary-purple/10 rounded-full font-bold text-xs text-dash-primary-purple">
+                        <Sparkles size={12} />
+                        {selectedResult.hiringRecommendation}
+                      </span>
+                    </div>
+                    <div className="bg-dash-white-card border border-dash-border-gray/40 rounded-xl p-3">
+                      <span className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider block mb-1">Overall AI Feedback</span>
+                      <p className="font-semibold leading-relaxed text-slate-700">{selectedResult.overallFeedback}</p>
+                    </div>
+                    <div className="bg-dash-white-card border border-dash-border-gray/40 rounded-xl p-3">
+                      <span className="text-[9px] font-extrabold text-green-600 uppercase tracking-wider block mb-1">Overall Strengths</span>
+                      <p className="font-semibold leading-relaxed text-green-800">{selectedResult.overallStrengths}</p>
+                    </div>
+                    <div className="bg-dash-white-card border border-dash-border-gray/40 rounded-xl p-3">
+                      <span className="text-[9px] font-extrabold text-amber-600 uppercase tracking-wider block mb-1">Overall Weaknesses</span>
+                      <p className="font-semibold leading-relaxed text-amber-800">{selectedResult.overallWeaknesses}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mb-6 flex justify-end">
+                  <button
+                    disabled={recalculating}
+                    onClick={() => handleReevaluate(selectedResult.assignmentId)}
+                    className="flex items-center gap-2 px-4 py-2 border border-dash-primary-purple hover:bg-dash-primary-purple hover:text-dash-white-card rounded-xl text-xs font-bold text-dash-primary-purple transition-all cursor-pointer disabled:opacity-40"
+                  >
+                    <RefreshCw size={13} className={recalculating ? "animate-spin" : ""} />
+                    <span>{recalculating ? "Re-grading..." : "Re-run AI Evaluation"}</span>
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="text-xs font-extrabold text-dash-dark-purple uppercase tracking-wider border-b border-dash-border-gray pb-2 mb-2">
+                    Question-by-Question Breakdown
+                  </h4>
+                  {(selectedResult.questionsAnalysis || []).map((q, idx) => {
+                    const isExpanded = expandedQuestions[q.questionId];
+                    let badgeColor = 'text-green-600 bg-green-50 border-green-200';
+                    if (q.status === 'Incorrect') {
+                      badgeColor = 'text-rose-600 bg-rose-50 border-rose-200';
+                    } else if (q.status === 'Partially Correct') {
+                      badgeColor = 'text-amber-600 bg-amber-50 border-amber-200';
+                    }
+
+                    return (
+                      <div key={q.questionId} className="border border-dash-border-gray/50 rounded-2xl overflow-hidden bg-dash-white-card">
+                        <button
+                          onClick={() => toggleQuestionExpand(q.questionId)}
+                          className="w-full text-left p-4 bg-dash-light-blue-bg/10 hover:bg-dash-light-blue-bg/25 transition-colors flex items-center justify-between gap-4 cursor-pointer border-0 outline-none"
+                        >
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1.5">
+                              <span className="text-[10px] font-bold text-dash-primary-purple uppercase tracking-wider">
+                                Question {idx + 1} ({q.type})
+                              </span>
+                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase border ${badgeColor}`}>
+                                {q.status}
+                              </span>
+                            </div>
+                            <p className="text-xs font-bold text-dash-dark-purple line-clamp-1">
+                              {q.questionText}
+                            </p>
+                          </div>
+                          <ChevronRight
+                            size={16}
+                            className={`text-dash-light-purple transition-transform duration-200 shrink-0 ${
+                              isExpanded ? 'rotate-90' : ''
+                            }`}
+                          />
+                        </button>
+
+                        <AnimatePresence>
+                          {isExpanded && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.2 }}
+                              className="border-t border-dash-border-gray/25 p-4 space-y-4 text-xs select-text bg-[#fcfcff]"
+                            >
+                              {q.type === 'CODING' || q.type === 'PYTHON_CODING' ? (
+                                <div className="space-y-4 w-full">
+                                  <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 relative font-mono overflow-x-auto text-[11px] text-zinc-100 max-h-[300px]">
+                                    <div className="absolute right-3.5 top-3 text-[9px] font-bold text-zinc-600 uppercase tracking-wider select-none">Submitted Code</div>
+                                    <SyntaxHighlighter code={q.candidateAnswer || '# No answer submitted.'} language="python" />
+                                  </div>
+                                  
+                                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                    <div className="bg-slate-50 border border-slate-200/50 rounded-xl p-3 text-center">
+                                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Passed Cases</span>
+                                      <span className="text-sm font-black text-green-600 mt-0.5 block">{q.passedTestCases ?? 0}</span>
+                                    </div>
+                                    <div className="bg-slate-50 border border-slate-200/50 rounded-xl p-3 text-center">
+                                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Failed Cases</span>
+                                      <span className="text-sm font-black text-rose-600 mt-0.5 block">{q.failedTestCases ?? 0}</span>
+                                    </div>
+                                    <div className="bg-slate-50 border border-slate-200/50 rounded-xl p-3 text-center">
+                                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Execution Time</span>
+                                      <span className="text-sm font-black text-slate-700 mt-0.5 block">{q.runTime !== null && q.runTime !== undefined ? `${q.runTime}s` : '0.0s'}</span>
+                                    </div>
+                                  </div>
+
+                                  {q.testResults && q.testResults.length > 0 && (
+                                    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-2 max-h-[220px] overflow-y-auto">
+                                      <span className="text-[9px] font-extrabold text-zinc-500 uppercase tracking-wider block border-b border-zinc-800 pb-1.5">Test Case Execution Log</span>
+                                      <div className="space-y-2">
+                                        {q.testResults.map((tc, tcIdx) => (
+                                          <div key={tcIdx} className="text-[11px] font-mono border-b border-zinc-800/40 pb-2 last:border-0 last:pb-0">
+                                            <div className="flex items-center justify-between font-bold text-xs">
+                                              <span className="text-zinc-400">Test Case #{tc.testCaseIndex}</span>
+                                              <span className={tc.passed ? "text-green-500" : "text-rose-500"}>{tc.passed ? "Passed" : "Failed"}</span>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2 mt-1.5 text-zinc-500 text-[10px]">
+                                              <div>Input: <span className="text-zinc-300">{tc.input}</span></div>
+                                              <div>Expected: <span className="text-zinc-300">{tc.expectedOutput}</span></div>
+                                              <div className="col-span-2">Actual Output: <span className={tc.passed ? "text-green-400" : "text-rose-400"}>{tc.actualOutput || (tc.stderr ? "Error" : "No output")}</span></div>
+                                              {tc.stderr && <div className="col-span-2 text-rose-500 text-[9px] overflow-x-auto whitespace-pre-wrap">{tc.stderr}</div>}
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div className="bg-dash-white-card border border-dash-border-gray/40 rounded-xl p-3">
+                                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Recruiter Correct Answer</span>
+                                    <p className="font-semibold text-slate-800 whitespace-pre-wrap">{q.correctAnswer}</p>
+                                  </div>
+                                  <div className="bg-dash-white-card border border-dash-border-gray/40 rounded-xl p-3">
+                                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Candidate Answer</span>
+                                    <p className="font-semibold text-slate-800 whitespace-pre-wrap">{q.candidateAnswer || <span className="italic text-slate-400">Not Answered</span>}</p>
+                                  </div>
+                                </div>
+                              )}
+
+                              <div className="bg-violet-50/50 border border-violet-200/50 rounded-xl p-4 space-y-3">
+                                <div className="flex items-center gap-1.5 text-[10px] font-extrabold text-violet-700 uppercase tracking-wider">
+                                  <Sparkles size={11} />
+                                  <span>AI Evaluation Details</span>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4 bg-white border border-violet-100 rounded-xl p-3">
+                                  <div>
+                                    <span className="text-[9px] font-bold text-violet-500 uppercase tracking-wider">Match Percentage</span>
+                                    <p className="text-base font-black text-slate-800 mt-0.5">{q.similarityScore !== null && q.similarityScore !== undefined ? q.similarityScore : (q.status === 'Correct' ? 100 : 0)}%</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-[9px] font-bold text-violet-500 uppercase tracking-wider">Marks Awarded</span>
+                                    <p className="text-base font-black text-slate-800 mt-0.5">{q.marksAwarded} / {q.maxMarks}</p>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <div>
+                                    <strong className="text-[10px] uppercase text-slate-500 block mb-0.5">AI Explanation:</strong>
+                                    <p className="text-xs font-semibold text-slate-700 leading-relaxed">{q.aiExplanation || q.feedback || "N/A"}</p>
+                                  </div>
+                                  <div>
+                                    <strong className="text-[10px] uppercase text-green-600 block mb-0.5">Strengths:</strong>
+                                    <p className="text-xs font-semibold text-green-800 leading-relaxed">{q.strengths || "None"}</p>
+                                  </div>
+                                  <div>
+                                    <strong className="text-[10px] uppercase text-rose-500 block mb-0.5">Missing Points:</strong>
+                                    <p className="text-xs font-semibold text-rose-800 leading-relaxed">{q.missingPoints || "None"}</p>
+                                  </div>
+                                  <div>
+                                    <strong className="text-[10px] uppercase text-amber-600 block mb-0.5">Suggested Improvement:</strong>
+                                    <p className="text-xs font-semibold text-amber-800 leading-relaxed">{q.suggestedImprovement || q.improvements || "None"}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-dash-border-gray mt-6 shrink-0">
+                <button
+                  onClick={() => setSelectedResult(null)}
+                  className="w-full py-3 rounded-xl bg-dash-primary-purple text-dash-white-card font-bold text-xs hover:bg-dash-dark-purple transition-all duration-200 flex items-center justify-center cursor-pointer border-none shadow-sm"
+                >
+                  Close Report
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
 export default RecruiterDashboard;
+
+const GroupsManager = ({ candidateGroups, setCandidateGroups, candidates, showToast, setAssigningGroup, setActiveTab }) => {
+  const handleDeleteGroup = (groupId) => {
+    if (confirm("Are you sure you want to delete this group?")) {
+      setCandidateGroups(prev => prev.filter(g => g.id !== groupId));
+      showToast("Group deleted successfully.");
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-6 animate-fade-in">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="font-plus-jakarta font-extrabold text-xl text-dash-dark-purple tracking-tight">
+            Candidate Groups
+          </h2>
+          <p className="text-xs text-dash-light-purple font-medium mt-0.5">
+            Manage groups of candidates and assign assessments collectively.
+          </p>
+        </div>
+      </div>
+
+      {candidateGroups.length === 0 ? (
+        <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-12 text-center shadow-sm">
+          <Users className="mx-auto mb-3 text-dash-light-purple" size={40} />
+          <h4 className="text-sm font-bold text-dash-dark-purple">No groups found</h4>
+          <p className="text-xs text-dash-light-purple mt-1 max-w-xs mx-auto font-medium">
+            Go to the main Dashboard list, select candidates using checkboxes, and click "Create Group" to create one.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {candidateGroups.map((group) => {
+            const groupMembers = (Array.isArray(candidates) ? candidates : [])
+              .filter(c => group.candidateIds.includes(c.id));
+
+            return (
+              <motion.div
+                key={group.id}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-dash-white-card border border-dash-border-gray/50 hover:border-dash-primary-purple/40 rounded-2xl p-5 shadow-[0_4px_20px_rgba(87,82,170,0.02)] flex flex-col gap-4 relative hover:shadow-md transition-all duration-300 group"
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-dash-dark-purple group-hover:text-dash-primary-purple transition-all leading-tight font-outfit">
+                      {group.name}
+                    </h3>
+                    <span className="text-[10px] text-dash-light-purple font-semibold mt-1 block">
+                      Created: {new Date(group.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => handleDeleteGroup(group.id)}
+                    className="p-1.5 rounded-lg text-dash-light-purple hover:text-red-500 hover:bg-rose-50 transition-colors cursor-pointer border-none bg-transparent bg-none"
+                    title="Delete Group"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+
+                <div className="h-px bg-dash-border-gray" />
+
+                <div>
+                  <span className="text-[9px] font-extrabold text-dash-primary-purple uppercase tracking-wider block mb-2">
+                    Members ({groupMembers.length})
+                  </span>
+                  <div className="max-h-36 overflow-y-auto space-y-2 pr-1 dashboard-scrollbar">
+                    {groupMembers.length === 0 ? (
+                      <span className="text-[11px] text-dash-light-purple italic">No active candidates in this group</span>
+                    ) : (
+                      groupMembers.map((member) => (
+                        <div key={member.id} className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full bg-dash-soft-pink text-dash-primary-purple flex items-center justify-center text-[10px] font-bold border border-dash-primary-purple/15 shrink-0">
+                            {(member.full_name || member.name || 'C').charAt(0).toUpperCase()}
+                          </div>
+                          <div className="truncate">
+                            <span className="text-xs font-bold text-dash-dark-purple block leading-none">
+                              {member.full_name || member.name}
+                            </span>
+                            <span className="text-[9px] text-dash-light-purple truncate block">
+                              {member.email}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-auto pt-2">
+                  <button
+                    onClick={() => {
+                      setAssigningGroup(group);
+                      setActiveTab('assessments');
+                      showToast(`Please select an assessment to assign to "${group.name}".`);
+                    }}
+                    className="w-full py-2.5 bg-dash-primary-purple hover:bg-dash-dark-purple text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer border-none shadow-sm hover:shadow transition-all duration-200"
+                  >
+                    <Save size={13} />
+                    <span>Assign Assessment</span>
+                  </button>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
