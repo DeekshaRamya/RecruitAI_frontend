@@ -9,7 +9,6 @@ import {
   Search,
   X,
   Check,
-  Settings,
   Bell,
   Menu,
   ChevronRight,
@@ -23,12 +22,8 @@ import {
   ShieldAlert,
   Phone,
   Calendar,
-  Globe,
   Plus,
   LogOut,
-  Edit2,
-  Lock,
-  ArrowUpRight,
   FileText,
   Sparkles,
   Trash2,
@@ -43,112 +38,12 @@ import {
   RefreshCw,
   Eye,
   UserPlus,
-  Send,
   Code,
   Database,
   Brain,
   PieChart
 } from 'lucide-react';
 import api from '../api';
-
-const questionPool = {
-  Python: [
-    {
-      question: 'Which keyword is used to define a generator function in Python?',
-      options: [
-        { label: 'A', text: 'return', isCorrect: false },
-        { label: 'B', text: 'yield', isCorrect: true },
-        { label: 'C', text: 'async', isCorrect: false },
-        { label: 'D', text: 'lambda', isCorrect: false }
-      ]
-    },
-    {
-      question: 'What is the output of: list(map(lambda x: x**2, [1, 2, 3, 4]))?',
-      options: [
-        { label: 'A', text: '[1, 4, 9, 16]', isCorrect: true },
-        { label: 'B', text: '[2, 4, 6, 8]', isCorrect: false },
-        { label: 'C', text: '[1, 2, 3, 4]', isCorrect: false },
-        { label: 'D', text: 'Error', isCorrect: false }
-      ]
-    },
-    {
-      question: 'Which decorator defines a class method that takes the class as the first argument?',
-      options: [
-        { label: 'A', text: '@staticmethod', isCorrect: false },
-        { label: 'B', text: '@property', isCorrect: false },
-        { label: 'C', text: '@classmethod', isCorrect: true },
-        { label: 'D', text: '@instancemethod', isCorrect: false }
-      ]
-    },
-    {
-      question: 'Which of the following is a mutable data type in Python?',
-      options: [
-        { label: 'A', text: 'tuple', isCorrect: false },
-        { label: 'B', text: 'string', isCorrect: false },
-        { label: 'C', text: 'list', isCorrect: true },
-        { label: 'D', text: 'int', isCorrect: false }
-      ]
-    }
-  ],
-  SQL: [
-    {
-      question: 'Which SQL clause is used to filter group results after aggregation?',
-      options: [
-        { label: 'A', text: 'WHERE', isCorrect: false },
-        { label: 'B', text: 'HAVING', isCorrect: true },
-        { label: 'C', text: 'GROUP BY', isCorrect: false },
-        { label: 'D', text: 'ORDER BY', isCorrect: false }
-      ]
-    },
-    {
-      question: 'What type of JOIN returns all records when there is a match in either left or right table?',
-      options: [
-        { label: 'A', text: 'INNER JOIN', isCorrect: false },
-        { label: 'B', text: 'LEFT JOIN', isCorrect: false },
-        { label: 'C', text: 'FULL OUTER JOIN', isCorrect: true },
-        { label: 'D', text: 'RIGHT JOIN', isCorrect: false }
-      ]
-    },
-    {
-      question: 'Which SQL constraint uniquely identifies each record in a database table?',
-      options: [
-        { label: 'A', text: 'UNIQUE', isCorrect: false },
-        { label: 'B', text: 'PRIMARY KEY', isCorrect: true },
-        { label: 'C', text: 'FOREIGN KEY', isCorrect: false },
-        { label: 'D', text: 'CHECK', isCorrect: false }
-      ]
-    }
-  ],
-  Aptitude: [
-    {
-      question: 'A work can be completed by 8 men in 12 days. How many days will 6 men take to complete the same work?',
-      options: [
-        { label: 'A', text: '16 days', isCorrect: true },
-        { label: 'B', text: '15 days', isCorrect: false },
-        { label: 'C', text: '18 days', isCorrect: false },
-        { label: 'D', text: '14 days', isCorrect: false }
-      ]
-    },
-    {
-      question: 'If a seller buys an item for $100 and sells it for $120, what is the profit percentage?',
-      options: [
-        { label: 'A', text: '10%', isCorrect: false },
-        { label: 'B', text: '15%', isCorrect: false },
-        { label: 'C', text: '20%', isCorrect: true },
-        { label: 'D', text: '25%', isCorrect: false }
-      ]
-    },
-    {
-      question: 'What is the next number in the series: 2, 6, 12, 20, 30, ...?',
-      options: [
-        { label: 'A', text: '40', isCorrect: false },
-        { label: 'B', text: '42', isCorrect: true },
-        { label: 'C', text: '44', isCorrect: false },
-        { label: 'D', text: '46', isCorrect: false }
-      ]
-    }
-  ]
-};
 
 const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
   // Candidate dataset state
@@ -262,11 +157,25 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
     localStorage.setItem('recruitai_candidates', JSON.stringify(candidates));
   }, [candidates]);
 
-  // Saved Assessments State
+  // Saved Assessments & Assignments State
   const [savedAssessments, setSavedAssessments] = useState([]);
   const [selectedAssessmentForView, setSelectedAssessmentForView] = useState(null);
+  const [assignments, setAssignments] = useState([]);
 
-  // Fetch assessments and candidates from backend on mount
+  const fetchAssignments = async () => {
+    try {
+      const response = await api.get('/api/assignments?limit=500');
+      if (response.data && response.data.assignments) {
+        setAssignments(response.data.assignments);
+      } else if (Array.isArray(response.data)) {
+        setAssignments(response.data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch assignments from backend:", err);
+    }
+  };
+
+  // Fetch assessments, candidates, and assignments from backend on mount
   useEffect(() => {
     const fetchAssessments = async () => {
       try {
@@ -294,6 +203,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
 
     fetchAssessments();
     fetchCandidates();
+    fetchAssignments();
   }, []);
 
   // Sidebar navigation state
@@ -470,7 +380,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
     setNewTopicVal('');
   };
 
-  const handleDeleteTopic = (subject, topic) => {
+  const _handleDeleteTopic = (subject, topic) => {
     setSubjectsData(prev => ({
       ...prev,
       [subject]: prev[subject].filter(t => t !== topic)
@@ -490,7 +400,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
     showToast(`Deleted topic "${topic}" from ${subject}.`);
   };
 
-  const renderAddTopicControl = (subject) => {
+  const _renderAddTopicControl = (subject) => {
     const isAdding = addingTopicTo === subject;
     const accentColorClass = subject === 'Aptitude' ? 'border-[#d97706] text-[#b45309]' : 'border-dash-primary-purple text-dash-primary-purple';
     const bgClass = subject === 'Aptitude' ? 'bg-[#fef3c7]/30 hover:bg-[#fef3c7] hover:border-[#d97706]' : 'bg-dash-primary-purple/5 hover:bg-dash-primary-purple/10 hover:border-dash-primary-purple';
@@ -575,7 +485,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
   const [toastMessage, setToastMessage] = useState('');
 
   // AI Generated preview questions state
-  const [previewQuestions, setPreviewQuestions] = useState([
+  const [_previewQuestions, _setPreviewQuestions] = useState([
     {
       id: 1,
       subject: 'Python',
@@ -614,8 +524,8 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
     }
   ]);
 
-  const [editingQuestionId, setEditingQuestionId] = useState(null);
-  const [editingText, setEditingText] = useState('');
+  const [_editingQuestionId, _setEditingQuestionId] = useState(null);
+  const [_editingText, _setEditingText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
 
   // Dynamic states for active assessments metric count
@@ -738,7 +648,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
   );
 
   // Action: Create Assessment (legacy submit)
-  const handleCreateAssessmentSubmit = (e) => {
+  const _handleCreateAssessmentSubmit = (e) => {
     e.preventDefault();
     if (!newAssessment.title.trim()) return;
 
@@ -885,11 +795,12 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
       if (response.data) {
         if (!skipReset) {
           showToast("Assessment assigned successfully.");
-          // Refresh saved assessments
+          // Refresh saved assessments & assignments
           const assessmentsRes = await api.get('/api/assessment');
           if (assessmentsRes.data) {
             setSavedAssessments(assessmentsRes.data);
           }
+          await fetchAssignments();
         }
       }
     } catch (err) {
@@ -1897,6 +1808,8 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
           <AssessmentsManager
             savedAssessments={savedAssessments}
             setSavedAssessments={setSavedAssessments}
+            assignments={assignments}
+            fetchAssignments={fetchAssignments}
             showToast={showToast}
             setActiveTab={setActiveTab}
             setSelectedAssessmentForView={setSelectedAssessmentForView}
@@ -2526,7 +2439,7 @@ const SyntaxHighlighter = ({ code, language }) => {
   return <pre className="font-mono text-xs leading-relaxed overflow-x-auto whitespace-pre-wrap text-[#0f172a]">{code}</pre>;
 };
 
-const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToast, onSave, onSaveAndAssign }) => {
+const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToast, _onSave, _onSaveAndAssign }) => {
   const [selectedId, setSelectedId] = useState(generatedQuestions[0]?.id || null);
   const [isEditing, setIsEditing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -2699,7 +2612,7 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
         showToast("Hidden test cases must be a JSON array.");
         return;
       }
-    } catch (err) {
+    } catch (_err) {
       showToast("Invalid JSON syntax in Hidden Test Cases.");
       return;
     }
@@ -2826,7 +2739,7 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
 
         {/* Question List container */}
         <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 dashboard-scrollbar">
-          {filteredQuestions.map((q, idx) => {
+          {filteredQuestions.map((q, _idx) => {
             const isSelected = q.id === selectedId;
             const actualIndex = generatedQuestions.findIndex(item => item.id === q.id) + 1;
             const isCoding = q.type?.includes('CODING') || q.type === 'SCENARIO_CODING' || q.type === 'SCENARIO';
@@ -3522,17 +3435,364 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
 };
 
 // ==========================================
+// CANDIDATE DETAILS MODAL COMPONENT
+// ==========================================
+const CandidateDetailsModal = ({ item, onClose }) => {
+  if (!item) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-dash-dark-purple/60 backdrop-blur-md">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.9 }}
+        className="bg-white rounded-[24px] border border-dash-border-gray shadow-2xl w-full max-w-lg p-6 flex flex-col gap-5"
+      >
+        <div className="flex items-center justify-between border-b border-dash-border-gray/30 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-dash-primary-purple text-white flex items-center justify-center font-extrabold text-base shadow-sm">
+              {item.candidateName ? item.candidateName[0] : 'C'}
+            </div>
+            <div>
+              <h3 className="font-outfit font-extrabold text-base text-dash-dark-purple">
+                {item.candidateName || 'Candidate Information'}
+              </h3>
+              <span className="text-xs text-dash-light-purple font-medium">
+                Candidate ID: {item.candidateId}
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-xl text-dash-light-purple hover:bg-dash-soft-pink hover:text-dash-dark-purple transition-colors cursor-pointer border-none bg-transparent"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Section 1: Candidate Info */}
+        <div className="bg-dash-light-blue-bg/30 border border-dash-border-gray/40 rounded-2xl p-4 flex flex-col gap-2.5">
+          <h4 className="text-[10px] font-extrabold uppercase tracking-widest text-dash-primary-purple">
+            Candidate Details
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div>
+              <p className="text-[10px] font-bold text-dash-light-purple">Full Name</p>
+              <p className="font-bold text-dash-dark-purple">{item.candidateName || 'N/A'}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-dash-light-purple">Email Address</p>
+              <p className="font-bold text-dash-dark-purple">{item.candidateEmail || 'N/A'}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-dash-light-purple">Phone Number</p>
+              <p className="font-bold text-dash-dark-purple">{item.candidatePhone || 'Not Provided'}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-dash-light-purple">Candidate ID</p>
+              <p className="font-mono text-[11px] font-semibold text-dash-dark-purple truncate">{item.candidateId}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 2: Assessment Info */}
+        <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-4 flex flex-col gap-2.5">
+          <h4 className="text-[10px] font-extrabold uppercase tracking-widest text-dash-primary-purple">
+            Assessment Information
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div>
+              <p className="text-[10px] font-bold text-dash-light-purple">Assessment Name</p>
+              <p className="font-bold text-dash-dark-purple">{item.assessmentName || 'N/A'}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-dash-light-purple">Assessment ID</p>
+              <p className="font-mono text-[11px] font-semibold text-dash-dark-purple truncate">{item.assessmentId}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-dash-light-purple">Assigned Date & Time</p>
+              <p className="font-bold text-dash-dark-purple">
+                {item.assignedAt ? new Date(item.assignedAt).toLocaleString() : 'N/A'}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-dash-light-purple">Due Date</p>
+              <p className="font-bold text-dash-dark-purple">
+                {item.dueDate ? new Date(item.dueDate).toLocaleDateString() : 'No Due Date'}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-dash-light-purple">Current Status</p>
+              <span className="font-bold text-dash-primary-purple uppercase text-[11px]">{item.status}</span>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-dash-light-purple">Score</p>
+              <p className="font-bold text-dash-dark-purple">
+                {item.score !== null && item.score !== undefined ? `${item.score}%` : 'Pending Completion'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end pt-2">
+          <button
+            onClick={onClose}
+            className="px-5 py-2 rounded-xl bg-dash-dark-purple text-white font-bold text-xs hover:bg-dash-primary-purple transition-all cursor-pointer border-none"
+          >
+            Close
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+// ==========================================
+// ASSIGNED CANDIDATES MODAL COMPONENT
+// ==========================================
+const AssignedCandidatesModal = ({
+  assessment,
+  assignments = [],
+  onClose
+}) => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [selectedCandidateDetail, setSelectedCandidateDetail] = useState(null);
+
+  if (!assessment) return null;
+
+  const asmAssignments = assignments.filter(
+    (a) => String(a.assessmentId) === String(assessment.id) || String(a.assessment_id) === String(assessment.id)
+  );
+
+  const filtered = asmAssignments.filter((a) => {
+    const name = (a.candidateName || '').toLowerCase();
+    const email = (a.candidateEmail || '').toLowerCase();
+    const q = searchQuery.toLowerCase();
+    const matchesSearch = name.includes(q) || email.includes(q);
+
+    if (!matchesSearch) return false;
+    if (statusFilter !== 'ALL' && (a.status || '').toUpperCase() !== statusFilter) {
+      return false;
+    }
+    return true;
+  });
+
+  const getStatusBadge = (status) => {
+    const s = (status || '').toUpperCase();
+    switch (s) {
+      case 'COMPLETED':
+        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      case 'IN_PROGRESS':
+        return 'bg-amber-50 text-amber-700 border-amber-200';
+      case 'EXPIRED':
+        return 'bg-rose-50 text-rose-700 border-rose-200';
+      case 'SCHEDULED':
+        return 'bg-blue-50 text-blue-700 border-blue-200';
+      default:
+        return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-dash-dark-purple/50 backdrop-blur-sm">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+          className="bg-white rounded-[24px] border border-dash-border-gray shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden"
+        >
+          {/* Header */}
+          <div className="p-6 border-b border-dash-border-gray/40 flex items-center justify-between bg-dash-light-blue-bg/20">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded-md bg-dash-primary-purple/10 text-dash-primary-purple border border-dash-primary-purple/20">
+                  Assigned Candidate Details
+                </span>
+                <span className="text-xs text-dash-light-purple font-semibold">
+                  Assessment ID: {assessment.id}
+                </span>
+              </div>
+              <h2 className="font-outfit font-extrabold text-xl text-dash-dark-purple mt-1">
+                {assessment.name}
+              </h2>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl text-dash-light-purple hover:bg-dash-soft-pink hover:text-dash-dark-purple transition-all cursor-pointer border-none bg-transparent"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Body */}
+          <div className="p-6 overflow-y-auto flex flex-col gap-5">
+            {/* Stats bar */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-3.5 rounded-2xl bg-dash-light-blue-bg/30 border border-dash-border-gray/40">
+                <p className="text-[10px] font-bold text-dash-light-purple uppercase tracking-wider">Total Assigned</p>
+                <p className="text-xl font-extrabold text-dash-dark-purple mt-0.5">{asmAssignments.length}</p>
+              </div>
+              <div className="p-3.5 rounded-2xl bg-amber-50/50 border border-amber-200/50">
+                <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">In Progress</p>
+                <p className="text-xl font-extrabold text-amber-700 mt-0.5">
+                  {asmAssignments.filter(a => a.status === 'IN_PROGRESS').length}
+                </p>
+              </div>
+              <div className="p-3.5 rounded-2xl bg-emerald-50/50 border border-emerald-200/50">
+                <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Completed</p>
+                <p className="text-xl font-extrabold text-emerald-700 mt-0.5">
+                  {asmAssignments.filter(a => a.status === 'COMPLETED').length}
+                </p>
+              </div>
+              <div className="p-3.5 rounded-2xl bg-rose-50/50 border border-rose-200/50">
+                <p className="text-[10px] font-bold text-rose-600 uppercase tracking-wider">Expired / Locked</p>
+                <p className="text-xl font-extrabold text-rose-700 mt-0.5">
+                  {asmAssignments.filter(a => a.status === 'EXPIRED').length}
+                </p>
+              </div>
+            </div>
+
+            {/* Search & Filter Toolbar */}
+            <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-slate-50 border border-slate-200/60 p-3 rounded-2xl">
+              <div className="relative w-full sm:w-72">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-dash-light-purple" />
+                <input
+                  type="text"
+                  placeholder="Search candidate name or email..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-white border border-dash-border-gray rounded-xl py-2 pl-9 pr-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <SlidersHorizontal size={14} className="text-dash-light-purple" />
+                <span className="text-xs font-bold text-dash-light-purple">Status:</span>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="bg-white border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-bold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple cursor-pointer"
+                >
+                  <option value="ALL">All Statuses</option>
+                  <option value="ASSIGNED">Assigned</option>
+                  <option value="IN_PROGRESS">In Progress</option>
+                  <option value="COMPLETED">Completed</option>
+                  <option value="EXPIRED">Expired</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Candidates Table */}
+            {filtered.length === 0 ? (
+              <div className="p-12 text-center border border-dash-border-gray/50 rounded-2xl bg-slate-50/50">
+                <User size={32} className="mx-auto text-dash-light-purple/50 mb-2" />
+                <p className="font-bold text-sm text-dash-dark-purple">
+                  No candidate has been assigned to this assessment.
+                </p>
+                <p className="text-xs text-dash-light-purple mt-1">
+                  Assign this assessment to candidates using the "Assign" button.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto border border-dash-border-gray/60 rounded-2xl shadow-sm">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-100/70 border-b border-dash-border-gray/50 text-[11px] font-extrabold text-dash-light-purple uppercase tracking-wider">
+                      <th className="py-3 px-4">Candidate Details</th>
+                      <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4">Assigned On</th>
+                      <th className="py-3 px-4">Due Date</th>
+                      <th className="py-3 px-4">Score</th>
+                      <th className="py-3 px-4 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-dash-border-gray/30 text-xs font-semibold text-dash-dark-purple">
+                    {filtered.map((item) => (
+                      <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-dash-primary-purple/15 text-dash-primary-purple flex items-center justify-center font-bold text-xs shrink-0">
+                              {item.candidateName ? item.candidateName[0] : 'C'}
+                            </div>
+                            <div>
+                              <p className="font-bold text-dash-dark-purple">{item.candidateName || 'Candidate'}</p>
+                              <p className="text-[11px] text-dash-light-purple font-medium flex items-center gap-1.5 mt-0.5">
+                                <Mail size={11} /> {item.candidateEmail}
+                              </p>
+                              {item.candidatePhone && (
+                                <p className="text-[10px] text-dash-light-purple/80 font-medium flex items-center gap-1.5">
+                                  <Phone size={10} /> {item.candidatePhone}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded-md border uppercase tracking-wider ${getStatusBadge(item.status)}`}>
+                            {item.status}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-dash-light-purple">
+                          {item.assignedAt ? new Date(item.assignedAt).toLocaleString() : 'N/A'}
+                        </td>
+                        <td className="py-3.5 px-4 text-dash-light-purple">
+                          {item.dueDate ? new Date(item.dueDate).toLocaleDateString() : 'None'}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          {item.score !== null && item.score !== undefined ? (
+                            <span className="font-extrabold text-dash-primary-purple bg-dash-primary-purple/10 px-2 py-0.5 rounded-md">
+                              {item.score}%
+                            </span>
+                          ) : (
+                            <span className="text-dash-light-purple/60 text-[11px]">—</span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <button
+                            onClick={() => setSelectedCandidateDetail(item)}
+                            className="px-3 py-1.5 rounded-xl bg-dash-primary-purple/10 border border-dash-primary-purple/30 text-dash-primary-purple font-bold text-xs hover:bg-dash-primary-purple hover:text-white transition-all cursor-pointer"
+                          >
+                            Details
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Candidate Details Panel Modal */}
+      {selectedCandidateDetail && (
+        <CandidateDetailsModal
+          item={selectedCandidateDetail}
+          onClose={() => setSelectedCandidateDetail(null)}
+        />
+      )}
+    </AnimatePresence>
+  );
+};
+
+// ==========================================
 // 9. ASSESSMENTS MANAGER COMPONENT
 // ==========================================
 const AssessmentsManager = ({
   savedAssessments,
   setSavedAssessments,
+  assignments = [],
+  _fetchAssignments,
   showToast,
   setActiveTab,
   setSelectedAssessmentForView,
   onAssignClick
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewingAssignedModalAssessment, setViewingAssignedModalAssessment] = useState(null);
 
   const handleDeleteAssessment = async (id, name) => {
     const confirmDelete = window.confirm(`Are you sure you want to delete "${name}"?`);
@@ -3636,6 +3896,10 @@ const AssessmentsManager = ({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {filteredAssessments.map((asm) => {
+            const asmAssignments = assignments.filter(
+              (a) => String(a.assessmentId) === String(asm.id) || String(a.assessment_id) === String(asm.id)
+            );
+
             return (
               <motion.div
                 key={asm.id}
@@ -3671,7 +3935,7 @@ const AssessmentsManager = ({
                   </div>
 
                   {/* Meta items */}
-                  <div className="grid grid-cols-2 gap-3.5 bg-dash-light-blue-bg/25 border border-dash-border-gray/30 p-3 rounded-xl mb-4 text-xs font-semibold text-dash-dark-purple">
+                  <div className="grid grid-cols-2 gap-3.5 bg-dash-light-blue-bg/25 border border-dash-border-gray/30 p-3 rounded-xl mb-3 text-xs font-semibold text-dash-dark-purple">
                     <div className="flex items-center gap-2">
                       <Clock size={14} className="text-dash-primary-purple" />
                       <span>{asm.duration}</span>
@@ -3682,15 +3946,82 @@ const AssessmentsManager = ({
                     </div>
                   </div>
 
-                  {/* Candidates Assigned Status */}
-                  <div className="flex items-center gap-2 text-xs font-semibold text-dash-light-purple">
-                    <div className={`w-1.5 h-1.5 rounded-full ${asm.candidatesAssigned > 0 ? 'bg-dash-success-green' : 'bg-dash-primary-purple/40'}`} />
-                    <span>
-                      {asm.candidatesAssigned > 0
-                        ? `Assigned to ${asm.candidatesAssigned} Candidate(s)`
-                        : 'Not assigned to candidates yet'}
-                    </span>
-                  </div>
+                  {/* Candidates Assigned Details Section */}
+                  {(() => {
+                    if (asmAssignments.length === 0) {
+                      return (
+                        <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-3 my-2 text-center">
+                          <p className="text-[11px] text-slate-500 font-medium">
+                            No candidate has been assigned to this assessment.
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    if (asmAssignments.length === 1) {
+                      const singleAssigned = asmAssignments[0];
+                      return (
+                        <div className="bg-dash-light-blue-bg/40 border border-dash-primary-purple/20 rounded-xl p-3 my-2 flex flex-col gap-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="w-7 h-7 rounded-full bg-dash-primary-purple/15 text-dash-primary-purple flex items-center justify-center font-bold text-xs shrink-0">
+                                <User size={13} />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-dash-dark-purple truncate" title={singleAssigned.candidateName}>
+                                  {singleAssigned.candidateName || 'Assigned Candidate'}
+                                </p>
+                                <p className="text-[10px] text-dash-light-purple font-medium truncate" title={singleAssigned.candidateEmail}>
+                                  {singleAssigned.candidateEmail}
+                                </p>
+                              </div>
+                            </div>
+                            <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-md border uppercase tracking-wider shrink-0 ${
+                              singleAssigned.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
+                              singleAssigned.status === 'IN_PROGRESS' ? 'bg-amber-50 text-amber-600 border-amber-200' :
+                              singleAssigned.status === 'EXPIRED' ? 'bg-rose-50 text-rose-600 border-rose-200' :
+                              'bg-indigo-50 text-indigo-600 border-indigo-200'
+                            }`}>
+                              {singleAssigned.status}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-[10px] text-dash-light-purple border-t border-dash-border-gray/30 pt-1.5 mt-1">
+                            <span>Assigned: {singleAssigned.assignedAt ? new Date(singleAssigned.assignedAt).toLocaleDateString() : 'Recent'}</span>
+                            <button
+                              onClick={() => setViewingAssignedModalAssessment(asm)}
+                              className="text-dash-primary-purple font-bold hover:underline cursor-pointer border-none bg-transparent"
+                            >
+                              View Details &rarr;
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="bg-dash-primary-purple/10 border border-dash-primary-purple/20 rounded-xl p-3 my-2 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="p-1.5 rounded-lg bg-dash-primary-purple text-white">
+                            <Users size={14} />
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold text-dash-dark-purple">
+                              Assigned Candidates: {asmAssignments.length}
+                            </p>
+                            <p className="text-[10px] text-dash-light-purple font-medium">
+                              {asmAssignments.filter(a => a.status === 'COMPLETED').length} Completed, {asmAssignments.filter(a => a.status === 'IN_PROGRESS').length} In Progress
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setViewingAssignedModalAssessment(asm)}
+                          className="px-2.5 py-1.5 rounded-lg bg-dash-primary-purple text-white font-bold text-[10px] hover:bg-dash-dark-purple transition-colors cursor-pointer border-none shadow-sm"
+                        >
+                          View List &rarr;
+                        </button>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Card Actions */}
@@ -3725,6 +4056,15 @@ const AssessmentsManager = ({
             );
           })}
         </div>
+      )}
+
+      {/* Modal for viewing all assigned candidates */}
+      {viewingAssignedModalAssessment && (
+        <AssignedCandidatesModal
+          assessment={viewingAssignedModalAssessment}
+          assignments={assignments}
+          onClose={() => setViewingAssignedModalAssessment(null)}
+        />
       )}
     </div>
   );
@@ -3968,7 +4308,6 @@ const ResultsManager = ({ showToast }) => {
   const [scoreFilter, setScoreFilter] = useState('All');
   const [sortBy, setSortBy] = useState('score-desc');
   const [selectedResult, setSelectedResult] = useState(null);
-  const [detailLoading, setDetailLoading] = useState(false);
   const [expandedQuestions, setExpandedQuestions] = useState({});
   const [recalculating, setRecalculating] = useState(false);
 

@@ -7,15 +7,12 @@ import { useExamSecurity } from '../hooks/useExamSecurity';
 import { ExamSecurityMonitor } from '../components/ExamSecurityMonitor';
 import {
   Briefcase,
-  Users,
-  Settings,
   LogOut,
   Menu,
   X,
   FileText,
   Award,
   TrendingUp,
-  Plus,
   Volume2,
   Terminal,
   Sparkles,
@@ -26,18 +23,13 @@ import {
   UploadCloud,
   Play,
   Bell,
-  ArrowLeft,
-  ArrowRight,
   Check,
   Loader2,
   Eye,
-  AlertTriangle,
-  ShieldAlert,
   Maximize2,
   Minimize2,
   RotateCcw,
   Code,
-  HelpCircle,
   Database,
   Table,
   Key
@@ -327,7 +319,6 @@ const CandidateResultsView = ({ showToast }) => {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedResult, setSelectedResult] = useState(null);
-  const [detailLoading, setDetailLoading] = useState(false);
 
   useEffect(() => {
     fetchCandidateResults();
@@ -704,9 +695,94 @@ const CandidateDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
   const [examState, setExamState] = useState({
     currentQuestionIndex: 0,
     answers: {},
+    executionOutputs: {},
     timeLeft: 0,
     submitted: false
   });
+
+  const prevQuestionIndexRef = useRef(examState.currentQuestionIndex);
+
+  // Sync compiler output state and starter code when navigating between questions
+  useEffect(() => {
+    const currentIdx = examState.currentQuestionIndex;
+    const prevIdx = prevQuestionIndexRef.current;
+
+    if (prevIdx !== undefined && prevIdx !== null && prevIdx !== currentIdx) {
+      // Save output of previous question into examState.executionOutputs
+      const currentOutputs = {
+        consoleOutput,
+        runtimeError,
+        syntaxError,
+        executionStatus,
+        executionTime,
+        sqlQueryResult,
+        customInput,
+        consoleTab
+      };
+      setExamState(prev => ({
+        ...prev,
+        executionOutputs: {
+          ...(prev.executionOutputs || {}),
+          [prevIdx]: currentOutputs
+        }
+      }));
+    }
+
+    // Load execution outputs for the new question (if any exist)
+    const savedOutputs = examState.executionOutputs?.[currentIdx];
+    if (savedOutputs) {
+      setConsoleOutput(savedOutputs.consoleOutput || '');
+      setRuntimeError(savedOutputs.runtimeError || '');
+      setSyntaxError(savedOutputs.syntaxError || '');
+      setExecutionStatus(savedOutputs.executionStatus || '');
+      setExecutionTime(savedOutputs.executionTime || 0);
+      setSqlQueryResult(savedOutputs.sqlQueryResult || null);
+      setCustomInput(savedOutputs.customInput || '');
+      setConsoleTab(savedOutputs.consoleTab || 'output');
+    } else {
+      // Reset console & compiler output for unexecuted question
+      setConsoleOutput('');
+      setRuntimeError('');
+      setSyntaxError('');
+      setExecutionStatus('');
+      setExecutionTime(0);
+      setSqlQueryResult(null);
+      setCustomInput('');
+      setConsoleTab('output');
+    }
+
+    // Initialize starter code for new question if candidate hasn't typed code yet
+    const asm = activeAssignment?.assessment || activeAssignment || {};
+    const questions = asm.questions || [];
+    const question = questions[currentIdx];
+    if (question && (examState.answers[currentIdx] === undefined || examState.answers[currentIdx] === null)) {
+      const isSql = (question.type === 'SCENARIO' || question.type === 'SCENARIO_CODING' || question.type === 'CODING') &&
+        (question.subject || question.language || '').toLowerCase().includes('sql');
+      const isCoding = question.type === 'CODING' || question.type === 'PYTHON_CODING' ||
+        (question.subject || '').toLowerCase().includes('python');
+
+      let starter = question.starterCode || question.starter_code || question.codeTemplate || question.exampleCode || null;
+      if (!starter) {
+        if (isSql) {
+          starter = '-- Write your SQL query here\n';
+        } else if (isCoding) {
+          starter = `def solution():\n    pass\n\nif __name__ == "__main__":\n    solution()`;
+        } else {
+          starter = '';
+        }
+      }
+
+      setExamState(prev => ({
+        ...prev,
+        answers: {
+          ...prev.answers,
+          [currentIdx]: starter
+        }
+      }));
+    }
+
+    prevQuestionIndexRef.current = currentIdx;
+  }, [examState.currentQuestionIndex, activeAssignment]);
 
   const isExamActive = !!(activeAssignment && !examState.submitted && activeTab === 'technical' && !isSubmitModalOpen && !isSubmittingManual);
 
@@ -822,7 +898,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
       try {
         const key = `recruitai_active_exam_${activeAssignment.id}`;
         localStorage.removeItem(key);
-      } catch (e) {}
+      } catch (_e) {}
     }
   }, [activeAssignment, examState]);
 
@@ -860,9 +936,13 @@ const CandidateDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
 
       const initialAnswers = {};
       sortedQuestions.forEach((q, idx) => {
-        const isCoding = q.type === 'CODING' || q.type === 'PYTHON_CODING';
-        const isSql = (q.type === 'SCENARIO' || q.type === 'SCENARIO_CODING' || q.type === 'CODING') && (q.subject || q.language || '').toLowerCase() === 'sql';
-        if (isSql) {
+        const isCoding = q.type === 'CODING' || q.type === 'PYTHON_CODING' || (q.subject || '').toLowerCase().includes('python');
+        const isSql = (q.type === 'SCENARIO' || q.type === 'SCENARIO_CODING' || q.type === 'CODING') && (q.subject || q.language || '').toLowerCase().includes('sql');
+        const starter = q.starterCode || q.starter_code || q.codeTemplate || q.exampleCode;
+
+        if (starter) {
+          initialAnswers[idx] = starter;
+        } else if (isSql) {
           initialAnswers[idx] = '-- Write your SQL query here\n';
         } else if (isCoding) {
           initialAnswers[idx] = `def solution():\n    pass\n\nif __name__ == "__main__":\n    solution()`;
@@ -888,6 +968,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
       setExamState({
         currentQuestionIndex: 0,
         answers: initialAnswers,
+        executionOutputs: {},
         timeLeft: parseDuration(asm.duration || "30") * 60,
         submitted: false
       });
@@ -922,7 +1003,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
     try {
       try {
         localStorage.removeItem(`recruitai_active_exam_${targetId}`);
-      } catch (e) {}
+      } catch (_e) {}
 
       const asm = activeAssignment?.assessment || activeAssignment || {};
       const questions = asm.questions || [];
@@ -980,7 +1061,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
     if (!parsedInputs && customInput) {
       try {
         parsedInputs = JSON.parse(customInput);
-      } catch (e) {
+      } catch (_e) {
         // Fallback to plain string input
       }
     }
@@ -1041,13 +1122,50 @@ const CandidateDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
           setSyntaxError('');
           setExecutionTime((data.executionTime || 0) / 1000);
           setExecutionStatus('Success');
+
+          setExamState(prev => ({
+            ...prev,
+            executionOutputs: {
+              ...(prev.executionOutputs || {}),
+              [examState.currentQuestionIndex]: {
+                consoleOutput: tableText,
+                runtimeError: '',
+                syntaxError: '',
+                executionTime: (data.executionTime || 0) / 1000,
+                executionStatus: 'Success',
+                sqlQueryResult: data,
+                customInput,
+                consoleTab: 'output'
+              }
+            }
+          }));
         } else {
+          const rErr = data.runtime_error || 'SQL Query Execution Error';
+          const sErr = data.syntax_error || '';
+          const exTime = (data.executionTime || 0) / 1000;
           setSqlQueryResult(null);
           setConsoleOutput('');
-          setRuntimeError(data.runtime_error || 'SQL Query Execution Error');
-          setSyntaxError(data.syntax_error || '');
-          setExecutionTime((data.executionTime || 0) / 1000);
+          setRuntimeError(rErr);
+          setSyntaxError(sErr);
+          setExecutionTime(exTime);
           setExecutionStatus('Error');
+
+          setExamState(prev => ({
+            ...prev,
+            executionOutputs: {
+              ...(prev.executionOutputs || {}),
+              [examState.currentQuestionIndex]: {
+                consoleOutput: '',
+                runtimeError: rErr,
+                syntaxError: sErr,
+                executionTime: exTime,
+                executionStatus: 'Error',
+                sqlQueryResult: null,
+                customInput,
+                consoleTab: 'output'
+              }
+            }
+          }));
         }
       } catch (err) {
         console.error("Failed to run SQL query:", err);
@@ -1055,6 +1173,23 @@ const CandidateDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
         setSqlQueryResult(null);
         setRuntimeError(errMsg);
         setExecutionStatus('Error');
+
+        setExamState(prev => ({
+          ...prev,
+          executionOutputs: {
+            ...(prev.executionOutputs || {}),
+            [examState.currentQuestionIndex]: {
+              consoleOutput: '',
+              runtimeError: errMsg,
+              syntaxError: '',
+              executionTime: 0,
+              executionStatus: 'Error',
+              sqlQueryResult: null,
+              customInput,
+              consoleTab: 'output'
+            }
+          }
+        }));
       } finally {
         setIsExecuting(false);
       }
@@ -1072,16 +1207,56 @@ const CandidateDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
 
       const res = await api.post('/run-python', payload);
       const data = res.data;
-      setConsoleOutput(data.output || data.stdout || '');
-      setRuntimeError(data.runtime_error || '');
-      setSyntaxError(data.syntax_error || '');
-      setExecutionTime(data.execution_time || 0);
-      setExecutionStatus(data.status || 'Success');
+      const outText = data.output || data.stdout || '';
+      const rErr = data.runtime_error || '';
+      const sErr = data.syntax_error || '';
+      const exTime = data.execution_time || 0;
+      const exStat = data.status || 'Success';
+
+      setConsoleOutput(outText);
+      setRuntimeError(rErr);
+      setSyntaxError(sErr);
+      setExecutionTime(exTime);
+      setExecutionStatus(exStat);
+
+      setExamState(prev => ({
+        ...prev,
+        executionOutputs: {
+          ...(prev.executionOutputs || {}),
+          [examState.currentQuestionIndex]: {
+            consoleOutput: outText,
+            runtimeError: rErr,
+            syntaxError: sErr,
+            executionTime: exTime,
+            executionStatus: exStat,
+            sqlQueryResult: null,
+            customInput,
+            consoleTab: 'output'
+          }
+        }
+      }));
     } catch (err) {
       console.error("Failed to run code:", err);
       const errMsg = err.response?.data?.detail || err.message || "Execution error.";
       setRuntimeError(errMsg);
       setExecutionStatus('Error');
+
+      setExamState(prev => ({
+        ...prev,
+        executionOutputs: {
+          ...(prev.executionOutputs || {}),
+          [examState.currentQuestionIndex]: {
+            consoleOutput: '',
+            runtimeError: errMsg,
+            syntaxError: '',
+            executionTime: 0,
+            executionStatus: 'Error',
+            sqlQueryResult: null,
+            customInput,
+            consoleTab: 'output'
+          }
+        }
+      }));
     } finally {
       setIsExecuting(false);
     }
@@ -1118,25 +1293,41 @@ const CandidateDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
     }
   };
 
-
   const handleResetCode = (currentIdx) => {
     if (window.confirm("Are you sure you want to reset your code to the default template? Any unsaved changes will be lost.")) {
       const asm = activeAssignment?.assessment || activeAssignment || {};
       const questions = asm.questions || [];
       const q = questions[currentIdx];
-      const isSql = q && (q.type === 'SCENARIO' || q.type === 'SCENARIO_CODING' || q.type === 'CODING') && (q.subject || q.language || '').toLowerCase() === 'sql';
-      const template = isSql
-        ? 'SELECT * FROM '
-        : `def solution():\n    pass\n\nif __name__ == "__main__":\n    solution()`;
+      const isSql = q && (q.type === 'SCENARIO' || q.type === 'SCENARIO_CODING' || q.type === 'CODING') && (q.subject || q.language || '').toLowerCase().includes('sql');
+      const isCoding = q && (q.type === 'CODING' || q.type === 'PYTHON_CODING' || (q.subject || '').toLowerCase().includes('python'));
+      const starter = q?.starterCode || q?.starter_code || q?.codeTemplate || q?.exampleCode;
+      const template = starter || (isSql
+        ? '-- Write your SQL query here\n'
+        : isCoding
+          ? `def solution():\n    pass\n\nif __name__ == "__main__":\n    solution()`
+          : '');
 
       setExamState(prev => ({
         ...prev,
         answers: {
           ...prev.answers,
           [currentIdx]: template
+        },
+        executionOutputs: {
+          ...(prev.executionOutputs || {}),
+          [currentIdx]: null
         }
       }));
-      showToast("Code reset to template.");
+
+      setConsoleOutput('');
+      setRuntimeError('');
+      setSyntaxError('');
+      setExecutionStatus('');
+      setExecutionTime(0);
+      setSqlQueryResult(null);
+      setCustomInput('');
+      setConsoleTab('output');
+      showToast("Code and compiler output reset to starter template.");
     }
   };
 
@@ -2135,7 +2326,6 @@ const CandidateDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
                   const asm = assignment?.assessment || assignment || {};
                   const isCompleted = assignment.status === 'COMPLETED';
                   const isInProgress = assignment.status === 'IN_PROGRESS';
-                  const isAssigned = assignment.status === 'ASSIGNED';
 
                   return (
                     <div
@@ -2610,6 +2800,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
                         {/* Monaco Editor Component */}
                         <div className={`w-full overflow-hidden rounded-xl border border-zinc-800 ${isFullscreen ? 'h-[60vh]' : 'h-[300px]'}`}>
                           <Editor
+                            key={`editor_${currentIdx}_${isSql ? 'sql' : 'python'}`}
                             height="100%"
                             defaultLanguage={isSql ? "sql" : "python"}
                             language={isSql ? "sql" : "python"}
