@@ -44,6 +44,10 @@ export const useExamSecurity = ({
   const remainingTimeRef = useRef(remainingTime);
   const maxWarningsRef = useRef(maxWarnings);
 
+  const lastTabSwitchTimeRef = useRef(0);
+  const lastWindowBlurTimeRef = useRef(0);
+  const lastEscTimeRef = useRef(0);
+
   const onLockRef = useRef(onLock);
   const onViolationRef = useRef(onViolation);
 
@@ -74,6 +78,9 @@ export const useExamSecurity = ({
     wasFullscreenRef.current = false;
     lastExitTimeRef.current = 0;
     setIsFullscreenGraceActive(false);
+    lastTabSwitchTimeRef.current = 0;
+    lastWindowBlurTimeRef.current = 0;
+    lastEscTimeRef.current = 0;
   }, []);
 
   const requestFullscreen = useCallback(async () => {
@@ -111,25 +118,70 @@ export const useExamSecurity = ({
     }
   }, []);
 
+  // Helper to increment warning counter for proctor security violations
+  const incrementWarningAndCheckLock = useCallback((reason) => {
+    const nextCount = exitCountRef.current + 1;
+    exitCountRef.current = nextCount;
+    setFullscreenExitCount(nextCount);
+
+    const isoTimestamp = new Date().toISOString();
+    const updatedHistory = [...warningHistoryRef.current, isoTimestamp];
+    warningHistoryRef.current = updatedHistory;
+    setWarningHistory(updatedHistory);
+
+    const maxLimit = (maxWarningsRef.current || 3) + 1;
+    if (nextCount >= maxLimit) {
+      setAutoSubmittedDueToViolations(true);
+      setIsExamLocked(true);
+      isExamLockedRef.current = true;
+      if (onLockRef.current) {
+        onLockRef.current(reason || 'Maximum security violations reached.');
+      }
+    }
+    return nextCount;
+  }, []);
+
   /**
    * Primary Violation & Activity Logger
    */
-  const triggerViolation = useCallback((type, description, severity = 'Medium', activityType = null) => {
+  const triggerViolation = useCallback((type, description, severity = 'Medium', activityType = null, isWarningViolation = false) => {
     if (!activeRef.current || isExamLockedRef.current) return;
 
     const now = Date.now();
-    // Prevent duplicates within 1.5 seconds
+
+    // Map standardized activity types for backend logging
+    const mappedType = activityType || (
+      type.includes('Right Click') ? 'RIGHT_CLICK' :
+      type.includes('Copy') ? 'COPY_ATTEMPT' :
+      type.includes('Paste') ? 'PASTE_ATTEMPT' :
+      type.includes('Cut') ? 'CUT_ATTEMPT' :
+      type.includes('Developer') ? 'DEVTOOLS_ATTEMPT' :
+      type.includes('Tab Switch') ? 'TAB_SWITCH' :
+      type.includes('Window Blur') ? 'WINDOW_BLUR' :
+      type.includes('Window Focus') ? 'WINDOW_FOCUS' :
+      type.includes('Escape') || type.includes('ESC') ? 'ESC_KEY' :
+      type.includes('Fullscreen') ? 'FULLSCREEN_EXIT' : 'OTHER_VIOLATION'
+    );
+
+    // Prevent duplicate events of the same activityType within 1000ms
     const duplicate = violationsRef.current.find(
-      (v) => v.type === type && now - v.timestamp < 1500
+      (v) => (v.activityType === mappedType || v.type === type) && now - v.timestamp < 1000
     );
     if (duplicate) return;
+
+    let currentWarnCount = exitCountRef.current;
+    if (isWarningViolation || ['TAB_SWITCH', 'WINDOW_BLUR', 'ESC_KEY', 'FULLSCREEN_EXIT'].includes(mappedType)) {
+      currentWarnCount = incrementWarningAndCheckLock(`${type}: ${description}`);
+    }
 
     const newViolation = {
       id: Math.random().toString(36).substring(2, 9),
       type,
+      activityType: mappedType,
       description,
       severity,
       timestamp: now,
+      warningCount: currentWarnCount
     };
 
     lastViolationTimeRef.current = now;
@@ -150,26 +202,12 @@ export const useExamSecurity = ({
       return updatedScore;
     });
 
-    // Map standardized activity types for backend logging
-    const mappedType = activityType || (
-      type.includes('Right Click') ? 'RIGHT_CLICK' :
-      type.includes('Copy') ? 'COPY_ATTEMPT' :
-      type.includes('Paste') ? 'PASTE_ATTEMPT' :
-      type.includes('Cut') ? 'CUT_ATTEMPT' :
-      type.includes('Developer') ? 'DEVTOOLS_ATTEMPT' :
-      type.includes('Tab Switch') ? 'TAB_SWITCH' :
-      type.includes('Window Blur') ? 'WINDOW_BLUR' :
-      type.includes('Window Focus') ? 'WINDOW_FOCUS' :
-      type.includes('Escape') || type.includes('ESC') ? 'ESC_KEY' :
-      type.includes('Fullscreen') ? 'FULLSCREEN_EXIT' : 'OTHER_VIOLATION'
-    );
-
-    sendActivityLogToBackend(mappedType, exitCountRef.current, description);
+    sendActivityLogToBackend(mappedType, currentWarnCount, description);
 
     if (onViolationRef.current) {
       onViolationRef.current(newViolation);
     }
-  }, [sendActivityLogToBackend]);
+  }, [sendActivityLogToBackend, incrementWarningAndCheckLock]);
 
   // 1. Right Click prevention
   useEffect(() => {
@@ -221,7 +259,10 @@ export const useExamSecurity = ({
     const handleKeyDown = (e) => {
       // Escape Key
       if (e.key === 'Escape' || e.keyCode === 27) {
-        triggerViolation('ESC Key Pressed', 'Escape key pressed.', 'Low', 'ESC_KEY');
+        const now = Date.now();
+        if (now - lastEscTimeRef.current < 1000) return;
+        lastEscTimeRef.current = now;
+        triggerViolation('ESC Key Pressed', 'Escape key pressed.', 'Medium', 'ESC_KEY', true);
         return;
       }
 
@@ -281,7 +322,10 @@ export const useExamSecurity = ({
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
-        triggerViolation('Tab Switch', 'Switched away from assessment tab.', 'High', 'TAB_SWITCH');
+        const now = Date.now();
+        if (now - lastTabSwitchTimeRef.current < 1000) return;
+        lastTabSwitchTimeRef.current = now;
+        triggerViolation('Tab Switch', 'Switched away from assessment tab.', 'High', 'TAB_SWITCH', true);
       } else if (document.visibilityState === 'visible') {
         sendActivityLogToBackend('WINDOW_FOCUS', exitCountRef.current, 'Returned to assessment tab.');
       }
@@ -289,10 +333,18 @@ export const useExamSecurity = ({
 
     const handleWindowBlur = () => {
       setTimeout(() => {
-        if (!document.hasFocus() && activeRef.current && !isExamLockedRef.current) {
-          triggerViolation('Window Blur', 'Browser lost focus.', 'Medium', 'WINDOW_BLUR');
+        const now = Date.now();
+        // Skip WINDOW_BLUR if tab switch happened within 800ms or document is hidden
+        if (document.visibilityState === 'hidden' || (now - lastTabSwitchTimeRef.current < 800)) {
+          return;
         }
-      }, 120);
+
+        if (!document.hasFocus() && activeRef.current && !isExamLockedRef.current) {
+          if (now - lastWindowBlurTimeRef.current < 1000) return;
+          lastWindowBlurTimeRef.current = now;
+          triggerViolation('Window Blur', 'Browser lost focus.', 'Medium', 'WINDOW_BLUR', true);
+        }
+      }, 150);
     };
 
     const handleWindowFocus = () => {
@@ -365,28 +417,16 @@ export const useExamSecurity = ({
         // Prevent duplicate events within 1500ms
         if (now - lastExitTimeRef.current > 1500) {
           lastExitTimeRef.current = now;
-          const nextCount = exitCountRef.current + 1;
-          exitCountRef.current = nextCount;
-          setFullscreenExitCount(nextCount);
+          const nextCount = incrementWarningAndCheckLock('Exited full-screen mode 4 times.');
 
-          const isoTimestamp = new Date(now).toISOString();
-          const updatedHistory = [...warningHistoryRef.current, isoTimestamp];
-          warningHistoryRef.current = updatedHistory;
-          setWarningHistory(updatedHistory);
-
-          if (nextCount >= 4) {
-            setAutoSubmittedDueToViolations(true);
-            setIsExamLocked(true);
-            isExamLockedRef.current = true;
-            if (onLockRef.current) {
-              onLockRef.current('Exited full-screen mode 4 times.');
-            }
-          } else {
-            triggerViolation(
-              `Fullscreen Exit`,
-              `Exited full-screen mode (Warning ${nextCount} of 3).`,
-              nextCount >= 3 ? 'High' : 'Medium'
-            );
+          triggerViolation(
+            `Fullscreen Exit`,
+            `Exited full-screen mode (Warning ${nextCount} of 3).`,
+            nextCount >= 3 ? 'High' : 'Medium',
+            'FULLSCREEN_EXIT',
+            false
+          );
+          if (nextCount < 4) {
             setIsFullscreenGraceActive(true);
             setGraceSecondsLeft(gracePeriodSeconds);
           }

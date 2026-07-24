@@ -334,6 +334,49 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
     localStorage.setItem('recruitai_candidate_groups', JSON.stringify(candidateGroups));
   }, [candidateGroups]);
 
+  const handleDeleteCandidate = async (candidateId, candidateName) => {
+    if (!window.confirm(`Are you sure you want to delete candidate "${candidateName || 'this candidate'}"? This action will remove all their assessment records.`)) {
+      return;
+    }
+
+    try {
+      await api.delete(`/api/candidates/${candidateId}`);
+      setCandidates(prev => (Array.isArray(prev) ? prev.filter(c => c.id !== candidateId) : []));
+      setSelectedCandidateIds(prev => prev.filter(id => id !== candidateId));
+      if (selectedCandidate && selectedCandidate.id === candidateId) {
+        setSelectedCandidate(null);
+      }
+      showToast("Candidate deleted successfully.");
+    } catch (err) {
+      console.error("Failed to delete candidate:", err);
+      // Fallback local deletion
+      setCandidates(prev => (Array.isArray(prev) ? prev.filter(c => c.id !== candidateId) : []));
+      setSelectedCandidateIds(prev => prev.filter(id => id !== candidateId));
+      showToast("Candidate deleted.");
+    }
+  };
+
+  const handleBulkDeleteCandidates = async () => {
+    if (selectedCandidateIds.length === 0) return;
+
+    if (!window.confirm(`Are you sure you want to delete ${selectedCandidateIds.length} selected candidate(s)?`)) {
+      return;
+    }
+
+    try {
+      await api.delete('/api/candidates', { data: { candidateIds: selectedCandidateIds } });
+      setCandidates(prev => (Array.isArray(prev) ? prev.filter(c => !selectedCandidateIds.includes(c.id)) : []));
+      setSelectedCandidateIds([]);
+      showToast("Selected candidates deleted successfully.");
+    } catch (err) {
+      console.error("Failed to bulk delete candidates:", err);
+      // Fallback local deletion
+      setCandidates(prev => (Array.isArray(prev) ? prev.filter(c => !selectedCandidateIds.includes(c.id)) : []));
+      setSelectedCandidateIds([]);
+      showToast("Selected candidates deleted.");
+    }
+  };
+
   useEffect(() => {
     setCandidatePage(1);
   }, [searchQuery, selectedStatus, candidates.length]);
@@ -1304,17 +1347,27 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
                   </select>
 
                   {selectedCandidateIds.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setGroupName('');
-                        setShowCreateGroupModal(true);
-                      }}
-                      className="px-3.5 py-2 rounded-lg bg-dash-primary-purple text-white text-xs font-bold flex items-center gap-2 hover:bg-dash-dark-purple transition-all duration-200 cursor-pointer shadow-md border-none"
-                    >
-                      <Users size={13} />
-                      <span>Create Group ({selectedCandidateIds.length})</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setGroupName('');
+                          setShowCreateGroupModal(true);
+                        }}
+                        className="px-3.5 py-2 rounded-lg bg-dash-primary-purple text-white text-xs font-bold flex items-center gap-2 hover:bg-dash-dark-purple transition-all duration-200 cursor-pointer shadow-md border-none"
+                      >
+                        <Users size={13} />
+                        <span>Create Group ({selectedCandidateIds.length})</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleBulkDeleteCandidates}
+                        className="px-3.5 py-2 rounded-lg bg-rose-600 text-white text-xs font-bold flex items-center gap-2 hover:bg-rose-700 transition-all duration-200 cursor-pointer shadow-md border-none"
+                      >
+                        <Trash2 size={13} />
+                        <span>Delete Selected ({selectedCandidateIds.length})</span>
+                      </button>
+                    </div>
                   )}
 
                 </div>
@@ -1440,15 +1493,24 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
                               </span>
                             </td>
 
-                            {/* Actions / Report */}
+                             {/* Actions / Report & Delete */}
                             <td className="px-6 py-4 text-right">
-                              <button
-                                onClick={() => setSelectedCandidate(candidate)}
-                                className="px-3 py-1.5 rounded-lg bg-dash-white-card border border-dash-border-gray hover:border-dash-primary-purple text-dash-primary-purple text-xs font-bold hover:bg-dash-soft-pink transition-all duration-300 flex items-center gap-1.5 ml-auto cursor-pointer"
-                              >
-                                <Eye size={13} />
-                                <span>Report</span>
-                              </button>
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => setSelectedCandidate(candidate)}
+                                  className="px-3 py-1.5 rounded-lg bg-dash-white-card border border-dash-border-gray hover:border-dash-primary-purple text-dash-primary-purple text-xs font-bold hover:bg-dash-soft-pink transition-all duration-300 flex items-center gap-1.5 cursor-pointer"
+                                >
+                                  <Eye size={13} />
+                                  <span>Report</span>
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteCandidate(candidate.id, candidate.full_name || candidate.name)}
+                                  className="p-1.5 rounded-lg text-rose-500 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-xs font-bold transition-all duration-200 cursor-pointer flex items-center justify-center"
+                                  title="Delete Candidate"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
                             </td>
                           </motion.tr>
                         );
