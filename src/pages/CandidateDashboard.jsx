@@ -419,19 +419,32 @@ const CandidateDashboard = ({ onLogout }) => {
     submitted: false
   });
 
+  const isExamActive = !!(activeAssignment && !examState.submitted && activeTab === 'technical');
+
   // Initialize Exam Security hook
   const examSecurity = useExamSecurity({
-    active: !!(activeAssignment && !examState.submitted),
+    active: isExamActive,
     maxViolations: 5,
     gracePeriodSeconds: 15,
     onLock: (reason) => {
-      showToast(`Assessment locked due to: ${reason}`);
-      handleSubmitExam(activeAssignment?.id);
+      showToast(`Security Alert: ${reason}`);
     },
     onViolation: (violation) => {
       showToast(`Security Warning: ${violation.type} - ${violation.description}`);
     }
   });
+
+  // Lock body scroll when active in assessment
+  useEffect(() => {
+    if (isExamActive) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'auto';
+    }
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
+  }, [isExamActive]);
 
   const fetchAssignments = async () => {
     try {
@@ -518,6 +531,10 @@ const CandidateDashboard = ({ onLogout }) => {
         }
       };
 
+      if (examSecurity?.resetExamSecurity) {
+        examSecurity.resetExamSecurity();
+      }
+
       setActiveAssignment(assignmentToSet);
       setActiveTab('technical');
       setExamState({
@@ -526,6 +543,13 @@ const CandidateDashboard = ({ onLogout }) => {
         timeLeft: parseDuration(asm.duration || "30") * 60,
         submitted: false
       });
+
+      // Request browser full-screen mode on exam start
+      setTimeout(() => {
+        if (examSecurity?.requestFullscreen) {
+          examSecurity.requestFullscreen();
+        }
+      }, 100);
     } catch (err) {
       console.error("Failed to start assessment:", err);
       let errMsg = "Error starting assessment. Please try again.";
@@ -540,7 +564,7 @@ const CandidateDashboard = ({ onLogout }) => {
     }
   };
 
-  const handleSubmitExam = async (assignmentIdOverride) => {
+  const handleSubmitExam = async (assignmentIdOverride, securityMetadata = {}) => {
     const targetId = assignmentIdOverride || activeAssignment?.id;
     if (!targetId) return;
 
@@ -555,11 +579,17 @@ const CandidateDashboard = ({ onLogout }) => {
       const durationSeconds = parseDuration(asm.duration || "30") * 60;
       const timeTaken = Math.max(0, durationSeconds - examState.timeLeft);
 
-      await api.post('/api/assessment/submit', {
+      const payload = {
         assignmentId: targetId,
         answers: answersPayload,
-        timeTaken: timeTaken
-      });
+        timeTaken: timeTaken,
+        autoSubmitted: securityMetadata?.autoSubmitted ?? (examSecurity.fullscreenExitCount >= 4),
+        submissionReason: securityMetadata?.submissionReason || null,
+        warningCount: securityMetadata?.warningCount ?? examSecurity.fullscreenExitCount ?? 0,
+        warningHistory: securityMetadata?.warningHistory || examSecurity.warningHistory || []
+      };
+
+      await api.post('/api/assessment/submit', payload);
 
       setExamState(prev => ({ ...prev, submitted: true }));
       await fetchAssignments();
@@ -756,6 +786,11 @@ const CandidateDashboard = ({ onLogout }) => {
   useEffect(() => {
     if (!activeAssignment || examState.submitted || examState.timeLeft <= 0) return;
 
+    // Pause timer if exam security warning dialog is open or full-screen is not active
+    if (!examSecurity.isFullscreen || examSecurity.isExamLocked) {
+      return;
+    }
+
     const timer = setInterval(() => {
       setExamState((prev) => {
         if (prev.timeLeft <= 1) {
@@ -770,7 +805,7 @@ const CandidateDashboard = ({ onLogout }) => {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [activeAssignment, examState.submitted, examState.timeLeft]);
+  }, [activeAssignment, examState.submitted, examState.timeLeft, examSecurity.isFullscreen, examSecurity.isExamLocked]);
 
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -1040,7 +1075,8 @@ const CandidateDashboard = ({ onLogout }) => {
       </AnimatePresence>
 
       {/* 1. SIDEBAR (Full-Height Solid Layout matching Recruiter) */}
-      <aside className="hidden lg:flex flex-col w-[260px] h-screen shrink-0 bg-dash-sidebar-bg pt-8 pb-8 pl-6 pr-0 relative z-30 text-dash-dark-purple shadow-[4px_0_24px_rgba(0,0,0,0.03)] justify-between">
+      {!isExamActive && (
+        <aside className="hidden lg:flex flex-col w-[260px] h-screen shrink-0 bg-dash-sidebar-bg pt-8 pb-8 pl-6 pr-0 relative z-30 text-dash-dark-purple shadow-[4px_0_24px_rgba(0,0,0,0.03)] justify-between">
         <div>
           {/* Branding */}
           <div className="flex items-center gap-3 px-2 py-4 mb-6">
@@ -1119,225 +1155,231 @@ const CandidateDashboard = ({ onLogout }) => {
           </button>
         </div>
       </aside>
+      )}
 
-      {/* Mobile Sidebar Backdrop */}
-      <AnimatePresence>
-        {sidebarOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 0.6 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setSidebarOpen(false)}
-            className="fixed inset-0 bg-dash-dark-purple z-40 lg:hidden"
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Mobile Sidebar Content */}
-      <AnimatePresence>
-        {sidebarOpen && (
-          <motion.aside
-            initial={{ x: '-100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '-100%' }}
-            transition={{ type: 'spring', bounce: 0.1, duration: 0.4 }}
-            className="fixed top-0 bottom-0 left-0 w-[270px] pt-6 pb-6 pl-6 pr-0 z-50 lg:hidden flex flex-col bg-dash-sidebar-bg text-dash-dark-purple border-r border-dash-border-gray/25"
-          >
-            <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-dash-primary-purple flex items-center justify-center">
-                  <span className="font-outfit font-extrabold text-dash-white-card text-base">R</span>
-                </div>
-                <h1 className="font-outfit font-bold text-base text-dash-dark-purple">RecruitAI</h1>
-              </div>
-              <button
+      {/* Mobile Sidebar Backdrop & Content */}
+      {!isExamActive && (
+        <>
+          <AnimatePresence>
+            {sidebarOpen && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.6 }}
+                exit={{ opacity: 0 }}
                 onClick={() => setSidebarOpen(false)}
-                className="p-1 rounded-lg hover:bg-dash-primary-purple/20 text-dash-light-purple hover:text-dash-dark-purple mr-4"
-              >
-                <X size={20} />
-              </button>
-            </div>
+                className="fixed inset-0 bg-dash-dark-purple z-40 lg:hidden"
+              />
+            )}
+          </AnimatePresence>
 
-            <nav className="space-y-1 flex-1">
-              {[
-                { id: 'dashboard', label: 'Dashboard', icon: Briefcase },
-                { id: 'resume', label: 'Resume Upload', icon: FileText },
-                { id: 'technical', label: 'Technical Test', icon: Terminal },
-                { id: 'english', label: 'English Speaking', icon: Volume2 },
-                { id: 'results', label: 'My Results', icon: Award },
-              ].map((item) => {
-                const Icon = item.icon;
-                const isActive = activeTab === item.id;
-                return (
+          <AnimatePresence>
+            {sidebarOpen && (
+              <motion.aside
+                initial={{ x: '-100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '-100%' }}
+                transition={{ type: 'spring', bounce: 0.1, duration: 0.4 }}
+                className="fixed top-0 bottom-0 left-0 w-[270px] pt-6 pb-6 pl-6 pr-0 z-50 lg:hidden flex flex-col bg-dash-sidebar-bg text-dash-dark-purple border-r border-dash-border-gray/25"
+              >
+                <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-dash-primary-purple flex items-center justify-center">
+                      <span className="font-outfit font-extrabold text-dash-white-card text-base">R</span>
+                    </div>
+                    <h1 className="font-outfit font-bold text-base text-dash-dark-purple">RecruitAI</h1>
+                  </div>
                   <button
-                    key={item.id}
-                    onClick={() => {
-                      setActiveTab(item.id);
-                      setSidebarOpen(false);
-                      if (item.id !== 'dashboard' && item.id !== 'resume' && item.id !== 'technical') {
-                        showToast(`"${item.label}" feature is coming soon!`);
-                      }
-                    }}
-                    className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-l-[24px] rounded-r-none text-sm font-bold transition-all duration-200 ${isActive
-                      ? 'sidebar-active-tab shadow-sm'
-                      : 'text-dash-light-purple hover:text-dash-dark-purple hover:bg-dash-primary-purple/20'
-                      }`}
+                    onClick={() => setSidebarOpen(false)}
+                    className="p-1 rounded-lg hover:bg-dash-primary-purple/20 text-dash-light-purple hover:text-dash-dark-purple mr-4"
                   >
-                    <Icon size={18} />
-                    <span>{item.label}</span>
+                    <X size={20} />
                   </button>
-                );
-              })}
-            </nav>
-            {/* Centered Lottie Animation */}
-            <div className="flex items-center justify-center py-2 pr-4 my-2">
-              <div className="w-44 h-44 flex items-center justify-center">
-                <DotLottieReact
-                  src="https://lottie.host/f5bd2f6c-67a9-44d5-954d-96176d4cb3df/USuWgujLWd.lottie"
-                  loop
-                  autoplay
-                />
-              </div>
-            </div>
+                </div>
 
-            <div className="border-t border-dash-border-gray/25 pt-4 space-y-3 mr-4">
-              <div className="flex items-center gap-3 px-2">
-                <div className="w-9 h-9 rounded-full bg-dash-primary-purple flex items-center justify-center font-semibold text-dash-white-card">
-                  {(candidate?.name || candidate?.full_name || 'Candidate').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                <nav className="space-y-1 flex-1">
+                  {[
+                    { id: 'dashboard', label: 'Dashboard', icon: Briefcase },
+                    { id: 'resume', label: 'Resume Upload', icon: FileText },
+                    { id: 'technical', label: 'Technical Test', icon: Terminal },
+                    { id: 'english', label: 'English Speaking', icon: Volume2 },
+                    { id: 'results', label: 'My Results', icon: Award },
+                  ].map((item) => {
+                    const Icon = item.icon;
+                    const isActive = activeTab === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          setActiveTab(item.id);
+                          setSidebarOpen(false);
+                          if (item.id !== 'dashboard' && item.id !== 'resume' && item.id !== 'technical') {
+                            showToast(`"${item.label}" feature is coming soon!`);
+                          }
+                        }}
+                        className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-l-[24px] rounded-r-none text-sm font-bold transition-all duration-200 ${isActive
+                          ? 'sidebar-active-tab shadow-sm'
+                          : 'text-dash-light-purple hover:text-dash-dark-purple hover:bg-dash-primary-purple/20'
+                          }`}
+                      >
+                        <Icon size={18} />
+                        <span>{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </nav>
+                {/* Centered Lottie Animation */}
+                <div className="flex items-center justify-center py-2 pr-4 my-2">
+                  <div className="w-44 h-44 flex items-center justify-center">
+                    <DotLottieReact
+                      src="https://lottie.host/f5bd2f6c-67a9-44d5-954d-96176d4cb3df/USuWgujLWd.lottie"
+                      loop
+                      autoplay
+                    />
+                  </div>
                 </div>
-                <div>
-                  <h4 className="text-xs font-semibold text-dash-dark-purple">{candidate?.name || candidate?.full_name || 'Candidate'}</h4>
-                  <span className="text-[10px] text-dash-light-purple">Candidate</span>
+
+                <div className="border-t border-dash-border-gray/25 pt-4 space-y-3 mr-4">
+                  <div className="flex items-center gap-3 px-2">
+                    <div className="w-9 h-9 rounded-full bg-dash-primary-purple flex items-center justify-center font-semibold text-dash-white-card">
+                      {(candidate?.name || candidate?.full_name || 'Candidate').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-semibold text-dash-dark-purple">{candidate?.name || candidate?.full_name || 'Candidate'}</h4>
+                      <span className="text-[10px] text-dash-light-purple">Candidate</span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSidebarOpen(false);
+                      handleSignOut();
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-dash-light-purple hover:bg-dash-primary-purple/20 transition-all duration-200"
+                  >
+                    <LogOut size={16} />
+                    <span>Sign Out</span>
+                  </button>
                 </div>
-              </div>
-              <button
-                onClick={() => {
-                  setSidebarOpen(false);
-                  handleSignOut();
-                }}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-dash-light-purple hover:bg-dash-primary-purple/20 transition-all duration-200"
-              >
-                <LogOut size={16} />
-                <span>Sign Out</span>
-              </button>
-            </div>
-          </motion.aside>
-        )}
-      </AnimatePresence>
+              </motion.aside>
+            )}
+          </AnimatePresence>
+        </>
+      )}
 
       {/* 2. MAIN WORKSPACE */}
-      <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 flex flex-col gap-6 relative z-20 overflow-y-auto h-screen max-h-screen">
+      <main className={isExamActive ? "fixed inset-0 z-40 bg-dash-light-blue-bg overflow-hidden flex flex-col p-4 sm:p-6 lg:p-8 w-screen h-screen" : "flex-1 min-w-0 p-4 sm:p-6 lg:p-8 flex flex-col gap-6 relative z-20 overflow-y-auto h-screen max-h-screen"}>
         {/* HEADER SECTION (Horizontal White Card style) */}
-        <header className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-5 px-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-2 lg:mt-0 shadow-[0_4px_20px_rgba(87,82,170,0.03)]">
-          <div className="flex items-center gap-3">
-            {/* Hamburger menu for small screens */}
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="lg:hidden p-2 rounded-xl bg-dash-white-card border border-dash-border-gray text-dash-primary-purple hover:bg-dash-soft-pink transition-all duration-200"
-            >
-              <Menu size={20} />
-            </button>
+        {!isExamActive && (
+          <header className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-5 px-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-2 lg:mt-0 shadow-[0_4px_20px_rgba(87,82,170,0.03)]">
+            <div className="flex items-center gap-3">
+              {/* Hamburger menu for small screens */}
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden p-2 rounded-xl bg-dash-white-card border border-dash-border-gray text-dash-primary-purple hover:bg-dash-soft-pink transition-all duration-200"
+              >
+                <Menu size={20} />
+              </button>
 
-            <div>
-              <h2 className="text-xl sm:text-2xl font-plus-jakarta font-extrabold tracking-tight text-dash-dark-purple flex items-center gap-2">
-                {getHeaderContent().title}
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-dash-primary-purple/10 border border-dash-border-gray text-dash-primary-purple font-outfit">{getHeaderContent().tag}</span>
-              </h2>
-              <p className="text-xs sm:text-sm text-dash-light-purple font-semibold mt-0.5">
-                {getHeaderContent().subtitle}
-              </p>
+              <div>
+                <h2 className="text-xl sm:text-2xl font-plus-jakarta font-extrabold tracking-tight text-dash-dark-purple flex items-center gap-2">
+                  {getHeaderContent().title}
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-dash-primary-purple/10 border border-dash-border-gray text-dash-primary-purple font-outfit">{getHeaderContent().tag}</span>
+                </h2>
+                <p className="text-xs sm:text-sm text-dash-light-purple font-semibold mt-0.5">
+                  {getHeaderContent().subtitle}
+                </p>
+              </div>
             </div>
-          </div>
 
-          {/* Right Area: Notifications bell */}
-          <div className="flex items-center gap-3 self-end sm:self-center relative">
-            <button
-              onClick={() => setShowNotifications(!showNotifications)}
-              className="relative p-2.5 rounded-xl bg-dash-white-card border border-dash-border-gray text-dash-primary-purple hover:bg-dash-soft-pink transition-all duration-300 hover:scale-105 cursor-pointer flex items-center justify-center"
-            >
-              {unreadNotificationsCount > 0 && (
-                <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse border-2 border-white" />
-              )}
-              <Bell size={18} />
-            </button>
+            {/* Right Area: Notifications bell */}
+            <div className="flex items-center gap-3 self-end sm:self-center relative">
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="relative p-2.5 rounded-xl bg-dash-white-card border border-dash-border-gray text-dash-primary-purple hover:bg-dash-soft-pink transition-all duration-300 hover:scale-105 cursor-pointer flex items-center justify-center"
+              >
+                {unreadNotificationsCount > 0 && (
+                  <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse border-2 border-white" />
+                )}
+                <Bell size={18} />
+              </button>
 
-            {/* Notifications Dropdown Panel */}
-            <AnimatePresence>
-              {showNotifications && (
-                <>
-                  <div className="fixed inset-0 z-45" onClick={() => setShowNotifications(false)} />
-                  <motion.div
-                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    className="absolute right-0 top-full mt-3 w-80 bg-dash-white-card border border-dash-border-gray rounded-2xl shadow-xl z-50 p-4 flex flex-col gap-3 max-h-96 overflow-y-auto"
-                  >
-                    <div className="flex items-center justify-between border-b border-dash-border-gray/25 pb-2">
-                      <h4 className="text-xs font-extrabold text-dash-dark-purple uppercase tracking-wider">Notifications</h4>
-                      {unreadNotificationsCount > 0 && (
-                        <button
-                          onClick={handleMarkAllAsRead}
-                          className="text-[10px] font-bold text-dash-primary-purple hover:underline bg-transparent border-0 cursor-pointer"
-                        >
-                          Mark all as read
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="flex flex-col gap-2">
-                      {notifications.length === 0 ? (
-                        <div className="text-center py-6 text-xs text-dash-light-purple font-semibold">
-                          No notifications found.
-                        </div>
-                      ) : (
-                        notifications.map((notif) => (
-                          <div
-                            key={notif.id}
-                            className={`p-3 rounded-xl border text-xs leading-relaxed flex flex-col gap-1.5 transition-all ${notif.read
-                              ? 'bg-slate-50/50 border-slate-100 text-slate-500 font-medium'
-                              : 'bg-dash-primary-purple/5 border-dash-primary-purple/20 text-dash-dark-purple font-semibold'
-                              }`}
+              {/* Notifications Dropdown Panel */}
+              <AnimatePresence>
+                {showNotifications && (
+                  <>
+                    <div className="fixed inset-0 z-45" onClick={() => setShowNotifications(false)} />
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      className="absolute right-0 top-full mt-3 w-80 bg-dash-white-card border border-dash-border-gray rounded-2xl shadow-xl z-50 p-4 flex flex-col gap-3 max-h-96 overflow-y-auto"
+                    >
+                      <div className="flex items-center justify-between border-b border-dash-border-gray/25 pb-2">
+                        <h4 className="text-xs font-extrabold text-dash-dark-purple uppercase tracking-wider">Notifications</h4>
+                        {unreadNotificationsCount > 0 && (
+                          <button
+                            onClick={handleMarkAllAsRead}
+                            className="text-[10px] font-bold text-dash-primary-purple hover:underline bg-transparent border-0 cursor-pointer"
                           >
-                            <div className="flex justify-between items-start gap-2">
-                              <span className="font-extrabold text-dash-primary-purple">{notif.title}</span>
-                              <span className="text-[9px] text-dash-light-purple font-medium whitespace-nowrap">
-                                {new Date(notif.time).toLocaleDateString()}
-                              </span>
-                            </div>
-                            <p className="text-[11px] leading-normal">{notif.message}</p>
-                            {notif.isScheduled && (
-                              <div className="flex items-center justify-between mt-1 pt-1 border-t border-slate-200/50">
-                                <span className="text-[10px] font-bold text-slate-500">
-                                  Starts: {new Date(notif.startTime).toLocaleString()}
-                                </span>
-                                {notif.isAvailable ? (
-                                  <button
-                                    onClick={() => {
-                                      setShowNotifications(false);
-                                      setActiveTab('technical');
-                                      handleStartExam(notif.assignment);
-                                    }}
-                                    className="px-2.5 py-1 bg-dash-primary-purple text-white text-[9px] font-extrabold rounded-lg border-0 cursor-pointer hover:bg-dash-dark-purple transition-all"
-                                  >
-                                    Start Now
-                                  </button>
-                                ) : (
-                                  <span className="text-[9px] font-extrabold text-amber-600 bg-amber-50 border border-amber-200/50 px-1.5 py-0.5 rounded-full uppercase">
-                                    Locked
-                                  </span>
-                                )}
-                              </div>
-                            )}
+                            Mark all as read
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        {notifications.length === 0 ? (
+                          <div className="text-center py-6 text-xs text-dash-light-purple font-semibold">
+                            No notifications found.
                           </div>
-                        ))
-                      )}
-                    </div>
-                  </motion.div>
-                </>
-              )}
-            </AnimatePresence>
-          </div>
-        </header>
+                        ) : (
+                          notifications.map((notif) => (
+                            <div
+                              key={notif.id}
+                              className={`p-3 rounded-xl border text-xs leading-relaxed flex flex-col gap-1.5 transition-all ${notif.read
+                                ? 'bg-slate-50/50 border-slate-100 text-slate-500 font-medium'
+                                : 'bg-dash-primary-purple/5 border-dash-primary-purple/20 text-dash-dark-purple font-semibold'
+                                }`}
+                            >
+                              <div className="flex justify-between items-start gap-2">
+                                <span className="font-extrabold text-dash-primary-purple">{notif.title}</span>
+                                <span className="text-[9px] text-dash-light-purple font-medium whitespace-nowrap">
+                                  {new Date(notif.time).toLocaleDateString()}
+                                </span>
+                              </div>
+                              <p className="text-[11px] leading-normal">{notif.message}</p>
+                              {notif.isScheduled && (
+                                <div className="flex items-center justify-between mt-1 pt-1 border-t border-slate-200/50">
+                                  <span className="text-[10px] font-bold text-slate-500">
+                                    Starts: {new Date(notif.startTime).toLocaleString()}
+                                  </span>
+                                  {notif.isAvailable ? (
+                                    <button
+                                      onClick={() => {
+                                        setShowNotifications(false);
+                                        setActiveTab('technical');
+                                        handleStartExam(notif.assignment);
+                                      }}
+                                      className="px-2.5 py-1 bg-dash-primary-purple text-white text-[9px] font-extrabold rounded-lg border-0 cursor-pointer hover:bg-dash-dark-purple transition-all"
+                                    >
+                                      Start Now
+                                    </button>
+                                  ) : (
+                                    <span className="text-[9px] font-extrabold text-amber-600 bg-amber-50 border border-amber-200/50 px-1.5 py-0.5 rounded-full uppercase">
+                                      Locked
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
+          </header>
+        )}
 
         {activeTab === 'dashboard' && (
           <>
@@ -1846,6 +1888,13 @@ const CandidateDashboard = ({ onLogout }) => {
                   Thank you for taking the assessment. Your response has been securely saved and submitted to your recruiter.
                 </p>
               </div>
+
+              {examSecurity?.autoSubmittedDueToViolations && (
+                <div className="w-full bg-red-50 border border-red-200 text-red-600 p-4 rounded-2xl font-bold text-xs flex items-center justify-center gap-2">
+                  <span>Your assessment has been automatically submitted because you exited full-screen mode multiple times.</span>
+                </div>
+              )}
+
               <button
                 onClick={() => setActiveAssignment(null)}
                 className="px-8 py-3 rounded-xl bg-dash-primary-purple text-dash-white-card font-bold text-sm hover:bg-dash-dark-purple transition-all duration-200 shadow-md cursor-pointer border-0"
@@ -2488,7 +2537,7 @@ const CandidateDashboard = ({ onLogout }) => {
         <ExamSecurityMonitor
           securityState={examSecurity}
           assessmentName={activeAssignment?.assessmentName || activeAssignment?.assessment?.name || 'Technical Assessment'}
-          onAutoSubmit={() => handleSubmitExam(activeAssignment?.id)}
+          onAutoSubmit={(secData) => handleSubmitExam(activeAssignment?.id, secData)}
         />
       )}
     </div>

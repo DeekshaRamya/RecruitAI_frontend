@@ -41,7 +41,11 @@ import {
   RefreshCw,
   Eye,
   UserPlus,
-  Send
+  Send,
+  Code,
+  Database,
+  Brain,
+  PieChart
 } from 'lucide-react';
 import api from '../api';
 
@@ -491,105 +495,28 @@ const RecruiterDashboard = ({ onLogout }) => {
     );
   };
 
-  // Selected topics state (Python topics selected by default as in screenshot)
-  const [selectedTopics, setSelectedTopics] = useState({
-    Python: ['Variables & Data Types', 'Control Flow & Loops'],
-    SQL: [],
-    Aptitude: []
-  });
+  // Redesigned Assessment Creation state
+  const [selectedSubjects, setSelectedSubjects] = useState(['Python', 'SQL']);
+  const [assessmentTitle, setAssessmentTitle] = useState('Python & SQL Technical Assessment');
+  const [durationInput, setDurationInput] = useState('60 minutes');
 
-  // Topic configuration state: maps topic names to their MCQ and Scenario-Based counts
-  const [topicConfigs, setTopicConfigs] = useState({
-    'Variables & Data Types': { mcqCount: 2, scenarioCount: 1 },
-    'Control Flow & Loops': { mcqCount: 2, scenarioCount: 1 }
-  });
+  // Percentage distribution states
+  const [questionDist, setQuestionDist] = useState({ mcq: 70, scenario: 30 });
+  const [difficultyDist, setDifficultyDist] = useState({ easy: 20, medium: 50, hard: 30 });
 
-  // Assessment Settings states
-  const [difficulty, setDifficulty] = useState('Medium');
-  const [duration, setDuration] = useState('60 minutes');
-
-  // Dynamic assessment calculations
-  const totalSelectedTopics = selectedTopics.Python.length + selectedTopics.SQL.length + selectedTopics.Aptitude.length;
-  const activeSubjectsCount = (selectedTopics.Python.length > 0 ? 1 : 0) + (selectedTopics.SQL.length > 0 ? 1 : 0) + (selectedTopics.Aptitude.length > 0 ? 1 : 0);
-
-  // Sum up MCQ and Scenario questions from active configurations
-  const totalMCQs = Object.keys(selectedTopics).reduce((sum, subject) => {
-    const list = selectedTopics[subject];
-    return sum + list.reduce((subSum, topicName) => {
-      const config = topicConfigs[topicName] || { mcqCount: 0 };
-      return subSum + (config.mcqCount || 0);
-    }, 0);
-  }, 0);
-
-  const totalScenarios = Object.keys(selectedTopics).reduce((sum, subject) => {
-    const list = selectedTopics[subject];
-    return sum + list.reduce((subSum, topicName) => {
-      const config = topicConfigs[topicName] || { scenarioCount: 0 };
-      return subSum + (config.scenarioCount || 0);
-    }, 0);
-  }, 0);
-
-  const totalQuestions = totalMCQs + totalScenarios;
-
-  const updateTopicConfig = (topicName, field, value) => {
-    setTopicConfigs(prev => ({
-      ...prev,
-      [topicName]: {
-        ...(prev[topicName] || { mcqCount: 0, scenarioCount: 0 }),
-        [field]: value
-      }
-    }));
+  // Toggle subject selection
+  const toggleSubject = (subject) => {
+    setSelectedSubjects((prev) =>
+      prev.includes(subject) ? prev.filter((s) => s !== subject) : [...prev, subject]
+    );
   };
 
-  const getAssessmentPayload = () => {
-    const payloadSubjects = [];
-    Object.keys(selectedTopics).forEach(subjectName => {
-      const list = selectedTopics[subjectName];
-      if (list.length > 0) {
-        const topicsPayload = list.map(topicName => {
-          const config = topicConfigs[topicName] || { mcqCount: 0, scenarioCount: 0 };
-          return {
-            name: topicName,
-            mcqCount: config.mcqCount || 0,
-            scenarioCount: config.scenarioCount || 0
-          };
-        });
-        payloadSubjects.push({
-          name: subjectName,
-          topics: topicsPayload
-        });
-      }
-    });
+  // Validations
+  const isQuestionDistValid = (questionDist.mcq + questionDist.scenario) === 100;
+  const isDifficultyDistValid = (difficultyDist.easy + difficultyDist.medium + difficultyDist.hard) === 100;
+  const isSubjectsValid = selectedSubjects.length > 0;
 
-    return {
-      subjects: payloadSubjects,
-      difficulty: difficulty,
-      duration: duration
-    };
-  };
-
-  // Toggle selection for a topic
-  const toggleTopic = (subject, topic) => {
-    setSelectedTopics(prev => {
-      const currentList = prev[subject];
-      const isSelected = currentList.includes(topic);
-      const newList = isSelected
-        ? currentList.filter(t => t !== topic)
-        : [...currentList, topic];
-
-      if (!isSelected) {
-        setTopicConfigs(prevConfigs => ({
-          ...prevConfigs,
-          [topic]: prevConfigs[topic] || { mcqCount: 2, scenarioCount: 1 }
-        }));
-      }
-
-      return {
-        ...prev,
-        [subject]: newList
-      };
-    });
-  };
+  const isValidForGeneration = isSubjectsValid && isQuestionDistValid && isDifficultyDistValid;
 
   // Create assessment form state (legacy fallback, unused but kept for compatibility)
   const [newAssessment, setNewAssessment] = useState({
@@ -782,62 +709,68 @@ const RecruiterDashboard = ({ onLogout }) => {
     });
   };
 
-  // Action: Generate Assessment with AI
-
   const handleGenerateAssessment = async () => {
-    const payload = getAssessmentPayload();
+    if (!isValidForGeneration) {
+      showToast("Please fix validation errors before generating assessment.");
+      return;
+    }
+
+    const payload = {
+      title: assessmentTitle || `${selectedSubjects.join(' & ')} Technical Assessment`,
+      subjects: selectedSubjects,
+      questionDistribution: {
+        mcq: questionDist.mcq,
+        scenario: questionDist.scenario
+      },
+      difficultyDistribution: {
+        easy: difficultyDist.easy,
+        medium: difficultyDist.medium,
+        hard: difficultyDist.hard
+      },
+      duration: durationInput
+    };
+
     showToast("Generating assessment with AI... Please wait.");
     setIsGenerating(true);
 
     try {
-      const token = localStorage.getItem('token') || '';
-      const response = await fetch('/api/assessment/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(payload)
-      });
+      const response = await api.post('/api/assessment/generate', payload);
 
-      if (!response.ok) {
-        const errDetails = await response.json().catch(() => ({}));
-        throw new Error(errDetails.detail || `Server returned status ${response.status}`);
-      }
-
-      const data = await response.json();
-      if (data && data.questions) {
-        // Format the questions from the API response
+      if (response.data && response.data.questions) {
+        const data = response.data;
         const formatted = data.questions.map((q, idx) => ({
           id: idx + 1,
           subject: q.subject,
-          topic: q.topic,
+          topic: q.topic || 'General',
           type: q.type,
           difficulty: q.difficulty,
-          scenario: q.scenario,
+          scenario: q.scenario || q.problemStatement || '',
           question: q.question,
-          q: q.question, // fallback
+          q: q.question,
           options: q.options,
           correctAnswer: q.correctAnswer,
-          expectedAnswer: q.type === 'SCENARIO' ? q.correctAnswer : '',
+          explanation: q.explanation || '',
+          problemStatement: q.problemStatement || q.scenario || '',
+          candidateTask: q.candidateTask || '',
+          expectedAnswer: q.expectedAnswer || q.correctAnswer || '',
+          evaluationCriteria: q.evaluationCriteria || '',
           exampleInput: q.exampleInput || '',
           exampleOutput: q.exampleOutput || '',
           databaseSchema: q.databaseSchema || null,
           sampleData: q.sampleData || null
         }));
         setGeneratedQuestions(formatted);
-        showToast(`Successfully generated assessment containing ${formatted.length} questions across ${totalSelectedTopics} topics!`);
+        showToast(`Successfully generated assessment containing ${formatted.length} questions across ${selectedSubjects.join(', ')}!`);
         setActiveAssessmentsCount(prev => prev + 1);
 
-        // Go to preview questions tab
         setActiveTab('preview-questions');
       } else {
         throw new Error('Invalid questions format returned from backend');
       }
     } catch (err) {
       console.error("AI assessment generation failed:", err);
-      showToast(`Error: ${err.message || err}. Falling back to preview...`);
-      // Fallback: proceed to preview screen with existing mock list so user experience is not broken
+      const errMsg = err.response?.data?.detail || err.message || err;
+      showToast(`Error: ${errMsg}. Falling back to preview...`);
       setActiveTab('preview-questions');
     } finally {
       setIsGenerating(false);
@@ -846,14 +779,14 @@ const RecruiterDashboard = ({ onLogout }) => {
 
   const handleSaveAssessment = async (andAssign = false) => {
     const subjectsInQuestions = [...new Set(generatedQuestions.map(q => q.subject))].filter(Boolean);
-    const activeSubjects = subjectsInQuestions.length > 0 ? subjectsInQuestions : ['General'];
-    const name = `${activeSubjects.join(' & ')} Technical Test`;
+    const activeSubjects = subjectsInQuestions.length > 0 ? subjectsInQuestions : (selectedSubjects.length > 0 ? selectedSubjects : ['General']);
+    const name = assessmentTitle || `${activeSubjects.join(' & ')} Technical Assessment`;
 
     const payload = {
       name: name,
       subjects: activeSubjects,
-      difficulty: difficulty || 'Medium',
-      duration: duration || '60 minutes',
+      difficulty: 'Medium',
+      duration: durationInput || '60 minutes',
       questionsCount: generatedQuestions.length,
       createdDate: new Date().toISOString().split('T')[0],
       status: 'Active',
@@ -868,11 +801,6 @@ const RecruiterDashboard = ({ onLogout }) => {
         setSavedAssessments(prev => [savedAsm, ...prev]);
         showToast('Assessment saved successfully!');
         setActiveAssessmentsCount(prev => prev + 1);
-        setSelectedTopics({
-          Python: [],
-          SQL: [],
-          Aptitude: []
-        });
 
         if (andAssign) {
           setAssigningAssessment(savedAsm);
@@ -883,7 +811,7 @@ const RecruiterDashboard = ({ onLogout }) => {
       }
     } catch (err) {
       console.error("Failed to save assessment to backend:", err);
-      showToast("Error saving assessment to database.");
+      showToast(`Error saving assessment: ${err.response?.data?.detail || err.message || err}`);
     }
   };
 
@@ -1588,337 +1516,303 @@ const RecruiterDashboard = ({ onLogout }) => {
 
         {/* 6. INTERACTIVE CREATE ASSESSMENT SCREEN */}
         {activeTab === 'create-assessment' && (
-          <div className="grid grid-cols-1 xl:grid-cols-5 gap-6 items-start">
-            {/* Left Pane: Subjects Grid (3/5 width) */}
-            <div className="xl:col-span-3 flex flex-col gap-6">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
+            {/* Left Column: Form Configuration Cards (2/3 width) */}
+            <div className="xl:col-span-2 flex flex-col gap-6">
 
-              {/* Python Card */}
-              <div className="bg-dash-white-card border border-dash-border-gray rounded-[24px] p-6 shadow-sm flex flex-col gap-4">
-                <div className="flex items-center justify-between border-b border-dash-border-gray/25 pb-3">
-                  <h3 className="font-outfit font-bold text-base text-dash-dark-purple">Python</h3>
-                  <span className="text-xs font-bold text-dash-light-purple">
-                    {selectedTopics.Python.length} of {subjectsData.Python.length} selected
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-2.5">
-                  {subjectsData.Python.map((topic) => {
-                    const isSelected = selectedTopics.Python.includes(topic);
-                    return (
-                      <button
-                        key={topic}
-                        onClick={() => toggleTopic('Python', topic)}
-                        className={`relative pl-3.5 pr-8 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 cursor-pointer flex items-center gap-1.5 group/btn ${isSelected
-                          ? 'bg-dash-primary-purple border-dash-primary-purple text-dash-white-card shadow-sm'
-                          : 'bg-dash-white-card border-dash-border-gray hover:bg-dash-soft-pink hover:border-dash-primary-purple/40 text-dash-dark-purple'
-                          }`}
-                      >
-                        {isSelected && <Check size={12} strokeWidth={3} />}
-                        <span>{topic}</span>
-                        <span
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteTopic('Python', topic);
-                          }}
-                          className={`absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover/btn:opacity-60 hover:!opacity-100 p-0.5 rounded transition-all duration-150 ${isSelected ? 'hover:bg-white/20 text-white' : 'hover:bg-red-50 text-red-500'
-                            }`}
-                          title={`Delete "${topic}"`}
-                        >
-                          <X size={10} strokeWidth={3} />
-                        </span>
-                      </button>
-                    );
-                  })}
-                  {renderAddTopicControl('Python')}
+              {/* 1. Assessment Details */}
+              <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-6 shadow-sm flex flex-col gap-4">
+                <h3 className="font-outfit font-bold text-base text-dash-dark-purple border-b border-dash-border-gray/25 pb-3 flex items-center gap-2">
+                  <FileText size={18} className="text-dash-primary-purple" />
+                  <span>Assessment Details</span>
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-dash-light-purple uppercase tracking-wider">Assessment Title</label>
+                    <input
+                      type="text"
+                      value={assessmentTitle}
+                      onChange={(e) => setAssessmentTitle(e.target.value)}
+                      placeholder="e.g. Python & SQL Technical Test"
+                      className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2.5 px-4 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple transition-all"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-dash-light-purple uppercase tracking-wider">Duration</label>
+                    <input
+                      type="text"
+                      value={durationInput}
+                      onChange={(e) => setDurationInput(e.target.value)}
+                      placeholder="e.g. 60 minutes"
+                      className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2.5 px-4 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple transition-all"
+                    />
+                  </div>
                 </div>
               </div>
 
-              {/* SQL Card */}
-              <div className="bg-dash-white-card border border-dash-border-gray rounded-[24px] p-6 shadow-sm flex flex-col gap-4">
+              {/* 2. Subject Selection */}
+              <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-6 shadow-sm flex flex-col gap-4">
                 <div className="flex items-center justify-between border-b border-dash-border-gray/25 pb-3">
-                  <h3 className="font-outfit font-bold text-base text-dash-dark-purple">SQL</h3>
-                  <span className="text-xs font-bold text-dash-light-purple">
-                    {selectedTopics.SQL.length} of {subjectsData.SQL.length} selected
-                  </span>
+                  <h3 className="font-outfit font-bold text-base text-dash-dark-purple flex items-center gap-2">
+                    <BookOpen size={18} className="text-dash-primary-purple" />
+                    <span>Subject Selection</span>
+                  </h3>
+                  {!isSubjectsValid && (
+                    <span className="text-[11px] font-bold text-red-500 bg-red-50 px-2.5 py-1 rounded-lg border border-red-200">
+                      Select at least 1 subject
+                    </span>
+                  )}
                 </div>
-                <div className="flex flex-wrap gap-2.5">
-                  {subjectsData.SQL.map((topic) => {
-                    const isSelected = selectedTopics.SQL.includes(topic);
+                <p className="text-xs text-dash-light-purple font-medium">Select one or more subjects for the assessment:</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {[
+                    { id: 'Python', name: 'Python', icon: Code, desc: 'Syntax, OOP, Data Structures' },
+                    { id: 'SQL', name: 'SQL', icon: Database, desc: 'Queries, Joins, Aggregations' },
+                    { id: 'Aptitude', name: 'Aptitude', icon: Brain, desc: 'Logical, Quantitative, Verbal' }
+                  ].map((subj) => {
+                    const isSelected = selectedSubjects.includes(subj.id);
+                    const Icon = subj.icon;
                     return (
                       <button
-                        key={topic}
-                        onClick={() => toggleTopic('SQL', topic)}
-                        className={`relative pl-3.5 pr-8 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 cursor-pointer flex items-center gap-1.5 group/btn ${isSelected
-                          ? 'bg-dash-primary-purple border-dash-primary-purple text-dash-white-card shadow-sm'
-                          : 'bg-dash-white-card border-dash-border-gray hover:bg-dash-soft-pink hover:border-dash-primary-purple/40 text-dash-dark-purple'
-                          }`}
+                        key={subj.id}
+                        type="button"
+                        onClick={() => toggleSubject(subj.id)}
+                        className={`p-4 rounded-2xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between gap-3 ${
+                          isSelected
+                            ? 'bg-dash-primary-purple/10 border-dash-primary-purple shadow-sm ring-1 ring-dash-primary-purple'
+                            : 'bg-dash-white-card border-dash-border-gray/70 hover:border-dash-primary-purple/40 hover:bg-dash-soft-pink'
+                        }`}
                       >
-                        {isSelected && <Check size={12} strokeWidth={3} />}
-                        <span>{topic}</span>
-                        <span
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteTopic('SQL', topic);
-                          }}
-                          className={`absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover/btn:opacity-60 hover:!opacity-100 p-0.5 rounded transition-all duration-150 ${isSelected ? 'hover:bg-white/20 text-white' : 'hover:bg-red-50 text-red-500'
-                            }`}
-                          title={`Delete "${topic}"`}
-                        >
-                          <X size={10} strokeWidth={3} />
-                        </span>
+                        <div className="flex items-center justify-between w-full">
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${isSelected ? 'bg-dash-primary-purple text-white' : 'bg-slate-100 text-slate-600'}`}>
+                            <Icon size={18} />
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => {}}
+                            className="w-4 h-4 rounded text-dash-primary-purple focus:ring-dash-primary-purple cursor-pointer"
+                          />
+                        </div>
+                        <div>
+                          <h4 className="font-plus-jakarta font-extrabold text-sm text-dash-dark-purple">{subj.name}</h4>
+                          <p className="text-[10px] text-dash-light-purple font-medium mt-0.5">{subj.desc}</p>
+                        </div>
                       </button>
                     );
                   })}
-                  {renderAddTopicControl('SQL')}
                 </div>
               </div>
 
-              {/* Aptitude Card (Amber styles matching the user's screenshot) */}
-              <div className="bg-dash-white-card border border-[#d97706]/20 rounded-[24px] p-6 shadow-sm flex flex-col gap-4">
+              {/* 3. Question Type Distribution */}
+              <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-6 shadow-sm flex flex-col gap-4">
                 <div className="flex items-center justify-between border-b border-dash-border-gray/25 pb-3">
-                  <h3 className="font-outfit font-bold text-base text-dash-dark-purple">Aptitude</h3>
-                  <span className="text-xs font-bold text-dash-light-purple">
-                    {selectedTopics.Aptitude.length} of {subjectsData.Aptitude.length} selected
+                  <h3 className="font-outfit font-bold text-base text-dash-dark-purple flex items-center gap-2">
+                    <PieChart size={18} className="text-dash-primary-purple" />
+                    <span>Question Type Distribution</span>
+                  </h3>
+                  <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border ${
+                    isQuestionDistValid
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : 'bg-red-50 text-red-600 border-red-200'
+                  }`}>
+                    Total: {questionDist.mcq + questionDist.scenario}% {isQuestionDistValid ? '✓' : '⚠️ Must equal 100%'}
                   </span>
                 </div>
-                <div className="flex flex-wrap gap-2.5">
-                  {subjectsData.Aptitude.map((topic) => {
-                    const isSelected = selectedTopics.Aptitude.includes(topic);
-                    return (
-                      <button
-                        key={topic}
-                        onClick={() => toggleTopic('Aptitude', topic)}
-                        className={`relative pl-3.5 pr-8 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 cursor-pointer flex items-center gap-1.5 group/btn ${isSelected
-                          ? 'bg-[#d97706] border-[#d97706] text-dash-white-card shadow-sm'
-                          : 'bg-dash-white-card border-[#d97706]/40 hover:bg-[#fef3c7] hover:border-[#d97706] text-[#b45309]'
-                          }`}
-                      >
-                        {isSelected && <Check size={12} strokeWidth={3} />}
-                        <span>{topic}</span>
-                        <span
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteTopic('Aptitude', topic);
-                          }}
-                          className={`absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover/btn:opacity-60 hover:!opacity-100 p-0.5 rounded transition-all duration-150 ${isSelected ? 'hover:bg-white/20 text-white' : 'hover:bg-red-50 text-red-600'
-                            }`}
-                          title={`Delete "${topic}"`}
-                        >
-                          <X size={10} strokeWidth={3} />
-                        </span>
-                      </button>
-                    );
-                  })}
-                  {renderAddTopicControl('Aptitude')}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-2 p-4 bg-slate-50 border border-slate-200/80 rounded-2xl">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-bold text-dash-dark-purple">Multiple Choice (MCQ)</label>
+                      <span className="text-xs font-extrabold text-dash-primary-purple">{questionDist.mcq}%</span>
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={questionDist.mcq}
+                      onChange={(e) => {
+                        const val = Math.min(100, Math.max(0, parseInt(e.target.value, 10) || 0));
+                        setQuestionDist({ mcq: val, scenario: 100 - val });
+                      }}
+                      className="w-full bg-white border border-dash-border-gray rounded-xl py-2 px-3 text-sm font-bold text-dash-dark-purple"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-2 p-4 bg-slate-50 border border-slate-200/80 rounded-2xl">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-bold text-dash-dark-purple">Scenario-Based</label>
+                      <span className="text-xs font-extrabold text-dash-primary-purple">{questionDist.scenario}%</span>
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={questionDist.scenario}
+                      onChange={(e) => {
+                        const val = Math.min(100, Math.max(0, parseInt(e.target.value, 10) || 0));
+                        setQuestionDist({ scenario: val, mcq: 100 - val });
+                      }}
+                      className="w-full bg-white border border-dash-border-gray rounded-xl py-2 px-3 text-sm font-bold text-dash-dark-purple"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 4. Difficulty Distribution */}
+              <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-6 shadow-sm flex flex-col gap-4">
+                <div className="flex items-center justify-between border-b border-dash-border-gray/25 pb-3">
+                  <h3 className="font-outfit font-bold text-base text-dash-dark-purple flex items-center gap-2">
+                    <SlidersHorizontal size={18} className="text-dash-primary-purple" />
+                    <span>Difficulty Distribution</span>
+                  </h3>
+                  <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border ${
+                    isDifficultyDistValid
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : 'bg-red-50 text-red-600 border-red-200'
+                  }`}>
+                    Total: {difficultyDist.easy + difficultyDist.medium + difficultyDist.hard}% {isDifficultyDistValid ? '✓' : '⚠️ Must equal 100%'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="flex flex-col gap-2 p-3.5 bg-emerald-50/60 border border-emerald-200/80 rounded-2xl">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-bold text-emerald-900">Easy %</label>
+                      <span className="text-xs font-extrabold text-emerald-700">{difficultyDist.easy}%</span>
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={difficultyDist.easy}
+                      onChange={(e) => {
+                        const val = Math.min(100, Math.max(0, parseInt(e.target.value, 10) || 0));
+                        setDifficultyDist(prev => ({ ...prev, easy: val }));
+                      }}
+                      className="w-full bg-white border border-emerald-300 rounded-xl py-1.5 px-3 text-xs font-bold text-emerald-950"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-2 p-3.5 bg-amber-50/60 border border-amber-200/80 rounded-2xl">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-bold text-amber-900">Medium %</label>
+                      <span className="text-xs font-extrabold text-amber-700">{difficultyDist.medium}%</span>
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={difficultyDist.medium}
+                      onChange={(e) => {
+                        const val = Math.min(100, Math.max(0, parseInt(e.target.value, 10) || 0));
+                        setDifficultyDist(prev => ({ ...prev, medium: val }));
+                      }}
+                      className="w-full bg-white border border-amber-300 rounded-xl py-1.5 px-3 text-xs font-bold text-amber-950"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-2 p-3.5 bg-rose-50/60 border border-rose-200/80 rounded-2xl">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-bold text-rose-900">Hard %</label>
+                      <span className="text-xs font-extrabold text-rose-700">{difficultyDist.hard}%</span>
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={difficultyDist.hard}
+                      onChange={(e) => {
+                        const val = Math.min(100, Math.max(0, parseInt(e.target.value, 10) || 0));
+                        setDifficultyDist(prev => ({ ...prev, hard: val }));
+                      }}
+                      className="w-full bg-white border border-rose-300 rounded-xl py-1.5 px-3 text-xs font-bold text-rose-950"
+                    />
+                  </div>
                 </div>
               </div>
 
             </div>
 
-            {/* Right Pane: Settings & Summary (2/5 width) */}
-            <div className="xl:col-span-2 flex flex-col gap-6">
-
-              {/* Assessment Settings Card */}
-              <div className="bg-dash-white-card border border-dash-border-gray rounded-[24px] p-6 shadow-sm flex flex-col gap-5">
-                <h3 className="font-outfit font-bold text-base text-dash-dark-purple border-b border-dash-border-gray/25 pb-3">
-                  Assessment Settings
-                </h3>
-
-
-                {/* Question Configuration */}
-                <div className="flex flex-col gap-3 border-b border-dash-border-gray/25 pb-4">
-                  <label className="text-xs font-bold text-dash-light-purple uppercase tracking-wider">
-                    Question Configuration
-                  </label>
-
-                  {totalSelectedTopics === 0 ? (
-                    <div className="text-xs font-medium text-dash-light-purple italic py-2">
-                      No topics selected. Select topics to configure questions.
-                    </div>
-                  ) : (
-                    <div className="space-y-4 h-[115px] overflow-y-auto pr-1 scrollbar-thin">
-                      {Object.keys(selectedTopics).map((subject) => {
-                        const topics = selectedTopics[subject];
-                        if (topics.length === 0) return null;
-
-                        return (
-                          <div key={subject} className="space-y-2">
-                            <div className="text-xs font-bold text-dash-dark-purple flex items-center gap-1.5">
-                              <span className="text-[10px]">▼</span>
-                              <span>{subject}</span>
-                            </div>
-
-                            <div className="pl-3 space-y-3">
-                              {topics.map((topic) => {
-                                const config = topicConfigs[topic] || { mcqCount: 2, scenarioCount: 1 };
-                                return (
-                                  <div key={topic} className="space-y-2 border-l border-dash-border-gray/50 pl-3">
-                                    <div className="text-xs font-semibold text-dash-dark-purple">
-                                      {topic}
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2">
-                                      <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] font-bold text-dash-light-purple uppercase">
-                                          MCQ Questions
-                                        </label>
-                                        <input
-                                          type="number"
-                                          min="0"
-                                          max="100"
-                                          value={config.mcqCount}
-                                          onChange={(e) => {
-                                            let val = e.target.value.replace(/[^0-9]/g, '');
-                                            if (val === '') {
-                                              updateTopicConfig(topic, 'mcqCount', 0);
-                                            } else {
-                                              let parsed = parseInt(val, 10);
-                                              if (parsed > 100) parsed = 100;
-                                              if (parsed < 0) parsed = 0;
-                                              updateTopicConfig(topic, 'mcqCount', parsed);
-                                            }
-                                          }}
-                                          onKeyDown={(e) => {
-                                            if (['e', 'E', '+', '-', '.'].includes(e.key)) {
-                                              e.preventDefault();
-                                            }
-                                          }}
-                                          className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-1.5 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple transition-all"
-                                        />
-                                      </div>
-                                      <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] font-bold text-dash-light-purple uppercase">
-                                          Scenario-Based
-                                        </label>
-                                        <input
-                                          type="number"
-                                          min="0"
-                                          max="100"
-                                          value={config.scenarioCount}
-                                          onChange={(e) => {
-                                            let val = e.target.value.replace(/[^0-9]/g, '');
-                                            if (val === '') {
-                                              updateTopicConfig(topic, 'scenarioCount', 0);
-                                            } else {
-                                              let parsed = parseInt(val, 10);
-                                              if (parsed > 100) parsed = 100;
-                                              if (parsed < 0) parsed = 0;
-                                              updateTopicConfig(topic, 'scenarioCount', parsed);
-                                            }
-                                          }}
-                                          onKeyDown={(e) => {
-                                            if (['e', 'E', '+', '-', '.'].includes(e.key)) {
-                                              e.preventDefault();
-                                            }
-                                          }}
-                                          className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-1.5 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple transition-all"
-                                        />
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+            {/* Right Column: Live Summary Preview Card & Action */}
+            <div className="flex flex-col gap-6 sticky top-6">
+              <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-[28px] p-6 shadow-md flex flex-col gap-5">
+                <div className="flex items-center justify-between border-b border-dash-border-gray/25 pb-4">
+                  <h3 className="font-outfit font-extrabold text-base text-dash-dark-purple flex items-center gap-2">
+                    <Sparkles size={18} className="text-dash-primary-purple" />
+                    <span>Summary Card</span>
+                  </h3>
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-dash-primary-purple/10 text-dash-primary-purple uppercase tracking-wider">
+                    AI Selection
+                  </span>
                 </div>
 
-                {/* Difficulty Level selector */}
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold text-dash-light-purple uppercase tracking-wider">
-                    Difficulty Level
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {['Easy', 'Medium', 'Hard'].map((lvl) => {
-                      const isActive = difficulty === lvl;
-                      return (
-                        <button
-                          key={lvl}
-                          type="button"
-                          onClick={() => setDifficulty(lvl)}
-                          className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all duration-200 cursor-pointer ${isActive
-                            ? 'bg-dash-primary-purple/10 border-dash-primary-purple text-dash-primary-purple shadow-sm'
-                            : 'bg-dash-white-card border-dash-border-gray text-dash-light-purple hover:border-dash-primary-purple/55 hover:text-dash-primary-purple'
-                            }`}
-                        >
-                          {lvl}
-                        </button>
-                      );
-                    })}
+                <div className="flex flex-col gap-3 text-xs">
+                  <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                    <span className="font-semibold text-dash-light-purple">Selected Subjects</span>
+                    <span className="font-extrabold text-dash-dark-purple">
+                      {selectedSubjects.length > 0 ? selectedSubjects.join(", ") : "None"}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                    <span className="font-semibold text-dash-light-purple">Total Questions</span>
+                    <span className="font-extrabold text-dash-primary-purple text-xs bg-dash-primary-purple/10 px-2 py-0.5 rounded-md border border-dash-primary-purple/20">AI Determined (15–30)</span>
+                  </div>
+
+                  <div className="flex justify-between items-center py-1.5">
+                    <span className="font-semibold text-dash-light-purple">MCQ Ratio</span>
+                    <span className="font-bold text-slate-800">{questionDist.mcq}%</span>
+                  </div>
+
+                  <div className="flex justify-between items-center py-1.5 border-b border-slate-100">
+                    <span className="font-semibold text-dash-light-purple">Scenario Ratio</span>
+                    <span className="font-bold text-slate-800">{questionDist.scenario}%</span>
+                  </div>
+
+                  <div className="flex justify-between items-center py-1.5">
+                    <span className="font-semibold text-emerald-700">Easy Ratio</span>
+                    <span className="font-bold text-emerald-800">{difficultyDist.easy}%</span>
+                  </div>
+
+                  <div className="flex justify-between items-center py-1.5">
+                    <span className="font-semibold text-amber-700">Medium Ratio</span>
+                    <span className="font-bold text-amber-800">{difficultyDist.medium}%</span>
+                  </div>
+
+                  <div className="flex justify-between items-center py-1.5 border-b border-slate-100">
+                    <span className="font-semibold text-rose-700">Hard Ratio</span>
+                    <span className="font-bold text-rose-800">{difficultyDist.hard}%</span>
                   </div>
                 </div>
 
-                {/* Duration select */}
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold text-dash-light-purple uppercase tracking-wider">
-                    Duration
-                  </label>
-                  <input
-                    type="text"
-                    value={duration}
-                    onChange={(e) => setDuration(e.target.value)}
-                    placeholder="e.g. 60 minutes"
-                    className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2.5 px-4 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple transition-all"
-                  />
-                </div>
-
-              </div>
-
-              {/* Summary Card */}
-              <div className="bg-dash-white-card border border-dash-border-gray rounded-[24px] p-6 shadow-sm flex flex-col gap-4">
-                <h3 className="font-outfit font-bold text-base text-dash-dark-purple border-b border-dash-border-gray/25 pb-3">
-                  Summary
-                </h3>
-
-                <div className="space-y-3.5">
-                  <div className="flex justify-between items-center text-xs font-semibold">
-                    <span className="text-dash-light-purple">Topics selected</span>
-                    <span className="text-dash-dark-purple font-bold">{totalSelectedTopics}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-xs font-semibold">
-                    <span className="text-dash-light-purple">Active subjects</span>
-                    <span className="text-dash-dark-purple font-bold">{activeSubjectsCount}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-xs font-semibold">
-                    <span className="text-dash-light-purple">Total questions</span>
-                    <span className="text-dash-dark-purple font-bold">{totalQuestions}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-xs font-semibold">
-                    <span className="text-dash-light-purple">Difficulty</span>
-                    <span className="text-dash-dark-purple font-bold">{difficulty}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-xs font-semibold">
-                    <span className="text-dash-light-purple">Duration</span>
-                    <span className="text-dash-dark-purple font-bold">{totalQuestions > 0 ? duration : '--'}</span>
-                  </div>
-                </div>
-
-                {totalSelectedTopics > 0 && totalQuestions === 0 && (
-                  <div className="text-[10px] font-bold text-red-500 bg-red-50 border border-red-200 rounded-xl p-2.5 text-center mt-1 animate-pulse">
-                    ⚠️ Configure at least 1 question to generate assessment.
+                {/* Validation Errors Box */}
+                {!isValidForGeneration && (
+                  <div className="bg-red-50 border border-red-200 rounded-2xl p-3.5 flex flex-col gap-1 text-[11px] font-semibold text-red-600">
+                    {!isSubjectsValid && <div>• Please select at least 1 subject.</div>}
+                    {!isQuestionDistValid && <div>• Question type distribution must sum to 100%.</div>}
+                    {!isDifficultyDistValid && <div>• Difficulty distribution must sum to 100%.</div>}
                   </div>
                 )}
 
                 <button
                   onClick={handleGenerateAssessment}
-                  disabled={totalQuestions === 0 || isGenerating}
-                  className="w-full mt-3 py-3.5 rounded-xl bg-dash-primary-purple border border-dash-primary-purple text-dash-white-card font-bold text-sm hover:bg-dash-dark-purple hover:border-dash-dark-purple transition-all duration-200 shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={!isValidForGeneration || isGenerating}
+                  className="w-full py-4 rounded-2xl bg-dash-primary-purple text-white font-extrabold text-sm hover:bg-dash-dark-purple transition-all duration-200 shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed border-0"
                 >
                   {isGenerating ? (
                     <>
-                      <RefreshCw className="animate-spin" size={15} />
-                      <span>Generating...</span>
+                      <RefreshCw className="animate-spin" size={16} />
+                      <span>Generating Questions with AI...</span>
                     </>
                   ) : (
                     <>
-                      <Globe size={15} />
+                      <Sparkles size={16} />
                       <span>Generate with AI</span>
                     </>
                   )}
                 </button>
               </div>
-
             </div>
           </div>
         )}
@@ -4444,6 +4338,15 @@ const ResultsManager = ({ showToast }) => {
             </div>
           </div>
 
+          ${(result.autoSubmitted || result.submissionReason || (result.warningHistory && result.warningHistory.length > 0)) ? `
+          <div style="background-color: #fff1f2; border: 1px solid #fecdd3; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
+            <h3 style="margin-top:0; margin-bottom: 12px; color: #be123c; font-size: 14px; text-transform: uppercase; font-weight: 800;">Security Audit & Violation Report</h3>
+            <p style="margin: 4px 0; font-size: 12px; color: #334155;"><strong>Submission Mode:</strong> ${result.autoSubmitted ? 'Automatic (4-Strike Violation Lockout)' : 'Manual'}</p>
+            <p style="margin: 4px 0; font-size: 12px; color: #334155;"><strong>Full-Screen Exits Recorded:</strong> ${result.warningCount || (result.autoSubmitted ? 4 : 0)} / 4 Exits</p>
+            ${result.submissionReason ? `<p style="margin: 8px 0 4px 0; font-size: 12px; color: #be123c;"><strong>Candidate Reason for Exiting:</strong> <em>"${result.submissionReason}"</em></p>` : ''}
+          </div>
+          ` : ''}
+
           <h2 style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 20px; font-weight: 800; color: #5752aa; border-bottom: 2px solid #5752aa; padding-bottom: 8px; margin-bottom: 20px;">Question-by-Question AI Breakdown</h2>
           
           ${questionsHTML}
@@ -4546,6 +4449,7 @@ const ResultsManager = ({ showToast }) => {
                     <th className="px-6 py-4.5">Candidate Name</th>
                     <th className="px-6 py-4.5">Assessment Name</th>
                     <th className="px-6 py-4.5">Submission Date & Time</th>
+                    <th className="px-6 py-4.5">Security Status</th>
                     <th className="px-6 py-4.5">Score</th>
                     <th className="px-6 py-4.5">AI Recommendation</th>
                     <th className="px-6 py-4.5 text-right">Actions</th>
@@ -4600,6 +4504,20 @@ const ResultsManager = ({ showToast }) => {
                                 minute: '2-digit'
                               })}
                             </span>
+                          </td>
+
+                          <td className="px-6 py-4">
+                            {res.autoSubmitted || res.submissionType === 'Automatic' ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-rose-50 border border-rose-200 text-rose-600">
+                                <AlertTriangle size={11} className="text-rose-500 shrink-0" />
+                                <span>Auto Submitted ({res.warningCount || 4} Exits)</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-50 border border-emerald-200 text-emerald-600">
+                                <CheckCircle size={11} className="text-emerald-500 shrink-0" />
+                                <span>Standard</span>
+                              </span>
+                            )}
                           </td>
 
                           <td className="px-6 py-4">
@@ -4709,6 +4627,70 @@ const ResultsManager = ({ showToast }) => {
                     </span>
                   </div>
                 </div>
+
+                {/* Security Audit & Violation Log Section */}
+                {(selectedResult.autoSubmitted || selectedResult.warningCount > 0 || (selectedResult.warningHistory && selectedResult.warningHistory.length > 0) || selectedResult.submissionReason) && (
+                  <div className="bg-gradient-to-r from-rose-50 to-amber-50/40 border border-rose-200 rounded-2xl p-5 mb-6">
+                    <div className="flex items-center justify-between border-b border-rose-200/60 pb-3 mb-4">
+                      <div className="flex items-center gap-2">
+                        <ShieldAlert size={18} className="text-rose-600" />
+                        <h4 className="text-xs font-extrabold text-rose-700 uppercase tracking-wider">
+                          Security Audit & Violation Log
+                        </h4>
+                      </div>
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${selectedResult.autoSubmitted ? "bg-rose-600 text-white" : "bg-amber-500 text-white"}`}>
+                        {selectedResult.autoSubmitted ? "Auto Submitted" : "Proctored Exam"}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+                      <div className="bg-white/80 border border-rose-100 rounded-xl p-3">
+                        <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider block mb-0.5">Submission Type</span>
+                        <span className="text-xs font-bold text-slate-800">{selectedResult.autoSubmitted ? "Automatic (Security Lockout)" : "Manual"}</span>
+                      </div>
+                      <div className="bg-white/80 border border-rose-100 rounded-xl p-3">
+                        <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider block mb-0.5">Full-Screen Exits</span>
+                        <span className="text-xs font-bold text-rose-600">{selectedResult.warningCount || (selectedResult.autoSubmitted ? 4 : 0)} / 4 Exits</span>
+                      </div>
+                      <div className="bg-white/80 border border-rose-100 rounded-xl p-3 col-span-2 sm:col-span-1">
+                        <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider block mb-0.5">Auto Lockout</span>
+                        <span className="text-xs font-bold text-slate-800">{selectedResult.autoSubmitted ? "Enforced (4/4 limit)" : "No"}</span>
+                      </div>
+                    </div>
+
+                    {selectedResult.submissionReason && (
+                      <div className="bg-white/90 border border-rose-200/80 rounded-xl p-3.5 mb-4">
+                        <span className="text-[9px] font-extrabold text-rose-600 uppercase tracking-wider block mb-1">
+                          Candidate Justification Reason (Mandatory Input)
+                        </span>
+                        <p className="text-xs font-semibold text-slate-800 leading-relaxed italic">
+                          "{selectedResult.submissionReason}"
+                        </p>
+                      </div>
+                    )}
+
+                    {selectedResult.warningHistory && selectedResult.warningHistory.length > 0 && (
+                      <div className="bg-white/90 border border-rose-200/80 rounded-xl p-3.5">
+                        <span className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider block mb-2">
+                          Chronological Warning Log ({selectedResult.warningHistory.length} Recorded Exits)
+                        </span>
+                        <div className="space-y-2">
+                          {selectedResult.warningHistory.map((timestamp, idx) => (
+                            <div key={idx} className="flex items-center justify-between text-xs border-b border-slate-100 pb-1.5 last:border-0 last:pb-0 font-medium">
+                              <span className="text-slate-700 flex items-center gap-1.5">
+                                <AlertCircle size={12} className="text-rose-500 shrink-0" />
+                                Warning {idx + 1}: {idx === 3 ? "Max Limit Exceeded (Auto Submitted)" : "Exited full-screen mode"}
+                              </span>
+                              <span className="text-slate-400 font-mono text-[11px]">
+                                {new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="bg-gradient-to-r from-dash-soft-pink to-dash-light-blue-bg/20 border border-dash-border-gray rounded-2xl p-5 mb-6">
                   <h4 className="text-xs font-extrabold text-dash-primary-purple uppercase tracking-wider mb-3">Overall AI Evaluation</h4>

@@ -15,7 +15,7 @@ const MicrosoftIcon = () => (
   </svg>
 );
 
-const LoginCard = ({ role, setRole, onRecruiterLogin, onLogin }) => {
+const LoginCard = ({ role, setRole, onLogin }) => {
   // Navigation mode for Candidate UI ('login' or 'register')
   const [candidateMode, setCandidateMode] = useState('login');
 

@@ -26,6 +26,9 @@ export const useExamSecurity = ({
   const [isFullscreenGraceActive, setIsFullscreenGraceActive] = useState(false);
   const [graceSecondsLeft, setGraceSecondsLeft] = useState(gracePeriodSeconds);
   const [isExamLocked, setIsExamLocked] = useState(false);
+  const [fullscreenExitCount, setFullscreenExitCount] = useState(0);
+  const [warningHistory, setWarningHistory] = useState([]);
+  const [autoSubmittedDueToViolations, setAutoSubmittedDueToViolations] = useState(false);
 
   // Use refs for value read inside event listeners to avoid closure-stale variables
   const violationsRef = useRef([]);
@@ -33,9 +36,31 @@ export const useExamSecurity = ({
   const lastViolationTimeRef = useRef(Date.now());
   const activeRef = useRef(active);
   const isExamLockedRef = useRef(false);
+  const exitCountRef = useRef(0);
+  const warningHistoryRef = useRef([]);
+  const wasFullscreenRef = useRef(false);
+  const lastExitTimeRef = useRef(0);
 
   const onLockRef = useRef(onLock);
   const onViolationRef = useRef(onViolation);
+
+  // Reset exam security state when starting a new session
+  const resetExamSecurity = useCallback(() => {
+    setViolations([]);
+    violationsRef.current = [];
+    setTrustScore(100);
+    trustScoreRef.current = 100;
+    setIsExamLocked(false);
+    isExamLockedRef.current = false;
+    setFullscreenExitCount(0);
+    exitCountRef.current = 0;
+    setWarningHistory([]);
+    warningHistoryRef.current = [];
+    setAutoSubmittedDueToViolations(false);
+    wasFullscreenRef.current = false;
+    lastExitTimeRef.current = 0;
+    setIsFullscreenGraceActive(false);
+  }, []);
 
   // Sync refs with latest state/prop values
   useEffect(() => {
@@ -55,6 +80,8 @@ export const useExamSecurity = ({
         await element.requestFullscreen();
       } else if (element.webkitRequestFullscreen) {
         await element.webkitRequestFullscreen();
+      } else if (element.mozRequestFullScreen) {
+        await element.mozRequestFullScreen();
       } else if (element.msRequestFullscreen) {
         await element.msRequestFullscreen();
       }
@@ -94,24 +121,12 @@ export const useExamSecurity = ({
     setViolations((prev) => {
       const updated = [...prev, newViolation];
       violationsRef.current = updated;
-
-      if (updated.length >= maxViolations) {
-        setIsExamLocked(true);
-        isExamLockedRef.current = true;
-        if (onLockRef.current) onLockRef.current('Maximum violation limit exceeded.');
-      }
       return updated;
     });
 
     setTrustScore((prev) => {
       const updatedScore = Math.max(0, prev - deduction);
       trustScoreRef.current = updatedScore;
-
-      if (updatedScore === 0) {
-        setIsExamLocked(true);
-        isExamLockedRef.current = true;
-        if (onLockRef.current) onLockRef.current('Trust score reached 0%.');
-      }
       return updatedScore;
     });
 
@@ -160,7 +175,7 @@ export const useExamSecurity = ({
     if (!active || isExamLocked) return;
 
     const handleKeyDown = (e) => {
-      // F12 key
+      // F12 key or Escape key
       if (e.key === 'F12' || e.keyCode === 123) {
         e.preventDefault();
         triggerViolation('Developer Tools', 'F12 key pressed.', 'High');
@@ -293,13 +308,43 @@ export const useExamSecurity = ({
 
       setIsFullscreen(isCurrentlyFull);
 
-      if (!isCurrentlyFull) {
-        triggerViolation('Fullscreen Exit', 'Exited fullscreen mode.', 'Medium');
-        setIsFullscreenGraceActive(true);
-        setGraceSecondsLeft(gracePeriodSeconds);
-      } else {
+      // Track transition from fullscreen to non-fullscreen
+      if (wasFullscreenRef.current && !isCurrentlyFull) {
+        const now = Date.now();
+        // Prevent duplicate events within 1500ms
+        if (now - lastExitTimeRef.current > 1500) {
+          lastExitTimeRef.current = now;
+          const nextCount = exitCountRef.current + 1;
+          exitCountRef.current = nextCount;
+          setFullscreenExitCount(nextCount);
+
+          const isoTimestamp = new Date(now).toISOString();
+          const updatedHistory = [...warningHistoryRef.current, isoTimestamp];
+          warningHistoryRef.current = updatedHistory;
+          setWarningHistory(updatedHistory);
+
+          if (nextCount >= 4) {
+            setAutoSubmittedDueToViolations(true);
+            setIsExamLocked(true);
+            isExamLockedRef.current = true;
+            if (onLockRef.current) {
+              onLockRef.current('Exited full-screen mode 4 times.');
+            }
+          } else {
+            triggerViolation(
+              `Fullscreen Exit`,
+              `Exited full-screen mode (Warning ${nextCount} of 3).`,
+              nextCount >= 3 ? 'High' : 'Medium'
+            );
+            setIsFullscreenGraceActive(true);
+            setGraceSecondsLeft(gracePeriodSeconds);
+          }
+        }
+      } else if (isCurrentlyFull) {
         setIsFullscreenGraceActive(false);
       }
+
+      wasFullscreenRef.current = isCurrentlyFull;
     };
 
     document.addEventListener('fullscreenchange', checkFullscreenState);
@@ -315,10 +360,7 @@ export const useExamSecurity = ({
       document.msFullscreenElement
     );
     setIsFullscreen(initialFull);
-    if (!initialFull) {
-      setIsFullscreenGraceActive(true);
-      setGraceSecondsLeft(gracePeriodSeconds);
-    }
+    wasFullscreenRef.current = initialFull;
 
     return () => {
       document.removeEventListener('fullscreenchange', checkFullscreenState);
@@ -336,9 +378,6 @@ export const useExamSecurity = ({
       setGraceSecondsLeft((prev) => {
         if (prev <= 1) {
           clearInterval(interval);
-          setIsExamLocked(true);
-          isExamLockedRef.current = true;
-          if (onLockRef.current) onLockRef.current('Failed to re-enter fullscreen within grace period.');
           return 0;
         }
         return prev - 1;
@@ -490,6 +529,10 @@ export const useExamSecurity = ({
     isFullscreenGraceActive,
     graceSecondsLeft,
     isExamLocked,
+    fullscreenExitCount,
+    warningHistory,
+    autoSubmittedDueToViolations,
+    resetExamSecurity,
     requestFullscreen,
     triggerViolation,
   };
