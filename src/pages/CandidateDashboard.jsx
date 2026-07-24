@@ -30,6 +30,9 @@ import {
   ArrowRight,
   Check,
   Loader2,
+  Eye,
+  AlertTriangle,
+  ShieldAlert,
   Maximize2,
   Minimize2,
   RotateCcw,
@@ -320,9 +323,293 @@ const DatabaseSchemaVisualizer = ({ schemaLines, dataLines }) => {
   );
 };
 
-const CandidateDashboard = ({ onLogout }) => {
+const CandidateResultsView = ({ showToast }) => {
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedResult, setSelectedResult] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  useEffect(() => {
+    fetchCandidateResults();
+  }, []);
+
+  const fetchCandidateResults = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/api/candidate/results');
+      setResults(response.data || []);
+    } catch (err) {
+      console.error("Failed to fetch candidate results:", err);
+      showToast("Error loading your assessment results.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOpenDetail = async (assignmentId) => {
+    try {
+      setDetailLoading(true);
+      const response = await api.get(`/api/results/${assignmentId}`);
+      setSelectedResult(response.data);
+    } catch (err) {
+      console.error("Failed to load result details:", err);
+      showToast("Error loading result details.");
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-12 flex flex-col items-center justify-center gap-3">
+        <Loader2 className="animate-spin text-dash-primary-purple" size={36} />
+        <span className="text-xs font-bold text-dash-light-purple">Loading your evaluation results...</span>
+      </div>
+    );
+  }
+
+  if (results.length === 0) {
+    return (
+      <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-12 text-center flex flex-col items-center justify-center gap-4">
+        <div className="w-14 h-14 rounded-2xl bg-dash-primary-purple/10 flex items-center justify-center text-dash-primary-purple">
+          <Award size={28} />
+        </div>
+        <div>
+          <h3 className="font-plus-jakarta font-extrabold text-base text-dash-dark-purple">No Assessment Results Yet</h3>
+          <p className="text-xs text-dash-light-purple font-semibold mt-1 max-w-md mx-auto">
+            Complete assigned technical assessments to view your detailed AI score reports and evaluation feedback here.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        {results.map((res) => {
+          const scoreVal = res.percentage || 0;
+          let scoreColor = '#149470';
+          let scoreBg = 'rgba(20, 148, 112, 0.1)';
+          if (scoreVal < 50) {
+            scoreColor = '#E11D48';
+            scoreBg = 'rgba(225, 29, 72, 0.1)';
+          } else if (scoreVal < 80) {
+            scoreColor = '#D97706';
+            scoreBg = 'rgba(217, 119, 6, 0.1)';
+          }
+
+          return (
+            <div
+              key={res.id}
+              className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-6 shadow-sm flex flex-col justify-between gap-5 hover:shadow-md transition-all duration-300"
+            >
+              <div className="flex items-center justify-between">
+                <span className="px-3 py-1 rounded-full text-[10px] font-extrabold bg-dash-primary-purple/10 text-dash-primary-purple uppercase tracking-wider">
+                  {res.assessmentName}
+                </span>
+                <span
+                  className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border"
+                  style={{ color: scoreColor, backgroundColor: scoreBg, borderColor: `${scoreColor}30` }}
+                >
+                  {scoreVal}%
+                </span>
+              </div>
+
+              <div>
+                <h4 className="font-plus-jakarta font-extrabold text-base text-dash-dark-purple">
+                  {res.assessmentName}
+                </h4>
+                <p className="text-xs font-semibold text-dash-light-purple mt-1">
+                  Submitted: {new Date(res.createdAt).toLocaleDateString()} at {new Date(res.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+
+              <div className="space-y-2 bg-slate-50 border border-slate-200/60 rounded-2xl p-4 text-xs font-semibold">
+                <div className="flex justify-between items-center">
+                  <span className="text-dash-light-purple">Total Questions:</span>
+                  <span className="text-dash-dark-purple font-bold">{res.totalQuestions}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-dash-light-purple">Correct Answers:</span>
+                  <span className="text-emerald-600 font-bold">{res.correctAnswers} / {res.totalQuestions}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-dash-light-purple">Status:</span>
+                  <span className={`font-bold ${res.passFail === 'Pass' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    {res.passFail}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => handleOpenDetail(res.assignmentId)}
+                className="w-full py-3 rounded-2xl bg-dash-primary-purple text-white font-extrabold text-xs hover:bg-dash-dark-purple transition-all duration-200 shadow-md flex items-center justify-center gap-2 cursor-pointer border-0"
+              >
+                <Eye size={14} />
+                <span>View Detailed Feedback</span>
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Modal / Drawer for Detailed Results */}
+      <AnimatePresence>
+        {selectedResult && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.4 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedResult(null)}
+              className="fixed inset-0 bg-dash-dark-purple/40 z-45"
+            />
+
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
+              className="fixed top-0 bottom-0 right-0 w-full sm:w-[600px] bg-dash-white-card border-l border-dash-border-gray shadow-2xl z-50 p-6 flex flex-col justify-between overflow-y-auto"
+            >
+              <div className="space-y-6">
+                <div className="flex items-center justify-between pb-4 border-b border-dash-border-gray">
+                  <div>
+                    <span className="text-[10px] text-dash-primary-purple font-extrabold tracking-widest uppercase">Candidate Score Card</span>
+                    <h3 className="text-base font-bold text-dash-dark-purple font-outfit mt-1">{selectedResult.assessmentName}</h3>
+                  </div>
+                  <button
+                    onClick={() => setSelectedResult(null)}
+                    className="p-1.5 rounded-lg hover:bg-dash-soft-pink text-dash-light-purple hover:text-dash-dark-purple transition-all duration-200 cursor-pointer border-none bg-transparent"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="bg-dash-soft-pink/50 border border-dash-border-gray/50 rounded-2xl p-5 space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-bold text-dash-light-purple uppercase tracking-wider">Overall AI Grade</span>
+                    <span className="font-plus-jakarta font-extrabold text-2xl text-dash-primary-purple">{selectedResult.percentage}%</span>
+                  </div>
+
+                  {selectedResult.overallFeedback && (
+                    <div className="text-xs text-dash-dark-purple leading-relaxed space-y-2">
+                      <div>
+                        <strong className="text-dash-primary-purple">AI Evaluation Feedback:</strong>
+                        <p className="mt-1 font-medium text-slate-700">{selectedResult.overallFeedback}</p>
+                      </div>
+                      {selectedResult.overallStrengths && (
+                        <div>
+                          <strong className="text-emerald-600">Key Strengths:</strong>
+                          <p className="mt-0.5 font-medium text-slate-700">{selectedResult.overallStrengths}</p>
+                        </div>
+                      )}
+                      {selectedResult.overallWeaknesses && (
+                        <div>
+                          <strong className="text-rose-600">Areas for Improvement:</strong>
+                          <p className="mt-0.5 font-medium text-slate-700">{selectedResult.overallWeaknesses}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Question Breakdown */}
+                {selectedResult.questionsAnalysis && selectedResult.questionsAnalysis.length > 0 && (
+                  <div className="space-y-4">
+                    <h4 className="font-plus-jakarta font-extrabold text-sm text-dash-dark-purple">
+                      Question-by-Question Analysis ({selectedResult.questionsAnalysis.length})
+                    </h4>
+                    <div className="space-y-3">
+                      {selectedResult.questionsAnalysis.map((q, idx) => (
+                        <div key={idx} className="p-4 rounded-2xl border border-dash-border-gray/60 bg-slate-50/50 space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-extrabold text-dash-primary-purple uppercase">Question {idx + 1} ({q.type})</span>
+                            <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border ${q.status === 'Correct' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : (q.status === 'Partially Correct' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-rose-50 text-rose-700 border-rose-200')}`}>
+                              {q.status}
+                            </span>
+                          </div>
+
+                          <p className="text-xs font-bold text-dash-dark-purple">{q.questionText}</p>
+
+                          <div className="bg-white p-3 rounded-xl border border-slate-200 text-xs space-y-1 font-mono">
+                            <div><span className="text-dash-light-purple">Your Answer: </span><span className="text-dash-dark-purple">{q.candidateAnswer || 'N/A'}</span></div>
+                            <div><span className="text-dash-light-purple">Correct Answer: </span><span className="text-emerald-600">{q.correctAnswer || 'N/A'}</span></div>
+                          </div>
+
+                          {q.aiExplanation && (
+                            <div className="text-[11px] text-dash-light-purple font-medium bg-dash-primary-purple/5 border border-dash-primary-purple/10 p-3 rounded-xl">
+                              <span className="font-bold text-dash-primary-purple block mb-0.5">✨ AI Explanation</span>
+                              {q.aiExplanation}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+const sortQuestionsForCandidate = (rawQuestions) => {
+  if (!Array.isArray(rawQuestions) || rawQuestions.length === 0) return [];
+
+  const subjectOrder = { aptitude: 0, sql: 1, python: 2, java: 3, javascript: 4, "c++": 5, "c#": 6 };
+
+  const isMcq = (q) => {
+    const t = String(q.type || q.question_type || 'MCQ').toUpperCase();
+    if (t === 'MCQ') return true;
+    if (Array.isArray(q.options) && q.options.length > 0 && t !== 'SCENARIO' && t !== 'CODING') return true;
+    return false;
+  };
+
+  const mcqs = [];
+  const scenarios = [];
+
+  rawQuestions.forEach((q) => {
+    const qCopy = { ...q };
+    const mcqFlag = isMcq(qCopy);
+    qCopy.type = mcqFlag ? 'MCQ' : 'SCENARIO';
+    qCopy.question_type = qCopy.type;
+    qCopy.topic = qCopy.topic || qCopy.subject || 'General';
+    qCopy.subject = qCopy.subject || qCopy.topic || 'General';
+    qCopy.difficulty = qCopy.difficulty || 'Medium';
+    qCopy.marks = qCopy.marks || (mcqFlag ? 1 : 5);
+
+    if (mcqFlag) {
+      mcqs.push(qCopy);
+    } else {
+      scenarios.push(qCopy);
+    }
+  });
+
+  const getSortKey = (q) => {
+    const subj = String(q.subject || q.topic || 'General').toLowerCase().trim();
+    const rank = subjectOrder[subj] !== undefined ? subjectOrder[subj] : 90;
+    return rank;
+  };
+
+  mcqs.sort((a, b) => getSortKey(a) - getSortKey(b));
+  scenarios.sort((a, b) => getSortKey(a) - getSortKey(b));
+
+  const sorted = [...mcqs, ...scenarios];
+  sorted.forEach((q, idx) => {
+    q.sequence_order = idx + 1;
+  });
+
+  return sorted;
+};
+
+const CandidateDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [toastMessage, setToastMessage] = useState('');
 
   const [candidate, setCandidate] = useState(() => {
@@ -412,6 +699,8 @@ const CandidateDashboard = ({ onLogout }) => {
   const [sqlQueryResult, setSqlQueryResult] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [consoleTab, setConsoleTab] = useState('output');
+  const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
+  const [isSubmittingManual, setIsSubmittingManual] = useState(false);
   const [examState, setExamState] = useState({
     currentQuestionIndex: 0,
     answers: {},
@@ -419,12 +708,34 @@ const CandidateDashboard = ({ onLogout }) => {
     submitted: false
   });
 
-  const isExamActive = !!(activeAssignment && !examState.submitted && activeTab === 'technical');
+  const isExamActive = !!(activeAssignment && !examState.submitted && activeTab === 'technical' && !isSubmitModalOpen && !isSubmittingManual);
+
+  const parseDuration = (durStr) => {
+    if (typeof durStr === 'number') return durStr;
+    if (!durStr) return 30;
+    const parsed = parseInt(String(durStr).replace(/\D/g, ''), 10);
+    return isNaN(parsed) ? 30 : parsed;
+  };
+
+  const formatTime = (seconds) => {
+    const sec = Math.max(0, parseInt(seconds, 10) || 0);
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    if (h > 0) {
+      return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
 
   // Initialize Exam Security hook
   const examSecurity = useExamSecurity({
     active: isExamActive,
-    maxViolations: 5,
+    assignmentId: activeAssignment?.id || activeAssignment?.assignmentId,
+    questionNumber: (examState.currentQuestionIndex || 0) + 1,
+    remainingTime: formatTime(examState.timeLeft),
+    maxViolations: 3,
+    maxWarnings: 3,
     gracePeriodSeconds: 15,
     onLock: (reason) => {
       showToast(`Security Alert: ${reason}`);
@@ -467,20 +778,54 @@ const CandidateDashboard = ({ onLogout }) => {
     fetchAssignments();
   }, []);
 
-  const parseDuration = (durStr) => {
-    const parsed = parseInt(durStr.replace(/\D/g, ''), 10);
-    return isNaN(parsed) ? 30 : parsed;
-  };
-
-  const formatTime = (seconds) => {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
-    if (h > 0) {
-      return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  // Resume support: restore active exam state if candidate refreshes page or reconnects
+  useEffect(() => {
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('recruitai_active_exam_')) {
+          const savedRaw = localStorage.getItem(key);
+          if (savedRaw) {
+            const saved = JSON.parse(savedRaw);
+            if (saved && saved.assignment && saved.examState && !saved.examState.submitted) {
+              if (saved.lastSavedTimestamp) {
+                const elapsedSeconds = Math.floor((Date.now() - saved.lastSavedTimestamp) / 1000);
+                saved.examState.timeLeft = Math.max(0, saved.examState.timeLeft - elapsedSeconds);
+              }
+              setActiveAssignment(saved.assignment);
+              setExamState(saved.examState);
+              setActiveTab('technical');
+              break;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to restore exam state from localStorage:", e);
     }
-    return `${m}:${s.toString().padStart(2, '0')}`;
-  };
+  }, []);
+
+  // Synchronize active exam state to localStorage on state changes
+  useEffect(() => {
+    if (activeAssignment && examState && !examState.submitted) {
+      try {
+        const key = `recruitai_active_exam_${activeAssignment.id}`;
+        localStorage.setItem(key, JSON.stringify({
+          assignment: activeAssignment,
+          examState: examState,
+          lastSavedTimestamp: Date.now()
+        }));
+      } catch (e) {
+        console.warn("Failed to save active exam state to localStorage:", e);
+      }
+    } else if (activeAssignment && examState?.submitted) {
+      try {
+        const key = `recruitai_active_exam_${activeAssignment.id}`;
+        localStorage.removeItem(key);
+      } catch (e) {}
+    }
+  }, [activeAssignment, examState]);
+
 
   const handleStartExam = async (assignment) => {
     try {
@@ -508,10 +853,13 @@ const CandidateDashboard = ({ onLogout }) => {
         }
       }
 
+      // Enforce Phase 1 (MCQ) -> Phase 2 (Scenario) ordering grouped by topic
+      const sortedQuestions = sortQuestionsForCandidate(activeQuestions);
+
       setAssignments(prev => prev.map(a => a.id === assignment.id ? { ...a, status: 'IN_PROGRESS' } : a));
 
       const initialAnswers = {};
-      activeQuestions.forEach((q, idx) => {
+      sortedQuestions.forEach((q, idx) => {
         const isCoding = q.type === 'CODING' || q.type === 'PYTHON_CODING';
         const isSql = (q.type === 'SCENARIO' || q.type === 'SCENARIO_CODING' || q.type === 'CODING') && (q.subject || q.language || '').toLowerCase() === 'sql';
         if (isSql) {
@@ -527,7 +875,7 @@ const CandidateDashboard = ({ onLogout }) => {
         ...assignment,
         assessment: {
           ...asm,
-          questions: activeQuestions
+          questions: sortedQuestions
         }
       };
 
@@ -568,7 +916,14 @@ const CandidateDashboard = ({ onLogout }) => {
     const targetId = assignmentIdOverride || activeAssignment?.id;
     if (!targetId) return;
 
+    setIsSubmittingManual(true);
+    setIsSubmitModalOpen(false);
+
     try {
+      try {
+        localStorage.removeItem(`recruitai_active_exam_${targetId}`);
+      } catch (e) {}
+
       const asm = activeAssignment?.assessment || activeAssignment || {};
       const questions = asm.questions || [];
       const answersPayload = questions.map((q, idx) => ({
@@ -578,12 +933,13 @@ const CandidateDashboard = ({ onLogout }) => {
 
       const durationSeconds = parseDuration(asm.duration || "30") * 60;
       const timeTaken = Math.max(0, durationSeconds - examState.timeLeft);
+      const isAuto = securityMetadata?.autoSubmitted === true;
 
       const payload = {
         assignmentId: targetId,
         answers: answersPayload,
         timeTaken: timeTaken,
-        autoSubmitted: securityMetadata?.autoSubmitted ?? (examSecurity.fullscreenExitCount >= 4),
+        autoSubmitted: isAuto,
         submissionReason: securityMetadata?.submissionReason || null,
         warningCount: securityMetadata?.warningCount ?? examSecurity.fullscreenExitCount ?? 0,
         warningHistory: securityMetadata?.warningHistory || examSecurity.warningHistory || []
@@ -596,6 +952,8 @@ const CandidateDashboard = ({ onLogout }) => {
     } catch (err) {
       console.error("Failed to submit exam:", err);
       showToast("Error submitting assessment. Please try again.");
+    } finally {
+      setIsSubmittingManual(false);
     }
   };
 
@@ -966,6 +1324,12 @@ const CandidateDashboard = ({ onLogout }) => {
           tag: 'Speaking',
           subtitle: 'AI-generated questions based on your resume. Speak clearly and confidently.'
         };
+      case 'results':
+        return {
+          title: 'My Assessment Results',
+          tag: 'Results',
+          subtitle: 'View your overall AI scores, detailed evaluations, and feedback report.'
+        };
       default:
         return {
           title: 'Candidate Portal',
@@ -1105,7 +1469,7 @@ const CandidateDashboard = ({ onLogout }) => {
                   key={item.id}
                   onClick={() => {
                     setActiveTab(item.id);
-                    if (item.id !== 'dashboard' && item.id !== 'resume' && item.id !== 'technical') {
+                    if (item.id !== 'dashboard' && item.id !== 'resume' && item.id !== 'technical' && item.id !== 'results') {
                       showToast(`"${item.label}" feature is coming soon!`);
                     }
                   }}
@@ -1212,7 +1576,7 @@ const CandidateDashboard = ({ onLogout }) => {
                         onClick={() => {
                           setActiveTab(item.id);
                           setSidebarOpen(false);
-                          if (item.id !== 'dashboard' && item.id !== 'resume' && item.id !== 'technical') {
+                          if (item.id !== 'dashboard' && item.id !== 'resume' && item.id !== 'technical' && item.id !== 'results') {
                             showToast(`"${item.label}" feature is coming soon!`);
                           }
                         }}
@@ -1910,15 +2274,6 @@ const CandidateDashboard = ({ onLogout }) => {
           const questions = asm.questions || [];
           const currentIdx = examState.currentQuestionIndex;
           const question = questions[currentIdx];
-          const hasOptions = question && Array.isArray(question.options) && question.options.length > 0;
-          const isSql = !hasOptions && question ? (((question.type === 'SCENARIO' || question.type === 'SCENARIO_CODING' || question.type === 'CODING') && (question.subject || question.language || '').toLowerCase() === 'sql') || (question.question || '').toUpperCase().includes('SELECT')) : false;
-          const isCoding = !hasOptions && (isSql || (question && (
-            question.type === 'CODING' ||
-            question.type === 'PYTHON_CODING' ||
-            question.type === 'SCENARIO_CODING' ||
-            (question.subject || question.language || '').toLowerCase().includes('python') ||
-            (question.subject || question.language || '').toLowerCase().includes('sql')
-          )));
 
           if (!question) {
             return (
@@ -1928,6 +2283,36 @@ const CandidateDashboard = ({ onLogout }) => {
               </div>
             );
           }
+
+          const mcqQuestions = questions.filter(q => (q.type || q.question_type || '').toUpperCase() === 'MCQ');
+          const scenarioQuestions = questions.filter(q => (q.type || q.question_type || '').toUpperCase() !== 'MCQ');
+
+          const totalMcqs = mcqQuestions.length;
+          const totalScenarios = scenarioQuestions.length;
+
+          const isMcqPhase = totalMcqs > 0 && currentIdx < totalMcqs;
+          const currentPhaseLabel = isMcqPhase
+            ? `Phase 1 of ${totalScenarios > 0 ? 2 : 1} — MCQ Questions`
+            : `Phase ${totalMcqs > 0 ? 2 : 1} of ${totalMcqs > 0 ? 2 : 1} — Scenario Questions`;
+
+          const phaseQuestionNum = isMcqPhase
+            ? currentIdx + 1
+            : (totalMcqs > 0 ? currentIdx - totalMcqs + 1 : currentIdx + 1);
+
+          const phaseTotalQuestions = isMcqPhase ? totalMcqs : totalScenarios;
+          const currentTopic = question.topic || question.subject || "General";
+          const answeredCount = Object.keys(examState.answers).filter(k => examState.answers[k] !== undefined && examState.answers[k] !== '').length;
+          const overallProgressPercent = Math.round((answeredCount / questions.length) * 100);
+
+          const hasOptions = question && Array.isArray(question.options) && question.options.length > 0;
+          const isSql = !hasOptions && question ? (((question.type === 'SCENARIO' || question.type === 'SCENARIO_CODING' || question.type === 'CODING') && (question.subject || question.language || '').toLowerCase() === 'sql') || (question.question || '').toUpperCase().includes('SELECT')) : false;
+          const isCoding = !hasOptions && (isSql || (question && (
+            question.type === 'CODING' ||
+            question.type === 'PYTHON_CODING' ||
+            question.type === 'SCENARIO_CODING' ||
+            (question.subject || question.language || '').toLowerCase().includes('python') ||
+            (question.subject || question.language || '').toLowerCase().includes('sql')
+          )));
 
           const hasPrev = currentIdx > 0;
           const hasNext = currentIdx < questions.length - 1;
@@ -1946,29 +2331,66 @@ const CandidateDashboard = ({ onLogout }) => {
                   </span>
                 </div>
 
-                {/* Questions Grid Selector */}
-                <div>
-                  <h4 className="text-xs font-bold text-dash-dark-purple uppercase tracking-wider mb-3">Questions</h4>
-                  <div className="grid grid-cols-4 gap-2">
-                    {questions.map((_, idx) => {
-                      const isCurrent = idx === currentIdx;
-                      const isAnswered = examState.answers[idx] !== undefined && examState.answers[idx] !== '';
-                      return (
-                        <button
-                          key={idx}
-                          onClick={() => setExamState(prev => ({ ...prev, currentQuestionIndex: idx }))}
-                          className={`w-10 h-10 rounded-xl font-extrabold text-xs flex items-center justify-center cursor-pointer border transition-all duration-200 ${isCurrent
-                            ? 'bg-dash-primary-purple text-white border-dash-primary-purple shadow-sm'
-                            : isAnswered
-                              ? 'bg-dash-success-green/10 text-dash-success-green border-[#22c55e]/20 hover:bg-dash-success-green/20'
-                              : 'bg-dash-soft-pink border border-dash-border-gray/50 text-dash-light-purple hover:bg-dash-border-gray'
-                            }`}
-                        >
-                          {idx + 1}
-                        </button>
-                      );
-                    })}
-                  </div>
+                {/* Questions Grid Selector Grouped by Phase */}
+                <div className="flex flex-col gap-4">
+                  {totalMcqs > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Phase 1 – MCQs ({totalMcqs})</h4>
+                        {isMcqPhase && <span className="text-[9px] font-extrabold px-2 py-0.5 rounded-md bg-purple-100 text-purple-700">Active</span>}
+                      </div>
+                      <div className="grid grid-cols-4 gap-2">
+                        {mcqQuestions.map((q, idx) => {
+                          const isCurrent = idx === currentIdx;
+                          const isAnswered = examState.answers[idx] !== undefined && examState.answers[idx] !== '';
+                          return (
+                            <button
+                              key={idx}
+                              onClick={() => setExamState(prev => ({ ...prev, currentQuestionIndex: idx }))}
+                              className={`w-10 h-10 rounded-xl font-extrabold text-xs flex items-center justify-center cursor-pointer border transition-all duration-200 ${isCurrent
+                                ? 'bg-dash-primary-purple text-white border-dash-primary-purple shadow-sm'
+                                : isAnswered
+                                  ? 'bg-dash-success-green/10 text-dash-success-green border-[#22c55e]/20 hover:bg-dash-success-green/20'
+                                  : 'bg-dash-soft-pink border border-dash-border-gray/50 text-dash-light-purple hover:bg-dash-border-gray'
+                                }`}
+                            >
+                              {idx + 1}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {totalScenarios > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Phase 2 – Scenario ({totalScenarios})</h4>
+                        {!isMcqPhase && <span className="text-[9px] font-extrabold px-2 py-0.5 rounded-md bg-purple-100 text-purple-700">Active</span>}
+                      </div>
+                      <div className="grid grid-cols-4 gap-2">
+                        {scenarioQuestions.map((q, sIdx) => {
+                          const realIdx = totalMcqs + sIdx;
+                          const isCurrent = realIdx === currentIdx;
+                          const isAnswered = examState.answers[realIdx] !== undefined && examState.answers[realIdx] !== '';
+                          return (
+                            <button
+                              key={realIdx}
+                              onClick={() => setExamState(prev => ({ ...prev, currentQuestionIndex: realIdx }))}
+                              className={`w-10 h-10 rounded-xl font-extrabold text-xs flex items-center justify-center cursor-pointer border transition-all duration-200 ${isCurrent
+                                ? 'bg-dash-primary-purple text-white border-dash-primary-purple shadow-sm'
+                                : isAnswered
+                                  ? 'bg-dash-success-green/10 text-dash-success-green border-[#22c55e]/20 hover:bg-dash-success-green/20'
+                                  : 'bg-dash-soft-pink border border-dash-border-gray/50 text-dash-light-purple hover:bg-dash-border-gray'
+                                }`}
+                            >
+                              {realIdx + 1}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Progress Stats */}
@@ -1976,24 +2398,20 @@ const CandidateDashboard = ({ onLogout }) => {
                   <div className="flex justify-between text-xs font-bold text-dash-light-purple">
                     <span>Progress</span>
                     <span className="text-dash-dark-purple">
-                      {Object.keys(examState.answers).length} / {questions.length} Done
+                      {answeredCount} / {questions.length} Done
                     </span>
                   </div>
                   <div className="w-full h-2 rounded-full bg-dash-light-blue-bg overflow-hidden">
                     <div
                       className="h-full bg-dash-primary-purple rounded-full transition-all duration-300"
-                      style={{ width: `${(Object.keys(examState.answers).length / questions.length) * 100}%` }}
+                      style={{ width: `${overallProgressPercent}%` }}
                     />
                   </div>
                 </div>
 
                 {/* Emergency Submit */}
                 <button
-                  onClick={() => {
-                    if (window.confirm("Are you sure you want to submit your assessment? You cannot make any changes after submission.")) {
-                      handleSubmitExam();
-                    }
-                  }}
+                  onClick={() => setIsSubmitModalOpen(true)}
                   className="w-full py-2.5 rounded-xl border border-red-200 bg-red-50 text-red-600 font-bold text-xs hover:bg-red-100 transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <CheckCircle2 size={14} />
@@ -2006,9 +2424,37 @@ const CandidateDashboard = ({ onLogout }) => {
 
                 {/* Question Info Header */}
                 <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-6 shadow-[0_4px_20px_rgba(87,82,170,0.02)] flex flex-col gap-4">
+                  {/* Phase & Topic Banner */}
+                  <div className="bg-gradient-to-r from-purple-50 via-indigo-50/70 to-blue-50 border border-purple-100/80 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="px-3 py-1 rounded-xl text-[11px] font-black uppercase tracking-wider bg-dash-primary-purple text-white shadow-xs">
+                        {currentPhaseLabel}
+                      </span>
+                      <div className="flex flex-col">
+                        <span className="text-xs font-extrabold text-dash-dark-purple flex items-center gap-1.5">
+                          <span className="text-slate-400 font-bold">Topic:</span>
+                          <span className="text-dash-primary-purple">{currentTopic}</span>
+                        </span>
+                        <span className="text-[11px] font-bold text-slate-500">
+                          Question {phaseQuestionNum} of {phaseTotalQuestions} in this Phase
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-t-0 border-purple-100/60 pt-2 sm:pt-0">
+                      <div className="flex flex-col items-end">
+                        <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">Overall Progress</span>
+                        <span className="text-xs font-extrabold text-dash-primary-purple">{overallProgressPercent}% Complete</span>
+                      </div>
+                      <div className="w-20 h-2 rounded-full bg-slate-200 overflow-hidden shrink-0">
+                        <div className="h-full bg-dash-primary-purple rounded-full transition-all duration-300" style={{ width: `${overallProgressPercent}%` }} />
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="flex items-center justify-between border-b border-dash-border-gray/25 pb-3">
                     <span className="text-xs font-bold text-dash-light-purple uppercase tracking-wider">
-                      Question {currentIdx + 1} of {questions.length}
+                      Question {currentIdx + 1} of {questions.length} (Sequence #{question.sequence_order || currentIdx + 1})
                     </span>
                     <span className="px-3 py-1 rounded-full text-[10px] font-extrabold tracking-wide uppercase bg-dash-soft-pink border border-dash-border-gray/50 text-dash-primary-purple">
                       {isSql ? 'SQL QUERY' : (isCoding ? 'PYTHON CODING' : (question.options && question.options.length > 0 ? 'MCQ' : 'SCENARIO'))}
@@ -2412,11 +2858,7 @@ const CandidateDashboard = ({ onLogout }) => {
                       </button>
                     ) : (
                       <button
-                        onClick={() => {
-                          if (window.confirm("Are you sure you want to submit your assessment? You cannot make any changes after submission.")) {
-                            handleSubmitExam();
-                          }
-                        }}
+                        onClick={() => setIsSubmitModalOpen(true)}
                         className="px-6 py-2.5 rounded-xl bg-[#22c55e] text-white font-bold text-xs hover:bg-[#16a34a] transition-all flex items-center gap-1.5 cursor-pointer border-0"
                       >
                         <CheckCircle2 size={16} />
@@ -2518,7 +2960,11 @@ const CandidateDashboard = ({ onLogout }) => {
           </div>
         )}
 
-        {activeTab !== 'dashboard' && activeTab !== 'resume' && activeTab !== 'technical' && activeTab !== 'english' && (
+        {activeTab === 'results' && (
+          <CandidateResultsView showToast={showToast} />
+        )}
+
+        {activeTab !== 'dashboard' && activeTab !== 'resume' && activeTab !== 'technical' && activeTab !== 'english' && activeTab !== 'results' && (
           <section className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-8 shadow-sm flex flex-col items-center justify-center min-h-[350px] text-center">
             <div className="p-4 rounded-full bg-dash-light-blue-bg text-dash-primary-purple mb-4">
               <Clock size={36} className="animate-spin" style={{ animationDuration: '10s' }} />
@@ -2540,6 +2986,51 @@ const CandidateDashboard = ({ onLogout }) => {
           onAutoSubmit={(secData) => handleSubmitExam(activeAssignment?.id, secData)}
         />
       )}
+
+      {/* Manual Submission Confirmation Modal */}
+      <AnimatePresence>
+        {isSubmitModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[9999] bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 10 }}
+              className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-100 flex flex-col items-center text-center"
+            >
+              <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 mb-4">
+                <CheckCircle2 size={30} />
+              </div>
+              <h3 className="font-outfit font-extrabold text-xl text-slate-900 mb-2">
+                Submit Assessment?
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-600 font-medium leading-relaxed mb-6">
+                Are you sure you want to submit your assessment? After submission, you will not be able to modify your answers.
+              </p>
+              <div className="flex items-center gap-3 w-full">
+                <button
+                  type="button"
+                  onClick={() => setIsSubmitModalOpen(false)}
+                  className="flex-1 py-3 px-4 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSubmitExam()}
+                  className="flex-1 py-3 px-4 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 transition-all shadow-md cursor-pointer"
+                >
+                  Submit Assessment
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

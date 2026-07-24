@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useSearchParams, useN
 import Login from './pages/Login';
 import CandidateDashboard from './pages/CandidateDashboard';
 import RecruiterDashboard from './pages/RecruiterDashboard';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Route Protection wrapper
 const ProtectedRoute = ({ children, allowedRole }) => {
@@ -25,6 +26,25 @@ const ProtectedRoute = ({ children, allowedRole }) => {
   return children;
 };
 
+// Smart Results Router for /results URL path
+const ResultsRedirect = ({ onLogout }) => {
+  const userStr = localStorage.getItem('recruitai_user');
+  let role = 'candidate';
+  try {
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      role = user.role;
+    }
+  } catch (e) {
+    console.error("Error parsing user role for results redirect:", e);
+  }
+
+  if (role === 'recruiter') {
+    return <RecruiterDashboard onLogout={onLogout} initialTab="results" />;
+  }
+  return <CandidateDashboard onLogout={onLogout} initialTab="results" />;
+};
+
 // Microsoft OAuth Callback handler
 const OAuthCallback = () => {
   const [searchParams] = useSearchParams();
@@ -42,7 +62,6 @@ const OAuthCallback = () => {
         localStorage.setItem('recruitai_refresh_token', refreshToken);
       }
       
-      // Save temporary user structure (will be populated on dashboard load)
       localStorage.setItem(
         'recruitai_user',
         JSON.stringify({
@@ -78,34 +97,60 @@ function App() {
   };
 
   return (
-    <Router>
-      <Routes>
-        {/* Public Routes */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/oauth/callback" element={<OAuthCallback />} />
-        
-        {/* Protected Dashboard Routes */}
-        <Route 
-          path="/candidate/dashboard" 
-          element={
-            <ProtectedRoute allowedRole="candidate">
-              <CandidateDashboard onLogout={handleLogout} />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/recruiter/dashboard" 
-          element={
-            <ProtectedRoute allowedRole="recruiter">
-              <RecruiterDashboard onLogout={handleLogout} />
-            </ProtectedRoute>
-          } 
-        />
+    <ErrorBoundary>
+      <Router>
+        <Routes>
+          {/* Public Routes */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/oauth/callback" element={<OAuthCallback />} />
+          
+          {/* Protected Dashboard Routes */}
+          <Route 
+            path="/candidate/dashboard" 
+            element={
+              <ProtectedRoute allowedRole="candidate">
+                <CandidateDashboard onLogout={handleLogout} />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/candidate/results" 
+            element={
+              <ProtectedRoute allowedRole="candidate">
+                <CandidateDashboard onLogout={handleLogout} initialTab="results" />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/recruiter/dashboard" 
+            element={
+              <ProtectedRoute allowedRole="recruiter">
+                <RecruiterDashboard onLogout={handleLogout} />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/recruiter/results" 
+            element={
+              <ProtectedRoute allowedRole="recruiter">
+                <RecruiterDashboard onLogout={handleLogout} initialTab="results" />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/results" 
+            element={
+              <ProtectedRoute>
+                <ResultsRedirect onLogout={handleLogout} />
+              </ProtectedRoute>
+            } 
+          />
 
-        {/* Redirects */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    </Router>
+          {/* Redirects */}
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </Router>
+    </ErrorBoundary>
   );
 }
 

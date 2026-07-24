@@ -1,21 +1,20 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import api from '../api';
 
 /**
  * Custom React Hook for Exam Security and Proctoring.
  * Provides protection against copying, tab-switching, right-clicking, devtools,
  * multi-monitor usage, screen sleeping, and page reloading.
- * Tracks candidate violations and calculates an evolving Trust Score.
- * 
- * @param {Object} options Configuration parameters.
- * @param {boolean} options.active True if security checks should be active (e.g. exam started).
- * @param {number} options.maxViolations Max number of violations permitted before locking the exam.
- * @param {number} options.gracePeriodSeconds Seconds allowed to re-enter fullscreen.
- * @param {function} options.onLock Callback triggered when the exam is locked.
- * @param {function} options.onViolation Callback triggered on every registered violation.
+ * Tracks candidate violations, logs real-time audit entries to the backend,
+ * and enforces configurable warning thresholds.
  */
 export const useExamSecurity = ({
   active = false,
-  maxViolations = 5,
+  assignmentId = null,
+  questionNumber = 1,
+  remainingTime = '',
+  maxViolations = 3,
+  maxWarnings = 3,
   gracePeriodSeconds = 10,
   onLock = null,
   onViolation = null,
@@ -30,7 +29,7 @@ export const useExamSecurity = ({
   const [warningHistory, setWarningHistory] = useState([]);
   const [autoSubmittedDueToViolations, setAutoSubmittedDueToViolations] = useState(false);
 
-  // Use refs for value read inside event listeners to avoid closure-stale variables
+  // Refs for closure-safe event listeners
   const violationsRef = useRef([]);
   const trustScoreRef = useRef(100);
   const lastViolationTimeRef = useRef(Date.now());
@@ -40,11 +39,26 @@ export const useExamSecurity = ({
   const warningHistoryRef = useRef([]);
   const wasFullscreenRef = useRef(false);
   const lastExitTimeRef = useRef(0);
+  const assignmentIdRef = useRef(assignmentId);
+  const questionNumberRef = useRef(questionNumber);
+  const remainingTimeRef = useRef(remainingTime);
+  const maxWarningsRef = useRef(maxWarnings);
 
   const onLockRef = useRef(onLock);
   const onViolationRef = useRef(onViolation);
 
-  // Reset exam security state when starting a new session
+  // Sync refs
+  useEffect(() => {
+    activeRef.current = active;
+    isExamLockedRef.current = isExamLocked;
+    onLockRef.current = onLock;
+    onViolationRef.current = onViolation;
+    assignmentIdRef.current = assignmentId;
+    questionNumberRef.current = questionNumber;
+    remainingTimeRef.current = remainingTime;
+    maxWarningsRef.current = maxWarnings;
+  }, [active, isExamLocked, onLock, onViolation, assignmentId, questionNumber, remainingTime, maxWarnings]);
+
   const resetExamSecurity = useCallback(() => {
     setViolations([]);
     violationsRef.current = [];
@@ -62,17 +76,6 @@ export const useExamSecurity = ({
     setIsFullscreenGraceActive(false);
   }, []);
 
-  // Sync refs with latest state/prop values
-  useEffect(() => {
-    activeRef.current = active;
-    isExamLockedRef.current = isExamLocked;
-    onLockRef.current = onLock;
-    onViolationRef.current = onViolation;
-  }, [active, isExamLocked, onLock, onViolation]);
-
-  /**
-   * Helper to trigger fullscreen mode programmatically.
-   */
   const requestFullscreen = useCallback(async () => {
     try {
       const element = document.documentElement;
@@ -90,16 +93,34 @@ export const useExamSecurity = ({
     }
   }, []);
 
+  // Post Activity Log to Backend API
+  const sendActivityLogToBackend = useCallback(async (activityType, warningCount, details) => {
+    if (!assignmentIdRef.current) return;
+    try {
+      await api.post('/api/assessment/activity-log', {
+        assignmentId: assignmentIdRef.current,
+        activityType,
+        warningCount: warningCount || exitCountRef.current || 0,
+        questionNumber: questionNumberRef.current || 1,
+        remainingTime: String(remainingTimeRef.current || ''),
+        browserInfo: navigator.userAgent,
+        details: details || ''
+      });
+    } catch (err) {
+      console.error("Failed to post real-time activity log:", err);
+    }
+  }, []);
+
   /**
-   * Log a security violation, reduce trust score, and lock exam if thresholds exceeded.
+   * Primary Violation & Activity Logger
    */
-  const triggerViolation = useCallback((type, description, severity = 'Medium') => {
+  const triggerViolation = useCallback((type, description, severity = 'Medium', activityType = null) => {
     if (!activeRef.current || isExamLockedRef.current) return;
 
     const now = Date.now();
-    // Prevent duplicate logs of the same type within 2 seconds
+    // Prevent duplicates within 1.5 seconds
     const duplicate = violationsRef.current.find(
-      (v) => v.type === type && now - v.timestamp < 2000
+      (v) => v.type === type && now - v.timestamp < 1500
     );
     if (duplicate) return;
 
@@ -113,7 +134,6 @@ export const useExamSecurity = ({
 
     lastViolationTimeRef.current = now;
 
-    // Severity weights for Trust Score deduction
     let deduction = 15;
     if (severity === 'Low') deduction = 5;
     if (severity === 'High') deduction = 30;
@@ -130,10 +150,26 @@ export const useExamSecurity = ({
       return updatedScore;
     });
 
+    // Map standardized activity types for backend logging
+    const mappedType = activityType || (
+      type.includes('Right Click') ? 'RIGHT_CLICK' :
+      type.includes('Copy') ? 'COPY_ATTEMPT' :
+      type.includes('Paste') ? 'PASTE_ATTEMPT' :
+      type.includes('Cut') ? 'CUT_ATTEMPT' :
+      type.includes('Developer') ? 'DEVTOOLS_ATTEMPT' :
+      type.includes('Tab Switch') ? 'TAB_SWITCH' :
+      type.includes('Window Blur') ? 'WINDOW_BLUR' :
+      type.includes('Window Focus') ? 'WINDOW_FOCUS' :
+      type.includes('Escape') || type.includes('ESC') ? 'ESC_KEY' :
+      type.includes('Fullscreen') ? 'FULLSCREEN_EXIT' : 'OTHER_VIOLATION'
+    );
+
+    sendActivityLogToBackend(mappedType, exitCountRef.current, description);
+
     if (onViolationRef.current) {
       onViolationRef.current(newViolation);
     }
-  }, [maxViolations]);
+  }, [sendActivityLogToBackend]);
 
   // 1. Right Click prevention
   useEffect(() => {
@@ -141,7 +177,7 @@ export const useExamSecurity = ({
 
     const handleContextMenu = (e) => {
       e.preventDefault();
-      triggerViolation('Right Click Blocked', 'Right-click menu is disabled.', 'Low');
+      triggerViolation('Right Click Blocked', 'Right-click context menu attempt.', 'Low', 'RIGHT_CLICK');
     };
 
     document.addEventListener('contextmenu', handleContextMenu);
@@ -154,73 +190,81 @@ export const useExamSecurity = ({
   useEffect(() => {
     if (!active || isExamLocked) return;
 
-    const handleClipboard = (e) => {
+    const handleCopy = (e) => {
       e.preventDefault();
-      triggerViolation('Clipboard Blocked', `${e.type.toUpperCase()} operation blocked.`, 'Low');
+      triggerViolation('Copy Blocked', 'Copy operation attempt.', 'Low', 'COPY_ATTEMPT');
+    };
+    const handlePaste = (e) => {
+      e.preventDefault();
+      triggerViolation('Paste Blocked', 'Paste operation attempt.', 'Low', 'PASTE_ATTEMPT');
+    };
+    const handleCut = (e) => {
+      e.preventDefault();
+      triggerViolation('Cut Blocked', 'Cut operation attempt.', 'Low', 'CUT_ATTEMPT');
     };
 
-    document.addEventListener('copy', handleClipboard);
-    document.addEventListener('cut', handleClipboard);
-    document.addEventListener('paste', handleClipboard);
+    document.addEventListener('copy', handleCopy);
+    document.addEventListener('cut', handleCut);
+    document.addEventListener('paste', handlePaste);
 
     return () => {
-      document.removeEventListener('copy', handleClipboard);
-      document.removeEventListener('cut', handleClipboard);
-      document.removeEventListener('paste', handleClipboard);
+      document.removeEventListener('copy', handleCopy);
+      document.removeEventListener('cut', handleCut);
+      document.removeEventListener('paste', handlePaste);
     };
   }, [active, isExamLocked, triggerViolation]);
 
-  // 3. Developer Tools & Command Keyboard Shortcut Blockers
+  // 3. DevTools & Keyboard Shortcuts (Escape, F12, Ctrl+Shift+I/J/C, Ctrl+U)
   useEffect(() => {
     if (!active || isExamLocked) return;
 
     const handleKeyDown = (e) => {
-      // F12 key or Escape key
+      // Escape Key
+      if (e.key === 'Escape' || e.keyCode === 27) {
+        triggerViolation('ESC Key Pressed', 'Escape key pressed.', 'Low', 'ESC_KEY');
+        return;
+      }
+
+      // F12 key
       if (e.key === 'F12' || e.keyCode === 123) {
         e.preventDefault();
-        triggerViolation('Developer Tools', 'F12 key pressed.', 'High');
+        triggerViolation('Developer Tools', 'F12 key pressed.', 'High', 'DEVTOOLS_ATTEMPT');
         return;
       }
 
       // Inspect Elements or Console (Ctrl+Shift+I / J / C)
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && ['I', 'J', 'C'].includes(e.key.toUpperCase())) {
         e.preventDefault();
-        triggerViolation('Developer Tools', 'Developer tools shortcut pressed.', 'High');
+        triggerViolation('Developer Tools', 'Developer tools shortcut pressed.', 'High', 'DEVTOOLS_ATTEMPT');
         return;
       }
 
       // Mac inspect shortcuts (Cmd+Option+I / J / U / C)
       if (e.metaKey && e.altKey && ['I', 'J', 'U', 'C'].includes(e.key.toUpperCase())) {
         e.preventDefault();
-        triggerViolation('Developer Tools', 'Mac inspector tools shortcut pressed.', 'High');
+        triggerViolation('Developer Tools', 'Mac inspector tools shortcut pressed.', 'High', 'DEVTOOLS_ATTEMPT');
         return;
       }
 
       // View Source (Ctrl+U / Cmd+U)
       if ((e.ctrlKey || e.metaKey) && e.key.toUpperCase() === 'U') {
         e.preventDefault();
-        triggerViolation('Developer Tools', 'View source shortcut pressed.', 'High');
+        triggerViolation('Developer Tools', 'View source shortcut pressed.', 'High', 'DEVTOOLS_ATTEMPT');
         return;
       }
 
       // Clipboard shortcuts (Ctrl+C, Ctrl+V, Ctrl+X)
       if ((e.ctrlKey || e.metaKey) && ['C', 'V', 'X'].includes(e.key.toUpperCase())) {
         e.preventDefault();
-        triggerViolation('Clipboard Blocked', 'Clipboard keyboard shortcut blocked.', 'Low');
+        const act = e.key.toUpperCase() === 'C' ? 'COPY_ATTEMPT' : (e.key.toUpperCase() === 'V' ? 'PASTE_ATTEMPT' : 'CUT_ATTEMPT');
+        triggerViolation('Clipboard Blocked', `Keyboard shortcut Ctrl+${e.key.toUpperCase()} blocked.`, 'Low', act);
         return;
       }
 
-      // Print page (Ctrl+P / Cmd+P)
-      if ((e.ctrlKey || e.metaKey) && e.key.toUpperCase() === 'P') {
+      // Print / Save page (Ctrl+P / Ctrl+S)
+      if ((e.ctrlKey || e.metaKey) && ['P', 'S'].includes(e.key.toUpperCase())) {
         e.preventDefault();
-        triggerViolation('Shortcut Blocked', 'Printing pages is disabled.', 'Low');
-        return;
-      }
-
-      // Save page (Ctrl+S / Cmd+S)
-      if ((e.ctrlKey || e.metaKey) && e.key.toUpperCase() === 'S') {
-        e.preventDefault();
-        triggerViolation('Shortcut Blocked', 'Saving pages is disabled.', 'Low');
+        triggerViolation('Shortcut Blocked', `Page shortcut Ctrl+${e.key.toUpperCase()} disabled.`, 'Low');
         return;
       }
     };
@@ -231,33 +275,40 @@ export const useExamSecurity = ({
     };
   }, [active, isExamLocked, triggerViolation]);
 
-  // 4. Tab Switch & Focus Loss Detection
+  // 4. Tab Switch & Focus Loss / Gain Detection
   useEffect(() => {
     if (!active || isExamLocked) return;
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
-        triggerViolation('Tab Switch', 'Switched away from the exam tab.', 'High');
+        triggerViolation('Tab Switch', 'Switched away from assessment tab.', 'High', 'TAB_SWITCH');
+      } else if (document.visibilityState === 'visible') {
+        sendActivityLogToBackend('WINDOW_FOCUS', exitCountRef.current, 'Returned to assessment tab.');
       }
     };
 
     const handleWindowBlur = () => {
-      // Small timeout to avoid triggering blur when entering fullscreen popup/iframe context
       setTimeout(() => {
         if (!document.hasFocus() && activeRef.current && !isExamLockedRef.current) {
-          triggerViolation('Window Blur', 'Browser lost focus. Do not navigate outside the exam window.', 'Medium');
+          triggerViolation('Window Blur', 'Browser lost focus.', 'Medium', 'WINDOW_BLUR');
         }
-      }, 100);
+      }, 120);
+    };
+
+    const handleWindowFocus = () => {
+      sendActivityLogToBackend('WINDOW_FOCUS', exitCountRef.current, 'Browser gained focus.');
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('blur', handleWindowBlur);
+    window.addEventListener('focus', handleWindowFocus);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('blur', handleWindowBlur);
+      window.removeEventListener('focus', handleWindowFocus);
     };
-  }, [active, isExamLocked, triggerViolation]);
+  }, [active, isExamLocked, triggerViolation, sendActivityLogToBackend]);
 
   // 5. Back Button and Popstate Blocking
   useEffect(() => {
