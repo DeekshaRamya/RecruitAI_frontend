@@ -205,9 +205,21 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
       }
     };
 
+    const fetchDashboardStats = async () => {
+      try {
+        const response = await api.get('/api/recruiter/dashboard');
+        if (response.data && response.data.stats && response.data.stats.active_assessments !== undefined) {
+          setActiveAssessmentsCount(response.data.stats.active_assessments);
+        }
+      } catch (err) {
+        console.error("Failed to fetch dashboard stats from backend:", err);
+      }
+    };
+
     fetchAssessments();
     fetchCandidates();
     fetchAssignments();
+    fetchDashboardStats();
   }, []);
 
   // Sidebar navigation state
@@ -554,7 +566,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
   const [isGenerating, setIsGenerating] = useState(false);
 
   // Dynamic states for active assessments metric count
-  const [activeAssessmentsCount, setActiveAssessmentsCount] = useState(18);
+  const [activeAssessmentsCount, setActiveAssessmentsCount] = useState(0);
 
   // AI-generated questions list (starts with default demo questions, updated on AI generation)
   const [generatedQuestions, setGeneratedQuestions] = useState([
@@ -626,44 +638,72 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
   // Dropdown open states
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
 
-  // Statistics data (dynamic active assessments)
+  // Dynamic valid active assessments filter
+  const validActiveAssessments = useMemo(() => {
+    if (!Array.isArray(savedAssessments)) return [];
+    return savedAssessments.filter(asm => {
+      if (!asm || !asm.id || !asm.name) return false;
+      const st = (asm.status || 'Active').toUpperCase();
+      return st === 'ACTIVE' || st === 'CREATED';
+    });
+  }, [savedAssessments]);
+
+  // Dynamic completed assessments count
+  const completedAssessmentsCount = useMemo(() => {
+    let count = 0;
+    if (Array.isArray(assignments) && assignments.length > 0) {
+      count = assignments.filter(a =>
+        a.status === 'SUBMITTED' || a.status === 'COMPLETED' || a.status === 'Submitted' || a.status === 'Completed'
+      ).length;
+    }
+    if (count === 0 && Array.isArray(candidates)) {
+      count = candidates.filter(c => c.status === 'Completed' || c.status === 'SUBMITTED').length;
+    }
+    return count;
+  }, [assignments, candidates]);
+
+  // Dynamic candidate groups count
+  const candidateGroupsCount = useMemo(() => {
+    return Array.isArray(candidateGroups) ? candidateGroups.length : 0;
+  }, [candidateGroups]);
+
+  // Statistics data (all fetched & calculated dynamically without hardcoded values)
   const stats = [
-    { label: 'Total Candidates', value: (Array.isArray(candidates) ? candidates.length : 0).toString(), change: '+12% this week', icon: Users },
-    { label: 'Active Assessments', value: activeAssessmentsCount.toString(), change: '+2 new today', icon: Briefcase },
-    { label: 'Completion Rate', value: '84.5%', change: '+3% avg. rate', icon: TrendingUp },
-    { label: 'Average Score', value: '78.2%', change: '+1.4% improvement', icon: Award },
+    {
+      label: 'Total Candidates',
+      value: (Array.isArray(candidates) ? candidates.length : 0).toString(),
+      change: 'Total candidates',
+      icon: Users
+    },
+    {
+      label: 'Active Assessments',
+      value: (Array.isArray(savedAssessments) ? validActiveAssessments.length : activeAssessmentsCount).toString(),
+      change: 'Active in workspace',
+      icon: Briefcase
+    },
+    {
+      label: 'Completed Assessments',
+      value: completedAssessmentsCount.toString(),
+      change: 'Successfully submitted',
+      icon: CheckCircle
+    },
+    {
+      label: 'Candidate Groups',
+      value: candidateGroupsCount.toString(),
+      change: 'Total unique groups',
+      icon: SlidersHorizontal
+    },
   ];
 
   // List of roles and statuses for filters
   const statuses = ['All Statuses', 'Completed', 'In Progress', 'Under Review', 'Failed'];
 
-  // Handle Search, Filters, and Sorting
-  const filteredCandidates = (Array.isArray(candidates) ? candidates : [])
-    .filter(candidate => {
-      const nameVal = (candidate.full_name || candidate.name || '').toLowerCase();
-      const emailVal = (candidate.email || '').toLowerCase();
-
-      const matchesSearch = nameVal.includes(searchQuery.toLowerCase()) ||
-        emailVal.includes(searchQuery.toLowerCase());
-
-      const matchesStatus = selectedStatus === 'All Statuses' || (candidate.status || 'Active') === selectedStatus;
-
-      return matchesSearch && matchesStatus;
-    })
-    .sort((a, b) => {
-      if (sortBy === 'newest') {
-        const dateB = b.created_at ? new Date(b.created_at) : new Date(b.date || 0);
-        const dateA = a.created_at ? new Date(a.created_at) : new Date(a.date || 0);
-        return dateB - dateA;
-      }
-      if (sortBy === 'score-high') {
-        return (b.final || 0) - (a.final || 0);
-      }
-      if (sortBy === 'score-low') {
-        return (a.final || 0) - (b.final || 0);
-      }
-      return 0;
-    });
+  // Handle Search filtering
+  const filteredCandidates = (Array.isArray(candidates) ? candidates : []).filter(candidate => {
+    const nameVal = (candidate.full_name || candidate.name || '').toLowerCase();
+    const emailVal = (candidate.email || '').toLowerCase();
+    return nameVal.includes(searchQuery.toLowerCase()) || emailVal.includes(searchQuery.toLowerCase());
+  });
 
   const candidatesPerPage = 5;
   const totalPages = Math.ceil(filteredCandidates.length / candidatesPerPage) || 1;
@@ -854,15 +894,9 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
     switch (activeTab) {
       case 'dashboard':
         return {
-          title: 'Recruiter Workspace',
+          title: 'Dashboard',
           tag: 'v1.2',
           subtitle: 'Analyze candidate assessments and coordinate evaluation flows.'
-        };
-      case 'create-assessment':
-        return {
-          title: 'Create Assessment',
-          tag: 'AI Generator',
-          subtitle: 'Select topics by subject. AI will generate questions automatically.'
         };
       case 'preview-questions':
         return {
@@ -878,7 +912,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
         };
       default:
         return {
-          title: 'Recruiter Workspace',
+          title: 'Dashboard',
           tag: 'v1.2',
           subtitle: 'Coordinate evaluation flows.'
         };
@@ -902,96 +936,83 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
         )}
       </AnimatePresence>
 
-      {/* 1. SIDEBAR (Full-Height Solid Layout) */}
-      <aside className="hidden lg:flex flex-col w-[260px] h-screen shrink-0 bg-dash-sidebar-bg pt-8 pb-8 pl-6 pr-0 relative z-30 text-dash-white-card shadow-[4px_0_24px_rgba(0,0,0,0.03)] justify-between">
-        <div>
-          {/* Branding */}
-          <div className="flex items-center gap-3 px-2 py-4 mb-6">
-            <div className="w-9 h-9 rounded-xl bg-dash-primary-purple flex items-center justify-center shadow-md">
-              <span className="font-outfit font-extrabold text-dash-white-card text-lg tracking-wider">R</span>
+      {/* 1. SIDEBAR (Full-Height Solid Layout with Independent Scroll) */}
+      <aside className="hidden lg:flex flex-col w-[260px] h-screen max-h-screen shrink-0 bg-dash-sidebar-bg p-6 overflow-y-auto dashboard-scrollbar relative z-30 text-dash-white-card shadow-[4px_0_24px_rgba(0,0,0,0.03)]">
+        <div className="flex flex-col min-h-full justify-between gap-6">
+          <div className="flex flex-col gap-6">
+            {/* Branding */}
+            <div className="flex items-center gap-3 px-2 py-2">
+              <div className="w-9 h-9 rounded-xl bg-dash-primary-purple flex items-center justify-center shadow-md shrink-0">
+                <span className="font-outfit font-extrabold text-dash-white-card text-lg tracking-wider">R</span>
+              </div>
+              <div>
+                <h1 className="font-outfit font-bold text-base tracking-tight text-dash-white-card leading-none">RecruitAI</h1>
+                <span className="text-[10px] text-dash-light-purple font-medium tracking-widest uppercase">Recruiter Portal</span>
+              </div>
             </div>
-            <div>
-              <h1 className="font-outfit font-bold text-base tracking-tight text-dash-white-card leading-none">RecruitAI</h1>
-              <span className="text-[10px] text-dash-light-purple font-medium tracking-widest uppercase">Recruiter Portal</span>
+
+            {/* Navigation Menu */}
+            <nav className="space-y-1.5">
+              {[
+                { id: 'dashboard', label: 'Dashboard', icon: Briefcase },
+                { id: 'create-assessment', label: 'Create Assessment', icon: Plus },
+                { id: 'preview-questions', label: 'Preview Questions', icon: FileText },
+                { id: 'assessments', label: 'Assessments', icon: Save },
+                { id: 'results', label: 'Technical Assessment Result', icon: Award },
+                { id: 'english-results', label: 'English Assessment Result', icon: Volume2 },
+                { id: 'overall-results', label: 'Overall Result', icon: BarChart2 },
+                { id: 'groups', label: 'Candidate Groups', icon: Users }
+              ].map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveTab(item.id)}
+                    className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-l-[24px] rounded-r-none text-sm font-bold transition-all duration-300 relative group cursor-pointer border-none text-left ${isActive
+                      ? 'sidebar-active-tab shadow-sm'
+                      : 'text-dash-light-purple hover:text-dash-white-card hover:bg-dash-primary-purple/20'
+                      }`}
+                  >
+                    <Icon size={18} className="relative z-10 shrink-0" />
+                    <span className="relative z-10">{item.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+
+            {/* Recruiter Sidebar Animation */}
+            <div className="flex items-center justify-center py-2 px-2">
+              <div className="w-48 h-48 flex items-center justify-center overflow-hidden">
+                <DotLottieReact
+                  src="https://lottie.host/5521a48e-619e-490f-a9b2-f4fb0386526e/5IWtyksCcc.lottie"
+                  loop
+                  autoplay
+                  style={{ width: '100%', height: '100%', transform: 'scale(1.2)', transformOrigin: 'center center' }}
+                />
+              </div>
             </div>
           </div>
 
-          {/* Navigation Menu */}
-          <nav className="space-y-2">
-            {[
-              { id: 'dashboard', label: 'Dashboard', icon: Briefcase },
-              { id: 'create-assessment', label: 'Create Assessment', icon: Plus },
-              { id: 'preview-questions', label: 'Preview Questions', icon: FileText },
-              { id: 'assessments', label: 'Assessments', icon: Save },
-              { id: 'results', label: 'Technical Assessment Result', icon: Award },
-              { id: 'english-results', label: 'English Assessment Result', icon: Volume2 },
-              { id: 'overall-results', label: 'Overall Result', icon: BarChart2 },
-              { id: 'groups', label: 'Candidate Groups', icon: Users }
-            ].map((item) => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveTab(item.id)}
-                  className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-l-[24px] rounded-r-none text-sm font-bold transition-all duration-300 relative group ${isActive
-                    ? 'sidebar-active-tab shadow-sm'
-                    : 'text-dash-light-purple hover:text-dash-white-card hover:bg-dash-primary-purple/20'
-                    }`}
-                >
-                  <Icon size={18} className="relative z-10" />
-                  <span className="relative z-10">{item.label}</span>
-                </button>
-              );
-            })}
-          </nav>
-
-          {/* Recruiter Sidebar Animation */}
-          <div className="flex items-center justify-center -mt-3 px-4">
-            <div className="w-56 h-56 flex items-center justify-center overflow-hidden">
-              <DotLottieReact
-                src="https://lottie.host/5521a48e-619e-490f-a9b2-f4fb0386526e/5IWtyksCcc.lottie"
-                loop
-                autoplay
-                style={{ width: '100%', height: '100%', transform: 'scale(1.35)', transformOrigin: 'center center' }}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* User Profile, Logout & Cookies Button */}
-        <div className="space-y-4">
-          <div className="border-t border-dash-border-gray/25 pt-4 px-2">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-dash-primary-purple flex items-center justify-center font-semibold text-dash-white-card">
+          {/* User Profile & Logout Section (Fixed at bottom of sidebar scroll container) */}
+          <div className="border-t border-dash-border-gray/25 pt-4 space-y-3 mt-auto">
+            <div className="flex items-center gap-3 px-2">
+              <div className="w-9 h-9 rounded-full bg-dash-primary-purple flex items-center justify-center font-semibold text-dash-white-card shrink-0">
                 RA
               </div>
-              <div className="overflow-hidden">
+              <div className="overflow-hidden min-w-0">
                 <h4 className="text-xs font-semibold text-dash-white-card truncate">Recruiter Admin</h4>
-                <span className="text-[10px] text-dash-light-purple truncate block">Recruiter</span>
+                <span className="text-[10px] text-dash-light-purple truncate block">recruiter@recruitai.com</span>
               </div>
             </div>
-          </div>
 
-          <div className="px-2 flex flex-col gap-2.5">
             <button
               onClick={onLogout}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-dash-light-purple hover:bg-dash-primary-purple/20 transition-all duration-200 cursor-pointer"
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-dash-light-purple hover:bg-dash-primary-purple/20 transition-all duration-200 cursor-pointer border-none bg-transparent"
             >
-              <LogOut size={16} />
+              <LogOut size={16} className="shrink-0" />
               <span>Log Out</span>
             </button>
-
-
-
-            {/* Cookie Manager Button matching image */}
-            <button
-              onClick={() => showToast('Cookie preferences updated!')}
-              className="w-full text-left px-3 py-2 rounded-lg bg-dash-white-card border border-dash-border-gray hover:bg-dash-soft-pink text-dash-dark-purple text-[10px] font-bold transition-all duration-200 cursor-pointer shadow-sm"
-            >
-              Manage cookies or opt out
-            </button>
-
           </div>
         </div>
       </aside>
@@ -1017,75 +1038,79 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}
             transition={{ type: 'spring', bounce: 0.1, duration: 0.4 }}
-            className="fixed top-0 bottom-0 left-0 w-[270px] pt-6 pb-6 pl-6 pr-0 z-50 lg:hidden flex flex-col bg-dash-sidebar-bg text-dash-white-card border-r border-dash-border-gray/25"
+            className="fixed top-0 bottom-0 left-0 w-[270px] p-6 z-50 lg:hidden flex flex-col bg-dash-sidebar-bg text-dash-white-card border-r border-dash-border-gray/25 overflow-y-auto dashboard-scrollbar"
           >
-            <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-dash-primary-purple flex items-center justify-center">
-                  <span className="font-outfit font-extrabold text-dash-white-card text-base">R</span>
-                </div>
-                <h1 className="font-outfit font-bold text-base text-dash-white-card">RecruitAI</h1>
-              </div>
-              <button
-                onClick={() => setSidebarOpen(false)}
-                className="p-1 rounded-lg hover:bg-dash-primary-purple/20 text-dash-light-purple hover:text-dash-white-card"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <nav className="space-y-1 flex-1">
-              {[
-                { id: 'dashboard', label: 'Dashboard', icon: Briefcase },
-                { id: 'create-assessment', label: 'Create Assessment', icon: Plus },
-                { id: 'preview-questions', label: 'Preview Questions', icon: FileText },
-                { id: 'assessments', label: 'Assessments', icon: Save },
-                { id: 'results', label: 'Technical Assessment Result', icon: Award },
-                { id: 'english-results', label: 'English Assessment Result', icon: Volume2 },
-                { id: 'overall-results', label: 'Overall Result', icon: BarChart2 },
-                { id: 'groups', label: 'Candidate Groups', icon: Users }
-              ].map((item) => {
-                const Icon = item.icon;
-                const isActive = activeTab === item.id;
-                return (
+            <div className="flex flex-col min-h-full justify-between gap-6">
+              <div className="flex flex-col gap-6">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-dash-primary-purple flex items-center justify-center shrink-0">
+                      <span className="font-outfit font-extrabold text-dash-white-card text-base">R</span>
+                    </div>
+                    <h1 className="font-outfit font-bold text-base text-dash-white-card">RecruitAI</h1>
+                  </div>
                   <button
-                    key={item.id}
-                    onClick={() => {
-                      setActiveTab(item.id);
-                      setSidebarOpen(false);
-                    }}
-                    className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-l-[24px] rounded-r-none text-sm font-bold transition-all duration-200 ${isActive
-                      ? 'sidebar-active-tab shadow-sm'
-                      : 'text-dash-light-purple hover:text-dash-white-card hover:bg-dash-primary-purple/20'
-                      }`}
+                    onClick={() => setSidebarOpen(false)}
+                    className="p-1 rounded-lg hover:bg-dash-primary-purple/20 text-dash-light-purple hover:text-dash-white-card border-none bg-transparent cursor-pointer"
                   >
-                    <Icon size={18} />
-                    <span>{item.label}</span>
+                    <X size={20} />
                   </button>
-                );
-              })}
-            </nav>
+                </div>
 
-            <div className="border-t border-dash-border-gray/25 pt-4 space-y-3">
-              <div className="flex items-center gap-3 px-2">
-                <div className="w-9 h-9 rounded-full bg-dash-primary-purple flex items-center justify-center font-semibold text-dash-white-card">
-                  RA
-                </div>
-                <div>
-                  <h4 className="text-xs font-semibold text-dash-white-card">Recruiter Admin</h4>
-                  <span className="text-[10px] text-dash-light-purple">Recruiter</span>
-                </div>
+                <nav className="space-y-1.5">
+                  {[
+                    { id: 'dashboard', label: 'Dashboard', icon: Briefcase },
+                    { id: 'create-assessment', label: 'Create Assessment', icon: Plus },
+                    { id: 'preview-questions', label: 'Preview Questions', icon: FileText },
+                    { id: 'assessments', label: 'Assessments', icon: Save },
+                    { id: 'results', label: 'Technical Assessment Result', icon: Award },
+                    { id: 'english-results', label: 'English Assessment Result', icon: Volume2 },
+                    { id: 'overall-results', label: 'Overall Result', icon: BarChart2 },
+                    { id: 'groups', label: 'Candidate Groups', icon: Users }
+                  ].map((item) => {
+                    const Icon = item.icon;
+                    const isActive = activeTab === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          setActiveTab(item.id);
+                          setSidebarOpen(false);
+                        }}
+                        className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-l-[24px] rounded-r-none text-sm font-bold transition-all duration-200 cursor-pointer border-none text-left ${isActive
+                          ? 'sidebar-active-tab shadow-sm'
+                          : 'text-dash-light-purple hover:text-dash-white-card hover:bg-dash-primary-purple/20'
+                          }`}
+                      >
+                        <Icon size={18} className="shrink-0" />
+                        <span>{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </nav>
               </div>
-              <button
-                onClick={() => {
-                  setSidebarOpen(false);
-                  onLogout();
-                }}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-dash-light-purple hover:bg-dash-primary-purple/20 transition-all duration-200"
-              >
-                <LogOut size={16} />
-                <span>Log Out</span>
-              </button>
+
+              <div className="border-t border-dash-border-gray/25 pt-4 space-y-3 mt-auto">
+                <div className="flex items-center gap-3 px-2">
+                  <div className="w-9 h-9 rounded-full bg-dash-primary-purple flex items-center justify-center font-semibold text-dash-white-card shrink-0">
+                    RA
+                  </div>
+                  <div className="overflow-hidden min-w-0">
+                    <h4 className="text-xs font-semibold text-dash-white-card truncate">Recruiter Admin</h4>
+                    <span className="text-[10px] text-dash-light-purple truncate block">recruiter@recruitai.com</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setSidebarOpen(false);
+                    onLogout();
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-dash-light-purple hover:bg-dash-primary-purple/20 transition-all duration-200 cursor-pointer border-none bg-transparent"
+                >
+                  <LogOut size={16} className="shrink-0" />
+                  <span>Log Out</span>
+                </button>
+              </div>
             </div>
           </motion.aside>
         )}
@@ -1093,76 +1118,34 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
 
       {/* 2. MAIN WORKSPACE */}
       <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 flex flex-col gap-6 relative z-20 overflow-y-auto h-screen max-h-screen">
-        {/* HEADER SECTION */}
-        <header className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-5 px-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-2 lg:mt-0 shadow-[0_4px_20px_rgba(87,82,170,0.03)]">
-          <div className="flex items-center gap-3">
-            {/* Hamburger menu for small screens */}
+        {/* WELCOME HEADER BANNER */}
+        <header className="bg-dash-white-card border border-dash-border-gray/60 rounded-[24px] p-5 px-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shadow-[0_4px_20px_rgba(87,82,170,0.03)] relative overflow-hidden">
+          {/* Subtle background decoration glow */}
+          <div className="absolute top-0 right-0 w-64 h-64 bg-dash-primary-purple/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
+
+          <div className="flex items-center gap-4 relative z-10">
+            {/* Mobile Navigation Toggle */}
             <button
               onClick={() => setSidebarOpen(true)}
-              className="lg:hidden p-2 rounded-xl bg-dash-white-card border border-dash-border-gray text-dash-primary-purple hover:bg-dash-soft-pink transition-all duration-200"
+              className="lg:hidden p-2.5 rounded-xl bg-dash-white-card border border-dash-border-gray text-dash-primary-purple hover:bg-dash-soft-pink transition-all duration-200 shrink-0"
+              aria-label="Open Mobile Menu"
             >
               <Menu size={20} />
             </button>
 
             <div>
-              <h2 className="text-xl sm:text-2xl font-plus-jakarta font-extrabold tracking-tight text-dash-dark-purple flex items-center gap-2">
-                {getHeaderContent().title}
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-dash-primary-purple/10 border border-dash-border-gray text-dash-primary-purple font-outfit">{getHeaderContent().tag}</span>
-              </h2>
-              <p className="text-xs sm:text-sm text-dash-light-purple font-semibold mt-0.5">
-                {getHeaderContent().subtitle}
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h1 className="text-xl sm:text-2xl font-plus-jakarta font-extrabold tracking-tight text-dash-dark-purple">
+                  Welcome to the Recruiter Dashboard 👋
+                </h1>
+                <span className="px-3 py-0.5 rounded-full bg-dash-primary-purple/10 border border-dash-primary-purple/20 text-dash-primary-purple font-outfit text-xs font-bold">
+                  v1.2
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm text-dash-light-purple font-semibold mt-1 max-w-2xl leading-relaxed">
+                Manage assessments, monitor candidate progress, and review recruitment insights from one place.
               </p>
             </div>
-          </div>
-
-          <div className="flex items-center gap-3.5 self-end sm:self-auto">
-            {activeTab === 'preview-questions' ? (
-              <>
-                <button
-                  onClick={() => setActiveTab('create-assessment')}
-                  className="px-4 py-2 rounded-xl border border-dash-border-gray hover:bg-dash-soft-pink text-dash-dark-purple text-xs font-bold transition-all duration-200 cursor-pointer flex items-center gap-2"
-                >
-                  <span>← Back</span>
-                </button>
-                <button
-                  onClick={() => handleSaveAssessment(false)}
-                  className="px-4 py-2 rounded-xl border border-dash-primary-purple text-dash-primary-purple text-xs font-bold hover:bg-dash-primary-purple/5 transition-all duration-200 cursor-pointer flex items-center gap-2 bg-dash-white-card"
-                >
-                  <Save size={14} />
-                  <span>Save</span>
-                </button>
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => handleSaveAssessment(true)}
-                  className="px-4.5 py-2.5 rounded-xl bg-dash-primary-purple border border-dash-primary-purple text-dash-white-card font-bold text-sm cursor-pointer shadow-md hover:bg-dash-dark-purple hover:border-dash-dark-purple transition-all duration-300 flex items-center gap-2"
-                >
-                  <Check size={16} strokeWidth={2.5} />
-                  <span>Save & Assign</span>
-                </motion.button>
-              </>
-            ) : (
-              <>
-                {/* Notifications */}
-                <button className="relative p-2.5 rounded-xl bg-dash-white-card border border-dash-border-gray text-dash-primary-purple hover:bg-dash-soft-pink transition-all duration-300 hover:scale-105">
-                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-dash-primary-purple animate-pulse" />
-                  <Bell size={18} />
-                </button>
-
-                {/* Create Assessment Button (Primary Purple style) */}
-                {activeTab !== 'create-assessment' && (
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => setActiveTab('create-assessment')}
-                    className="px-4.5 py-2.5 rounded-xl bg-dash-primary-purple border border-dash-primary-purple text-dash-white-card font-bold text-sm cursor-pointer shadow-md hover:bg-dash-dark-purple hover:border-dash-dark-purple transition-all duration-300 flex items-center gap-2"
-                  >
-                    <Plus size={16} strokeWidth={2.5} />
-                    <span>Create Assessment</span>
-                  </motion.button>
-                )}
-              </>
-            )}
           </div>
         </header>
 
@@ -1202,7 +1185,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
             </section>
 
             {/* 4. CANDIDATE ASSESSMENT MANAGEMENT SECTION */}
-            <section className="bg-dash-white-card border border-dash-border-gray rounded-[20px] shadow-sm flex-1 flex flex-col overflow-hidden">
+            <section className="bg-dash-white-card border border-dash-border-gray rounded-[20px] shadow-sm flex flex-col overflow-hidden">
 
               {/* SEARCH & FILTERS BAR */}
               <div className="p-5 border-b border-dash-border-gray bg-dash-white-card flex flex-col md:flex-row gap-4 items-center justify-between z-20">
@@ -1227,65 +1210,8 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
                   )}
                 </div>
 
-                {/* Filter Dropdowns */}
+                {/* Action Buttons for Selected Candidates */}
                 <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-
-
-
-                  {/* Status Select */}
-                  <div className="relative">
-                    <button
-                      onClick={() => {
-                        setStatusDropdownOpen(!statusDropdownOpen);
-                        setRoleDropdownOpen(false);
-                      }}
-                      className="px-3.5 py-2 rounded-lg bg-dash-white-card border border-dash-border-gray text-xs font-bold text-dash-dark-purple flex items-center gap-2 hover:border-dash-primary-purple transition-all duration-200 cursor-pointer"
-                    >
-                      <span className="text-dash-light-purple font-medium">Status:</span>
-                      <span>{selectedStatus}</span>
-                      <SlidersHorizontal size={12} className="text-dash-primary-purple" />
-                    </button>
-
-                    <AnimatePresence>
-                      {statusDropdownOpen && (
-                        <>
-                          <div className="fixed inset-0 z-40" onClick={() => setStatusDropdownOpen(false)} />
-                          <motion.div
-                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                            className="absolute right-0 mt-2 w-44 rounded-xl bg-dash-white-card border border-dash-border-gray shadow-lg z-50 py-1 overflow-hidden"
-                          >
-                            {statuses.map((status) => (
-                              <button
-                                key={status}
-                                onClick={() => {
-                                  setSelectedStatus(status);
-                                  setStatusDropdownOpen(false);
-                                }}
-                                className="w-full text-left px-4 py-2 text-xs font-bold text-dash-dark-purple hover:bg-dash-soft-pink flex items-center justify-between cursor-pointer border-none"
-                              >
-                                <span>{status}</span>
-                                {selectedStatus === status && <Check size={12} className="text-dash-primary-purple" />}
-                              </button>
-                            ))}
-                          </motion.div>
-                        </>
-                      )}
-                    </AnimatePresence>
-                  </div>
-
-                  {/* Sort Selector */}
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                    className="px-2.5 py-2 rounded-lg bg-dash-white-card border border-dash-border-gray text-xs font-bold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple cursor-pointer hover:border-dash-primary-purple transition-all duration-200"
-                  >
-                    <option value="newest">Date Applied</option>
-                    <option value="score-high">Score: High to Low</option>
-                    <option value="score-low">Score: Low to High</option>
-                  </select>
-
                   {selectedCandidateIds.length > 0 && (
                     <div className="flex items-center gap-2">
                       <button
@@ -1309,14 +1235,13 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
                       </button>
                     </div>
                   )}
-
                 </div>
 
               </div>
 
               {/* CANDIDATE LIST DATA TABLE */}
-              <div className="flex-1 overflow-x-auto dashboard-scrollbar">
-                <table className="w-full min-w-[900px] border-collapse text-left text-sm">
+              <div className="overflow-x-auto dashboard-scrollbar">
+                <table className="w-full min-w-[1050px] border-collapse text-left text-sm">
                   <thead>
                     <tr className="bg-dash-soft-pink border-b border-dash-border-gray text-[10px] font-extrabold text-dash-dark-purple tracking-widest uppercase">
                       <th className="px-4 py-4.5 w-12 text-center">
@@ -1343,28 +1268,48 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
                           className="rounded text-dash-primary-purple focus:ring-dash-primary-purple cursor-pointer"
                         />
                       </th>
-                      <th className="px-6 py-4.5">Full Name</th>
-                      <th className="px-6 py-4.5">Email Address</th>
-                      <th className="px-6 py-4.5">Phone Number</th>
-                      <th className="px-6 py-4.5">Registration Date</th>
-                      <th className="px-6 py-4.5">Status</th>
-                      <th className="px-6 py-4.5"></th>
+                      <th className="px-5 py-4.5">Candidate Name</th>
+                      <th className="px-5 py-4.5">Email</th>
+                      <th className="px-5 py-4.5">Assessment Name</th>
+                      <th className="px-5 py-4.5">Assigned Date</th>
+                      <th className="px-5 py-4.5 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-dash-border-gray">
                     <AnimatePresence mode="popLayout">
                       {paginatedCandidates.map((candidate) => {
-                        const regDate = candidate.created_at
-                          ? new Date(candidate.created_at).toLocaleDateString(undefined, {
+                        // Find candidate's assignment
+                        const candAssignment = Array.isArray(assignments)
+                          ? assignments.find((a) =>
+                              a.candidate_id === candidate.id ||
+                              a.candidateId === candidate.id ||
+                              a.candidate?.id === candidate.id ||
+                              (a.candidateEmail && candidate.email && a.candidateEmail.toLowerCase() === candidate.email.toLowerCase()) ||
+                              (a.candidate?.email && candidate.email && a.candidate.email.toLowerCase() === candidate.email.toLowerCase())
+                            )
+                          : null;
+
+                        // Assessment Name
+                        const assessmentName =
+                          candAssignment?.assessment?.name ||
+                          candAssignment?.assessmentName ||
+                          candidate.assessment_name ||
+                          candidate.role ||
+                          'Not Assigned';
+
+                        // Assigned Date
+                        const rawAssignedDate =
+                          candAssignment?.assigned_at ||
+                          candAssignment?.assignedAt ||
+                          candidate.created_at ||
+                          candidate.date;
+                        const assignedDateDisplay = rawAssignedDate
+                          ? new Date(rawAssignedDate).toLocaleDateString(undefined, {
                               year: 'numeric',
                               month: 'short',
                               day: 'numeric'
                             })
-                          : (candidate.date || 'N/A');
-
-                        const isCompleted = candidate.status === 'Completed';
-                        let statusColor = isCompleted ? '#149470' : '#5752AA';
-                        let statusBg = isCompleted ? 'rgba(20, 148, 112, 0.1)' : 'rgba(87, 82, 170, 0.1)';
+                          : 'N/A';
 
                         return (
                           <motion.tr
@@ -1393,56 +1338,34 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
                                 className="rounded text-dash-primary-purple focus:ring-dash-primary-purple cursor-pointer"
                               />
                             </td>
-                            {/* Full Name */}
-                            <td className="px-6 py-4">
+
+                            {/* Candidate Name */}
+                            <td className="px-5 py-4">
                               <h4 className="text-xs font-bold text-dash-dark-purple group-hover:text-dash-primary-purple transition-colors duration-200">
                                 {candidate.full_name || candidate.name}
                               </h4>
                             </td>
 
-                            {/* Email Address */}
-                            <td className="px-6 py-4 text-xs font-semibold text-dash-dark-purple">
+                            {/* Email */}
+                            <td className="px-5 py-4 text-xs font-semibold text-dash-dark-purple">
                               {candidate.email}
                             </td>
 
-                            {/* Phone Number */}
-                            <td className="px-6 py-4 text-xs font-semibold text-dash-light-purple">
-                              {candidate.phone || 'N/A'}
-                            </td>
-
-                            {/* Registration Date */}
-                            <td className="px-6 py-4 text-xs font-semibold text-dash-light-purple">
-                              {regDate}
-                            </td>
-
-                            {/* Status */}
-                            <td className="px-6 py-4">
-                              <span
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase border"
-                                style={{
-                                  borderColor: `${statusColor}30`,
-                                  backgroundColor: statusBg,
-                                  color: statusColor,
-                                }}
-                              >
-                                <span
-                                  className="w-1.5 h-1.5 rounded-full"
-                                  style={{ backgroundColor: statusColor }}
-                                />
-                                {candidate.status || 'Active'}
+                            {/* Assessment Name */}
+                            <td className="px-5 py-4 text-xs font-semibold text-dash-dark-purple">
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-dash-light-blue-bg/60 border border-dash-border-gray text-dash-primary-purple font-bold">
+                                {assessmentName}
                               </span>
                             </td>
 
-                             {/* Actions / Report & Delete */}
-                            <td className="px-6 py-4 text-right">
+                            {/* Assigned Date */}
+                            <td className="px-5 py-4 text-xs font-semibold text-dash-light-purple">
+                              {assignedDateDisplay}
+                            </td>
+
+                            {/* Actions */}
+                            <td className="px-5 py-4 text-right">
                               <div className="flex items-center justify-end gap-2">
-                                <button
-                                  onClick={() => setSelectedCandidate(candidate)}
-                                  className="px-3 py-1.5 rounded-lg bg-dash-white-card border border-dash-border-gray hover:border-dash-primary-purple text-dash-primary-purple text-xs font-bold hover:bg-dash-soft-pink transition-all duration-300 flex items-center gap-1.5 cursor-pointer"
-                                >
-                                  <Eye size={13} />
-                                  <span>Report</span>
-                                </button>
                                 <button
                                   onClick={() => handleDeleteCandidate(candidate.id, candidate.full_name || candidate.name)}
                                   className="p-1.5 rounded-lg text-rose-500 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-xs font-bold transition-all duration-200 cursor-pointer flex items-center justify-center"
@@ -1459,7 +1382,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
 
                     {filteredCandidates.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="px-6 py-12 text-center text-sm text-dash-light-purple">
+                        <td colSpan={6} className="px-6 py-12 text-center text-sm text-dash-light-purple">
                           <AlertCircle className="mx-auto mb-3 text-dash-light-purple" size={32} />
                           No candidates found matching filters.
                         </td>
@@ -4058,10 +3981,16 @@ const AssessmentsManager = ({
     }
   };
 
-  const filteredAssessments = savedAssessments.filter(asm => {
+  const validActiveAssessments = (Array.isArray(savedAssessments) ? savedAssessments : []).filter(asm => {
+    if (!asm || !asm.id || !asm.name) return false;
+    const st = (asm.status || 'Active').toUpperCase();
+    return st === 'ACTIVE' || st === 'CREATED';
+  });
+
+  const filteredAssessments = validActiveAssessments.filter(asm => {
     const query = searchQuery.toLowerCase();
-    const nameMatch = asm.name.toLowerCase().includes(query);
-    const subjectMatch = asm.subjects.some(sub => sub.toLowerCase().includes(query));
+    const nameMatch = asm.name && asm.name.toLowerCase().includes(query);
+    const subjectMatch = Array.isArray(asm.subjects) && asm.subjects.some(sub => sub.toLowerCase().includes(query));
     return nameMatch || subjectMatch;
   });
 
@@ -4099,7 +4028,7 @@ const AssessmentsManager = ({
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-dash-light-purple transition-colors duration-300 group-focus-within:text-dash-primary-purple" size={16} />
           <input
             type="text"
-            placeholder="Search saved assessments by name or subject..."
+            placeholder="Search active assessments by name or subject..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2.5 pl-10 pr-4 text-xs font-semibold text-dash-dark-purple placeholder-dash-light-purple/60 focus:outline-none focus:border-dash-primary-purple transition-all"
@@ -4111,13 +4040,6 @@ const AssessmentsManager = ({
           )}
         </div>
 
-        <button
-          onClick={() => setActiveTab('create-assessment')}
-          className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-dash-primary-purple border border-dash-primary-purple text-dash-white-card font-bold text-xs hover:bg-dash-dark-purple transition-all duration-200 shadow-sm flex items-center justify-center gap-2 cursor-pointer"
-        >
-          <Plus size={14} strokeWidth={2.5} />
-          <span>New Assessment</span>
-        </button>
       </div>
 
       {/* Grid of Saved Assessments */}
@@ -4127,21 +4049,13 @@ const AssessmentsManager = ({
             <BookOpen size={36} className="animate-pulse" />
           </div>
           <h3 className="font-plus-jakarta font-extrabold text-base text-dash-dark-purple">
-            No Assessments Found
+            {searchQuery ? "No Assessments Found" : "No active assessments available."}
           </h3>
           <p className="text-xs text-dash-light-purple font-medium mt-2 max-w-sm leading-relaxed">
             {searchQuery
-              ? `No assessments match "${searchQuery}". Try refining your search query.`
-              : 'You have not saved any AI generated assessments yet. Create one using the AI Generator.'}
+              ? `No active assessments match "${searchQuery}". Try refining your search query.`
+              : 'No active assessments have been found in the system.'}
           </p>
-          {!searchQuery && (
-            <button
-              onClick={() => setActiveTab('create-assessment')}
-              className="mt-5 px-4.5 py-2.5 rounded-xl bg-dash-primary-purple text-dash-white-card font-bold text-xs hover:bg-dash-dark-purple transition-all cursor-pointer border-none shadow-md"
-            >
-              Get Started with AI
-            </button>
-          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
