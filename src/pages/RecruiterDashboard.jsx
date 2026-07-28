@@ -568,72 +568,8 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
   // Dynamic states for active assessments metric count
   const [activeAssessmentsCount, setActiveAssessmentsCount] = useState(0);
 
-  // AI-generated questions list (starts with default demo questions, updated on AI generation)
-  const [generatedQuestions, setGeneratedQuestions] = useState([
-    {
-      id: 1,
-      type: 'SCENARIO_CODING',
-      subject: 'Python',
-      topic: 'Functions & Strings',
-      difficulty: 'Medium',
-      estimatedTime: '15 Minutes',
-      question: 'Write a Python function that checks whether a given string is a palindrome without using Python\'s built-in reverse methods.',
-      problemStatement: 'Write a Python function that checks whether a given string is a palindrome without using Python\'s built-in reverse methods.',
-      exampleInput: 'madam',
-      exampleOutput: 'True',
-      constraints: ['Length <= 1000', 'Ignore Case', 'Ignore Spaces'],
-      expectedAnswer: 'def is_palindrome(text):\n    cleaned = text.replace(" ","").lower()\n    return cleaned == cleaned[::-1]',
-      explanation: 'The input string is first converted into lowercase and spaces are removed. The cleaned string is then compared with its reversed version.',
-      isSaved: false
-    },
-    {
-      id: 2,
-      type: 'SCENARIO_CODING',
-      subject: 'SQL',
-      topic: 'Window Functions & Subqueries',
-      difficulty: 'Hard',
-      estimatedTime: '20 Minutes',
-      question: 'Find the second highest salary from an Employee table without using the LIMIT clause.',
-      problemStatement: 'Write an SQL query to find the second highest salary from the Employee table. If there is no second highest salary, the query should return NULL. Do not use the LIMIT or OFFSET clauses.',
-      exampleInput: 'Employee Table:\n+----+--------+\n| Id | Salary |\n+----+--------+\n| 1  | 100    |\n| 2  | 200    |\n| 3  | 300    |\n+----+--------+',
-      exampleOutput: '+---------------------+\n| SecondHighestSalary |\n+---------------------+\n| 200                 |\n+---------------------+',
-      constraints: ['Do not use LIMIT', 'Do not use OFFSET', 'Handle duplicates gracefully', 'Return NULL if no second highest exists'],
-      expectedAnswer: 'SELECT MAX(Salary) AS SecondHighestSalary\nFROM Employee\nWHERE Salary < (SELECT MAX(Salary) FROM Employee);',
-      explanation: 'The subquery finds the maximum salary in the Employee table. The outer query then finds the maximum salary that is strictly less than the absolute maximum salary, effectively yielding the second highest salary.',
-      isSaved: false
-    },
-    {
-      id: 3,
-      type: 'MCQ',
-      subject: 'Python',
-      topic: 'Generators & Decorators',
-      difficulty: 'Medium',
-      estimatedTime: '5 Minutes',
-      question: 'Which keyword is used to define a generator function in Python?',
-      options: ['return', 'yield', 'async', 'lambda'],
-      correctAnswer: 'yield',
-      explanation: 'The yield keyword is used to return a value from a generator function, pausing its execution and maintaining its local state.',
-      isSaved: false
-    },
-    {
-      id: 4,
-      type: 'MCQ',
-      subject: 'Python',
-      topic: 'Exception Handling',
-      difficulty: 'Easy',
-      estimatedTime: '5 Minutes',
-      question: 'A developer wants to read a file that may not exist. The application should handle this gracefully without crashing and log a warning. Which approach is the best?',
-      options: [
-        'Ignore the error',
-        'Use try-except block to catch FileNotFoundError',
-        'Use a while loop to check continuously',
-        'Restart the application when error occurs'
-      ],
-      correctAnswer: 'Use try-except block to catch FileNotFoundError',
-      explanation: 'Using try-except allows the application to intercept specific exceptions like FileNotFoundError, handle them (e.g., logging a warning), and resume normal execution.',
-      isSaved: false
-    }
-  ]);
+  // AI-generated questions list (starts empty, updated on AI assessment creation)
+  const [generatedQuestions, setGeneratedQuestions] = useState([]);
 
   // Dropdown open states
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
@@ -780,18 +716,18 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
           sampleData: q.sampleData || null
         }));
         setGeneratedQuestions(formatted);
-        showToast(`Successfully generated assessment containing ${formatted.length} questions across ${selectedSubjects.join(', ')}!`);
+        showToast(`Successfully generated assessment containing ${formatted.length} questions across ${selectedSubjects.join(', ')}! Saved to list.`);
         setActiveAssessmentsCount(prev => prev + 1);
 
-        setActiveTab('preview-questions');
+        // Redirect to Assessment List after creation without automatically forcing preview tab
+        setActiveTab('assessments');
       } else {
         throw new Error('Invalid questions format returned from backend');
       }
     } catch (err) {
       console.error("AI assessment generation failed:", err);
       const errMsg = err.response?.data?.detail || err.message || err;
-      showToast(`Error: ${errMsg}. Falling back to preview...`);
-      setActiveTab('preview-questions');
+      showToast(`Error: ${errMsg}`);
     } finally {
       setIsGenerating(false);
     }
@@ -1118,39 +1054,51 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
 
       {/* 2. MAIN WORKSPACE */}
       <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 flex flex-col gap-6 relative z-20 overflow-y-auto h-screen max-h-screen">
-        {/* WELCOME HEADER BANNER */}
-        <header className="bg-dash-white-card border border-dash-border-gray/60 rounded-[24px] p-5 px-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shadow-[0_4px_20px_rgba(87,82,170,0.03)] relative overflow-hidden">
-          {/* Subtle background decoration glow */}
-          <div className="absolute top-0 right-0 w-64 h-64 bg-dash-primary-purple/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
-
-          <div className="flex items-center gap-4 relative z-10">
-            {/* Mobile Navigation Toggle */}
+        {/* Mobile Navigation Toggle for Non-Dashboard Tabs */}
+        {activeTab !== 'dashboard' && (
+          <div className="lg:hidden flex items-center mb-2">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="lg:hidden p-2.5 rounded-xl bg-dash-white-card border border-dash-border-gray text-dash-primary-purple hover:bg-dash-soft-pink transition-all duration-200 shrink-0"
+              className="p-2.5 rounded-xl bg-dash-white-card border border-dash-border-gray text-dash-primary-purple hover:bg-dash-soft-pink transition-all duration-200"
               aria-label="Open Mobile Menu"
             >
               <Menu size={20} />
             </button>
-
-            <div>
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <h1 className="text-xl sm:text-2xl font-plus-jakarta font-extrabold tracking-tight text-dash-dark-purple">
-                  Welcome to the Recruiter Dashboard 👋
-                </h1>
-                <span className="px-3 py-0.5 rounded-full bg-dash-primary-purple/10 border border-dash-primary-purple/20 text-dash-primary-purple font-outfit text-xs font-bold">
-                  v1.2
-                </span>
-              </div>
-              <p className="text-xs sm:text-sm text-dash-light-purple font-semibold mt-1 max-w-2xl leading-relaxed">
-                Manage assessments, monitor candidate progress, and review recruitment insights from one place.
-              </p>
-            </div>
           </div>
-        </header>
+        )}
 
         {activeTab === 'dashboard' && (
           <>
+            {/* WELCOME HEADER BANNER */}
+            <header className="bg-dash-white-card border border-dash-border-gray/60 rounded-[24px] p-5 px-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shadow-[0_4px_20px_rgba(87,82,170,0.03)] relative overflow-hidden mb-6">
+              {/* Subtle background decoration glow */}
+              <div className="absolute top-0 right-0 w-64 h-64 bg-dash-primary-purple/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
+
+              <div className="flex items-center gap-4 relative z-10">
+                {/* Mobile Navigation Toggle */}
+                <button
+                  onClick={() => setSidebarOpen(true)}
+                  className="lg:hidden p-2.5 rounded-xl bg-dash-white-card border border-dash-border-gray text-dash-primary-purple hover:bg-dash-soft-pink transition-all duration-200 shrink-0"
+                  aria-label="Open Mobile Menu"
+                >
+                  <Menu size={20} />
+                </button>
+
+                <div>
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <h1 className="text-xl sm:text-2xl font-plus-jakarta font-extrabold tracking-tight text-dash-dark-purple">
+                      Welcome to the Recruiter Dashboard 👋
+                    </h1>
+                    <span className="px-3 py-0.5 rounded-full bg-dash-primary-purple/10 border border-dash-primary-purple/20 text-dash-primary-purple font-outfit text-xs font-bold">
+                      v1.2
+                    </span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-dash-light-purple font-semibold mt-1 max-w-2xl leading-relaxed">
+                    Manage assessments, monitor candidate progress, and review recruitment insights from one place.
+                  </p>
+                </div>
+              </div>
+            </header>
             {/* 3. STATISTICS CARDS */}
             <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4.5">
               {stats.map((stat, idx) => {
@@ -1760,6 +1708,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
           <AssessmentsManager
             savedAssessments={savedAssessments}
             setSavedAssessments={setSavedAssessments}
+            setGeneratedQuestions={setGeneratedQuestions}
             assignments={assignments}
             fetchAssignments={fetchAssignments}
             showToast={showToast}
@@ -1986,9 +1935,10 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
               className="fixed inset-4 sm:inset-10 m-auto w-full max-w-4xl h-fit max-h-[85vh] bg-dash-white-card border border-dash-border-gray rounded-[28px] shadow-2xl z-[10000] p-6 sm:p-8 flex flex-col justify-between overflow-y-auto select-text"
             >
               {loadingEnglishReport ? (
-                <div className="flex flex-col items-center justify-center py-20 gap-4 w-full">
-                  <Loader2 className="animate-spin text-dash-primary-purple" size={40} />
-                  <p className="text-xs font-semibold text-dash-light-purple">Loading English Assessment Report...</p>
+                <div className="p-6 space-y-4 animate-pulse w-full">
+                  <div className="h-10 bg-slate-100/80 rounded-xl w-3/4" />
+                  <div className="h-24 bg-slate-50 rounded-2xl w-full" />
+                  <div className="h-24 bg-slate-50 rounded-2xl w-full" />
                 </div>
               ) : englishReport ? (() => {
                 const rep = englishReport.report || {};
@@ -2612,12 +2562,31 @@ const SyntaxHighlighter = ({ code, language }) => {
   return <pre className="font-mono text-xs leading-relaxed overflow-x-auto whitespace-pre-wrap text-[#0f172a]">{code}</pre>;
 };
 
-const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToast, _onSave, _onSaveAndAssign }) => {
-  const [selectedId, setSelectedId] = useState(generatedQuestions[0]?.id || null);
+const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToast, onSave, onSaveAndAssign }) => {
+  const [selectedId, setSelectedId] = useState(generatedQuestions?.[0]?.id || null);
   const [isEditing, setIsEditing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
+
+  // Clean empty state when no questions/assessments exist
+  if (!generatedQuestions || generatedQuestions.length === 0) {
+    return (
+      <div className="flex flex-col gap-6 w-full animate-fade-in">
+        <div className="bg-dash-white-card border border-dash-border-gray rounded-[24px] p-12 shadow-[0_4px_20px_rgba(87,82,170,0.03)] flex flex-col items-center justify-center text-center my-auto min-h-[420px]">
+          <div className="w-16 h-16 rounded-2xl bg-dash-primary-purple/10 border border-dash-primary-purple/20 flex items-center justify-center text-dash-primary-purple mb-4 shadow-sm">
+            <FileText size={32} />
+          </div>
+          <h3 className="font-outfit font-extrabold text-lg sm:text-xl text-dash-dark-purple mb-2">
+            No Assessment Preview
+          </h3>
+          <p className="text-xs sm:text-sm text-dash-light-purple font-semibold max-w-md leading-relaxed">
+            No assessment created yet. Create and save an assessment to preview the generated questions.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // Edit form state
   const [editForm, setEditForm] = useState({
@@ -2834,7 +2803,7 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
   return (
     <div className="flex flex-col gap-6 w-full animate-fade-in">
       {/* Assessment Question Pool Sub-Header */}
-      <div className="bg-dash-white-card border border-dash-border-gray rounded-[24px] p-5 shadow-sm flex items-center justify-between">
+      <div className="bg-dash-white-card border border-dash-border-gray rounded-[24px] p-5 px-6 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h3 className="font-outfit font-extrabold text-base text-dash-dark-purple">
             Confirm AI Assessment Question Pool
@@ -2842,6 +2811,28 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
           <p className="text-xs text-dash-light-purple font-medium mt-1">
             Review the questions generated by AI before finalizing and assigning.
           </p>
+        </div>
+
+        <div className="flex items-center gap-3 shrink-0">
+          {onSave && (
+            <button
+              onClick={onSave}
+              className="px-4 py-2.5 rounded-xl border border-dash-border-gray bg-dash-white-card hover:bg-dash-soft-pink text-dash-dark-purple font-bold text-xs transition-all duration-200 flex items-center gap-2 cursor-pointer shadow-sm"
+            >
+              <Save size={15} className="text-dash-primary-purple" />
+              <span>Save Assessment</span>
+            </button>
+          )}
+
+          {onSaveAndAssign && (
+            <button
+              onClick={onSaveAndAssign}
+              className="px-4 py-2.5 rounded-xl bg-dash-primary-purple text-dash-white-card font-bold text-xs transition-all duration-200 flex items-center gap-2 cursor-pointer shadow-md hover:bg-dash-dark-purple border-none"
+            >
+              <UserPlus size={15} />
+              <span>Save & Assign</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -2877,38 +2868,7 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
           )}
         </div>
 
-        {/* Add Custom Question Button */}
-        <button
-          onClick={() => {
-            const newQ = {
-              id: 'custom-' + Date.now(),
-              subject: 'Python',
-              topic: 'General',
-              type: 'PYTHON_CODING',
-              difficulty: 'Medium',
-              question: 'Write a Python function to...',
-              correctAnswer: 'def solution():\n    pass\n\nif __name__ == "__main__":\n    solution()',
-              exampleInput: '',
-              exampleOutput: '',
-              inputFormat: '',
-              outputFormat: '',
-              constraints: [],
-              sampleInput: '',
-              sampleOutput: '',
-              hiddenTestCases: [],
-              marks: 10,
-              isSaved: true
-            };
-            setGeneratedQuestions(prev => [...prev, newQ]);
-            setSelectedId(newQ.id);
-            setIsEditing(true);
-            showToast("Custom Python Coding question created!");
-          }}
-          className="w-full py-2 bg-dash-primary-purple/10 border border-dash-primary-purple/30 text-dash-primary-purple font-bold text-xs rounded-xl hover:bg-dash-primary-purple/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer border-dashed"
-        >
-          <Plus size={12} strokeWidth={3} />
-          <span>Add Custom Question</span>
-        </button>
+
 
         {/* Question List container */}
         <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 dashboard-scrollbar">
@@ -3562,7 +3522,7 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
               <button
                 type="button"
                 onClick={() => setIsEditing(true)}
-                className="flex-1 py-3 rounded-xl border border-dash-border-gray/80 hover:bg-dash-soft-pink text-dash-dark-purple font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer"
+                className="flex-1 py-3 rounded-xl border border-dash-border-gray/80 hover:bg-dash-soft-pink text-dash-dark-purple font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer bg-dash-white-card"
               >
                 <Edit3 size={13} />
                 <span>Edit Question</span>
@@ -3570,33 +3530,12 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
 
               <button
                 type="button"
-                onClick={() => handleRegenerateQuestion(selectedQuestion.id)}
-                className="flex-1 py-3 rounded-xl border border-dash-primary-purple/20 hover:border-dash-primary-purple/40 bg-dash-primary-purple/5 hover:bg-dash-primary-purple/10 text-dash-primary-purple font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <Sparkles size={13} />
-                <span>Regenerate</span>
-              </button>
-
-              <button
-                type="button"
                 onClick={() => handleDeleteQuestion(selectedQuestion.id)}
-                className="py-3 px-4 rounded-xl border border-red-200 hover:border-red-300 bg-red-50/50 hover:bg-red-50 text-red-600 font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer"
+                className="flex-1 py-3 rounded-xl border border-red-200 hover:border-red-300 bg-red-50/50 hover:bg-red-50 text-red-600 font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer"
                 title="Delete Question"
               >
                 <Trash2 size={13} />
-                <span>Delete</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleSaveQuestionToggle(selectedQuestion.id)}
-                className={`flex-1 py-3 rounded-xl font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 border cursor-pointer ${selectedQuestion.isSaved
-                    ? 'bg-dash-success-green border-dash-success-green text-dash-white-card shadow-sm hover:opacity-90'
-                    : 'bg-dash-primary-purple border-dash-primary-purple text-dash-white-card shadow-md hover:bg-dash-dark-purple hover:border-dash-dark-purple shadow-[0_4px_12px_rgba(87,82,170,0.15)]'
-                  }`}
-              >
-                <Save size={13} />
-                <span>{selectedQuestion.isSaved ? 'Question Saved' : 'Save Question'}</span>
+                <span>Delete Question</span>
               </button>
             </div>
           </div>
@@ -3957,6 +3896,7 @@ const AssignedCandidatesModal = ({
 const AssessmentsManager = ({
   savedAssessments,
   setSavedAssessments,
+  setGeneratedQuestions,
   assignments = [],
   _fetchAssignments,
   showToast,
@@ -3966,6 +3906,14 @@ const AssessmentsManager = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewingAssignedModalAssessment, setViewingAssignedModalAssessment] = useState(null);
+
+  const handlePreviewAssessment = (asm) => {
+    if (setGeneratedQuestions) {
+      setGeneratedQuestions(asm.questions || []);
+    }
+    setActiveTab('preview-questions');
+    showToast(`Loaded question preview for "${asm.name}".`);
+  };
 
   const handleDeleteAssessment = async (id, name) => {
     const confirmDelete = window.confirm(`Are you sure you want to delete "${name}"?`);
@@ -4192,11 +4140,11 @@ const AssessmentsManager = ({
                 <div className="border-t border-dash-border-gray/30 pt-4 mt-1">
                   <div className="flex items-center justify-between gap-2.5 w-full">
                     <button
-                      onClick={() => setSelectedAssessmentForView(asm)}
-                      className="flex-1 py-2.5 rounded-xl border border-dash-border-gray/80 hover:bg-dash-soft-pink text-dash-dark-purple font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer bg-dash-white-card"
+                      onClick={() => handlePreviewAssessment(asm)}
+                      className="flex-1 py-2.5 rounded-xl border border-dash-primary-purple/30 bg-dash-primary-purple/10 hover:bg-dash-primary-purple/20 text-dash-primary-purple font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <Eye size={13} />
-                      <span>View Questions</span>
+                      <span>Preview Questions</span>
                     </button>
 
                     <button
@@ -5080,9 +5028,11 @@ const ResultsManager = ({ showToast, candidateGroups = [], candidates = [] }) =>
 
       <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] shadow-[0_4px_25px_rgba(87,82,170,0.02)] overflow-hidden flex flex-col min-h-[400px]">
         {loading ? (
-          <div className="flex-1 flex flex-col justify-center items-center py-20 text-dash-light-purple gap-3">
-            <RefreshCw className="animate-spin text-dash-primary-purple" size={32} />
-            <span className="font-semibold text-xs">Loading assessment results...</span>
+          <div className="p-6 space-y-4 animate-pulse w-full">
+            <div className="h-10 bg-slate-100/80 rounded-xl w-full" />
+            <div className="h-16 bg-slate-50 rounded-xl w-full" />
+            <div className="h-16 bg-slate-50 rounded-xl w-full" />
+            <div className="h-16 bg-slate-50 rounded-xl w-full" />
           </div>
         ) : (
           <>
@@ -5962,9 +5912,11 @@ const EnglishResultsManager = ({ showToast, handleOpenEnglishReport }) => {
       {/* Main content table card */}
       <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-[28px] p-6 shadow-[0_4px_20px_rgba(87,82,170,0.02)] overflow-hidden">
         {loading && assessments.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-4">
-            <Loader2 className="animate-spin text-dash-primary-purple" size={36} />
-            <p className="text-xs font-semibold text-dash-light-purple">Loading assessments list...</p>
+          <div className="p-6 space-y-4 animate-pulse w-full">
+            <div className="h-10 bg-slate-100/80 rounded-xl w-full" />
+            <div className="h-14 bg-slate-50 rounded-xl w-full" />
+            <div className="h-14 bg-slate-50 rounded-xl w-full" />
+            <div className="h-14 bg-slate-50 rounded-xl w-full" />
           </div>
         ) : assessments.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center gap-2">
@@ -6068,11 +6020,11 @@ const EnglishResultsManager = ({ showToast, handleOpenEnglishReport }) => {
   );
 };
 
-
 const OverallResultsManager = ({ showToast }) => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [selectedRecCandidate, setSelectedRecCandidate] = useState(null);
 
   const fetchOverallResults = async () => {
     try {
@@ -6091,6 +6043,84 @@ const OverallResultsManager = ({ showToast }) => {
     fetchOverallResults();
   }, []);
 
+  const getRecommendation = (item) => {
+    if (item.ai_recommendation) return item.ai_recommendation;
+
+    const tech = item.technical_score;
+    const eng = item.english_score;
+    const avg = item.overall_score;
+
+    if (tech === null && eng === null) {
+      return {
+        decision: "Awaiting Assessments",
+        explanation: "Candidate has not completed technical or English speaking assessments yet.",
+        strengths: ["Candidate registered on recruitment portal"],
+        weaknesses: ["No assessment scores recorded yet"],
+        technical_performance: "Pending technical assessment completion.",
+        communication_skills: "Pending English speaking assessment completion.",
+        suitability: "Awaiting candidate test submissions before rendering evaluation."
+      };
+    }
+
+    const effectiveScore = avg !== null ? avg : (tech !== null ? tech : eng);
+
+    let decision = "Not Recommended";
+    let suitability = `Overall performance (${effectiveScore}%) falls below qualifying criteria. Not recommended to proceed.`;
+
+    if (effectiveScore >= 80 && (tech === null || tech >= 75) && (eng === null || eng >= 75)) {
+      decision = "Highly Recommended";
+      suitability = `Exceptional candidate overall (${effectiveScore}%). Highly recommended for immediate hiring or advancing to final executive interview rounds.`;
+    } else if (effectiveScore >= 65) {
+      decision = "Recommended";
+      suitability = `Solid performance (${effectiveScore}%). Meets core technical and communication requirements for the role.`;
+    } else if (effectiveScore >= 50) {
+      decision = "Recommended with Reservations";
+      suitability = `Moderate performance (${effectiveScore}%). Recommended with reservations; further technical or language verification advised.`;
+    }
+
+    const strengths = [];
+    if (tech !== null && tech >= 75) strengths.push(`Strong technical problem-solving (${tech}%)`);
+    if (eng !== null && eng >= 75) strengths.push(`Fluent English communication (${eng}%)`);
+    if (tech !== null && 60 <= tech && tech < 75) strengths.push(`Solid technical foundation (${tech}%)`);
+    if (eng !== null && 60 <= eng && eng < 75) strengths.push(`Clear verbal articulation (${eng}%)`);
+    if (strengths.length === 0) strengths.push("Completed mandatory evaluation assessments");
+
+    const weaknesses = [];
+    if (tech !== null && tech < 60) weaknesses.push(`Technical score below benchmark (${tech}%)`);
+    if (eng !== null && eng < 60) weaknesses.push(`Communication score needs improvement (${eng}%)`);
+    if (tech === null) weaknesses.push("Pending technical assessment submission");
+    if (eng === null) weaknesses.push("Pending English speaking assessment submission");
+    if (weaknesses.length === 0) weaknesses.push("No critical shortcomings identified");
+
+    const tech_perf = tech !== null ? `Technical Score: ${tech}%` : "Technical assessment pending";
+    const comm_skills = eng !== null ? `Communication Score: ${eng}%` : "English speaking assessment pending";
+
+    return {
+      decision,
+      explanation: `${decision}: ${suitability} (${tech_perf}, ${comm_skills}).`,
+      strengths,
+      weaknesses,
+      technical_performance: tech_perf,
+      communication_skills: comm_skills,
+      suitability
+    };
+  };
+
+  const getBadgeStyle = (decision) => {
+    switch (decision) {
+      case 'Highly Recommended':
+        return 'bg-emerald-50 border-emerald-300 text-emerald-700 shadow-sm font-extrabold';
+      case 'Recommended':
+        return 'bg-blue-50 border-blue-300 text-blue-700 font-extrabold';
+      case 'Recommended with Reservations':
+        return 'bg-amber-50 border-amber-300 text-amber-800 font-extrabold';
+      case 'Not Recommended':
+        return 'bg-rose-50 border-rose-300 text-rose-700 font-extrabold';
+      default:
+        return 'bg-slate-100 border-slate-300 text-slate-600 font-semibold';
+    }
+  };
+
   const filtered = data.filter(item => 
     item.candidate_name.toLowerCase().includes(search.toLowerCase()) ||
     item.candidate_email.toLowerCase().includes(search.toLowerCase())
@@ -6102,10 +6132,10 @@ const OverallResultsManager = ({ showToast }) => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-dash-white-card border border-dash-border-gray/50 rounded-[20px] p-5 shadow-sm font-inter">
         <div>
           <h2 className="font-outfit font-bold text-lg text-dash-dark-purple leading-tight">
-            Overall Result Comparison
+            Overall Result & AI Recommendation
           </h2>
           <p className="text-xs text-dash-light-purple font-semibold mt-1">
-            Compare candidate scores side-by-side across Technical and English Speaking assessments.
+            Review AI-generated hiring recommendations synthesized from candidate Technical and English assessments.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -6130,16 +6160,18 @@ const OverallResultsManager = ({ showToast }) => {
       {/* Comparison Grid Table */}
       <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-[28px] p-6 shadow-[0_4px_20px_rgba(87,82,170,0.02)] overflow-hidden font-inter">
         {loading && data.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-4">
-            <Loader2 className="animate-spin text-dash-primary-purple" size={36} />
-            <p className="text-xs font-semibold text-dash-light-purple">Computing overall averages...</p>
+          <div className="p-6 space-y-4 animate-pulse w-full">
+            <div className="h-10 bg-slate-100/80 rounded-xl w-full" />
+            <div className="h-14 bg-slate-50 rounded-xl w-full" />
+            <div className="h-14 bg-slate-50 rounded-xl w-full" />
+            <div className="h-14 bg-slate-50 rounded-xl w-full" />
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center gap-2">
             <BarChart2 size={36} className="text-dash-light-purple/40 animate-pulse" />
-            <h4 className="font-plus-jakarta font-extrabold text-sm text-dash-dark-purple">No Unified Scores Found</h4>
-            <p className="text-xs text-dash-light-purple font-medium max-w-xs">
-              Complete results comparison will show here as candidates submit technical and English assessments.
+            <h4 className="font-plus-jakarta font-extrabold text-sm text-dash-dark-purple">No completed technical assessments available yet.</h4>
+            <p className="text-xs text-dash-light-purple font-medium max-w-sm">
+              Only candidates assigned an assessment by you who have completed their Technical Assessment will appear here.
             </p>
           </div>
         ) : (
@@ -6149,16 +6181,15 @@ const OverallResultsManager = ({ showToast }) => {
                 <tr className="border-b border-dash-border-gray/25 text-[10px] text-dash-light-purple font-extrabold uppercase tracking-wider">
                   <th className="pb-3.5 pl-2">Candidate Details</th>
                   <th className="pb-3.5">Technical Assessment</th>
-                  <th className="pb-3.5">English Speaking Assessment</th>
-                  <th className="pb-3.5 text-center">Consolidated Overall Score</th>
-                  <th className="pb-3.5 pr-2 text-right">Linguistic Level</th>
+                  <th className="pb-3.5">English Assessment</th>
+                  <th className="pb-3.5 pl-4">AI Recommendation</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-dash-border-gray/10 text-xs font-semibold">
                 {filtered.map((item) => {
                   const techPercent = item.technical_score !== null ? `${item.technical_score}%` : 'Pending';
                   const engPercent = item.english_score !== null ? `${item.english_score}%` : 'Pending';
-                  const overallVal = item.overall_score !== null ? item.overall_score : null;
+                  const rec = getRecommendation(item);
 
                   return (
                     <tr key={item.candidate_id} className="hover:bg-slate-50/50 transition-colors">
@@ -6170,10 +6201,10 @@ const OverallResultsManager = ({ showToast }) => {
                         </div>
                       </td>
 
-                      {/* Technical Score with Side-By-Side Visual bar */}
+                      {/* Technical Score with Visual Bar */}
                       <td className="py-4">
-                        <div className="flex items-center gap-3 w-40">
-                          <span className={`w-14 text-left font-bold ${item.technical_score !== null ? 'text-dash-dark-purple' : 'text-slate-400 font-medium'}`}>
+                        <div className="flex items-center gap-3 w-36">
+                          <span className={`w-12 text-left font-bold ${item.technical_score !== null ? 'text-dash-dark-purple' : 'text-slate-400 font-medium'}`}>
                             {techPercent}
                           </span>
                           {item.technical_score !== null && (
@@ -6184,10 +6215,10 @@ const OverallResultsManager = ({ showToast }) => {
                         </div>
                       </td>
 
-                      {/* English Score with Side-By-Side Visual bar */}
+                      {/* English Score with Visual Bar */}
                       <td className="py-4">
-                        <div className="flex items-center gap-3 w-40">
-                          <span className={`w-14 text-left font-bold ${item.english_score !== null ? 'text-dash-dark-purple' : 'text-slate-400 font-medium'}`}>
+                        <div className="flex items-center gap-3 w-36">
+                          <span className={`w-12 text-left font-bold ${item.english_score !== null ? 'text-dash-dark-purple' : 'text-slate-400 font-medium'}`}>
                             {engPercent}
                           </span>
                           {item.english_score !== null && (
@@ -6198,31 +6229,27 @@ const OverallResultsManager = ({ showToast }) => {
                         </div>
                       </td>
 
-                      {/* Overall Average Radial Circle representation */}
-                      <td className="py-4">
-                        <div className="flex items-center justify-center">
-                          {overallVal !== null ? (
-                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-dash-soft-pink border border-[#2b72b5]/20 text-[#2b72b5] font-extrabold text-xs">
-                              <Activity size={12} className="text-[#2b72b5] shrink-0" />
-                              <span>{overallVal}% Average</span>
-                            </div>
-                          ) : (
-                            <span className="text-slate-400 font-medium">Pending Both</span>
-                          )}
+                      {/* AI Recommendation Column */}
+                      <td className="py-4 pl-4 pr-2">
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] uppercase tracking-wide border ${getBadgeStyle(rec.decision)}`}>
+                              <Sparkles size={12} />
+                              <span>{rec.decision}</span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedRecCandidate(item)}
+                              className="px-2.5 py-1 rounded-lg border border-dash-primary-purple/30 bg-dash-primary-purple/10 hover:bg-dash-primary-purple/20 text-dash-primary-purple font-bold text-[10px] transition-all cursor-pointer flex items-center gap-1"
+                            >
+                              <Brain size={11} />
+                              <span>View Insights</span>
+                            </button>
+                          </div>
+                          <p className="text-[11px] text-slate-600 font-medium leading-relaxed line-clamp-2 max-w-md">
+                            {rec.suitability}
+                          </p>
                         </div>
-                      </td>
-
-                      {/* Performance status evaluation badge */}
-                      <td className="py-4 pr-2 text-right">
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wide border ${
-                          overallVal && overallVal >= 80
-                            ? 'bg-[#10b981]/5 border-[#10b981]/25 text-[#10b981]'
-                            : overallVal && overallVal >= 60
-                              ? 'bg-blue-50 border-blue-200 text-blue-700'
-                              : 'bg-amber-50 border-amber-200 text-amber-700'
-                        }`}>
-                          {overallVal && overallVal >= 80 ? 'Highly Qualified' : overallVal && overallVal >= 60 ? 'Qualified' : 'Awaiting Tests'}
-                        </span>
                       </td>
                     </tr>
                   );
@@ -6232,6 +6259,152 @@ const OverallResultsManager = ({ showToast }) => {
           </div>
         )}
       </div>
+
+      {/* AI Recommendation Insights Modal */}
+      <AnimatePresence>
+        {selectedRecCandidate && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.5 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedRecCandidate(null)}
+              className="fixed inset-0 bg-dash-dark-purple/50 backdrop-blur-xs"
+            />
+
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 10 }}
+              className="bg-white border border-dash-border-gray/60 rounded-[28px] p-6 sm:p-8 max-w-2xl w-full shadow-2xl z-10 relative overflow-hidden space-y-6 max-h-[90vh] overflow-y-auto font-inter"
+            >
+              {/* Header */}
+              <div className="flex items-start justify-between border-b border-dash-border-gray/30 pb-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-dash-primary-purple bg-dash-primary-purple/10 px-2.5 py-0.5 rounded-md">
+                      AI Hiring Recommendation
+                    </span>
+                    {selectedRecCandidate.overall_score !== null && (
+                      <span className="text-[10px] font-bold text-dash-dark-purple bg-slate-100 px-2.5 py-0.5 rounded-md">
+                        {selectedRecCandidate.overall_score}% Overall Score
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="font-outfit font-extrabold text-xl text-dash-dark-purple mt-1.5">
+                    {selectedRecCandidate.candidate_name}
+                  </h3>
+                  <p className="text-xs text-dash-light-purple font-medium">
+                    {selectedRecCandidate.candidate_email}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedRecCandidate(null)}
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-dash-dark-purple hover:bg-slate-100 transition-colors border-none bg-transparent cursor-pointer"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {(() => {
+                const rec = getRecommendation(selectedRecCandidate);
+                return (
+                  <div className="space-y-5">
+                    {/* Hiring Decision Banner */}
+                    <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${getBadgeStyle(rec.decision)}`}>
+                      <div className="flex items-center gap-2.5">
+                        <Sparkles size={20} className="shrink-0" />
+                        <div>
+                          <span className="text-[9px] font-extrabold uppercase tracking-wider opacity-75 block">Decision</span>
+                          <span className="text-base font-outfit font-extrabold">{rec.decision}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Overall Suitability */}
+                    <div className="space-y-1.5">
+                      <h4 className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
+                        Overall Suitability & Hiring Rationale
+                      </h4>
+                      <p className="text-xs font-semibold text-slate-700 leading-relaxed bg-slate-50 border border-slate-200/60 p-4 rounded-2xl select-text">
+                        {rec.suitability}
+                      </p>
+                    </div>
+
+                    {/* Technical & Communication Performance Breakdown Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1 bg-dash-light-blue-bg/30 border border-dash-border-gray/30 p-4 rounded-2xl">
+                        <span className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider block">
+                          Technical Performance
+                        </span>
+                        <p className="text-xs font-semibold text-dash-dark-purple mt-1">
+                          {rec.technical_performance}
+                        </p>
+                      </div>
+
+                      <div className="space-y-1 bg-dash-light-blue-bg/30 border border-dash-border-gray/30 p-4 rounded-2xl">
+                        <span className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider block">
+                          Communication Skills
+                        </span>
+                        <p className="text-xs font-semibold text-dash-dark-purple mt-1">
+                          {rec.communication_skills}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Strengths & Weaknesses Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Strengths */}
+                      <div className="space-y-2 bg-emerald-50/40 border border-emerald-200/60 p-4 rounded-2xl">
+                        <h4 className="text-[10px] font-extrabold text-emerald-700 uppercase tracking-wider flex items-center gap-1.5">
+                          <CheckCircle size={13} className="text-emerald-600" />
+                          <span>Candidate Strengths</span>
+                        </h4>
+                        <ul className="space-y-1.5 text-xs font-semibold text-emerald-900">
+                          {rec.strengths.map((str, idx) => (
+                            <li key={idx} className="flex items-center gap-2">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                              <span>{str}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      {/* Weaknesses */}
+                      <div className="space-y-2 bg-amber-50/40 border border-amber-200/60 p-4 rounded-2xl">
+                        <h4 className="text-[10px] font-extrabold text-amber-800 uppercase tracking-wider flex items-center gap-1.5">
+                          <AlertTriangle size={13} className="text-amber-600" />
+                          <span>Areas for Improvement</span>
+                        </h4>
+                        <ul className="space-y-1.5 text-xs font-semibold text-amber-950">
+                          {rec.weaknesses.map((wk, idx) => (
+                            <li key={idx} className="flex items-center gap-2">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                              <span>{wk}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+
+                    {/* Footer Close */}
+                    <div className="pt-2 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedRecCandidate(null)}
+                        className="px-5 py-2.5 rounded-xl bg-dash-primary-purple text-white font-bold text-xs hover:bg-dash-dark-purple transition-all cursor-pointer border-none shadow-sm"
+                      >
+                        Close Insights
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
