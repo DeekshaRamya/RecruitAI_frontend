@@ -1097,6 +1097,32 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     }
   }, [activeAssignment, examState]);
 
+  // Synchronize activeAssignment state with server fetched assignments to clear stale/completed local storage state
+  useEffect(() => {
+    if (activeAssignment && !loadingAssignments) {
+      if (assignments.length > 0) {
+        const match = assignments.find(a => a.id === activeAssignment.id);
+        if (!match || match.status === 'COMPLETED') {
+          try {
+            localStorage.removeItem(`recruitai_active_exam_${activeAssignment.id}`);
+          } catch (e) {}
+          setActiveAssignment(null);
+          setExamState(null);
+          setActiveTab('dashboard');
+          showToast("Assessment session is no longer active.");
+        }
+      } else {
+        try {
+          localStorage.removeItem(`recruitai_active_exam_${activeAssignment.id}`);
+        } catch (e) {}
+        setActiveAssignment(null);
+        setExamState(null);
+        setActiveTab('dashboard');
+        showToast("Assessment session is no longer active.");
+      }
+    }
+  }, [assignments, activeAssignment, loadingAssignments]);
+
 
   const handleStartExam = async (assignment) => {
     try {
@@ -1238,9 +1264,20 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       await fetchAssignments();
     } catch (err) {
       console.error("Failed to submit exam:", err);
+      const status = err.response?.status;
       const detail = err?.response?.data?.detail;
       const errMsg = typeof detail === 'string' ? detail : (detail?.message || "Error submitting assessment. Please try again.");
       showToast(errMsg);
+
+      // If the assignment is missing, unauthorized, or expired, clean up local storage and exit technical view
+      if (status === 404 || status === 403 || (status === 400 && String(errMsg).toLowerCase().includes("expire"))) {
+        try {
+          localStorage.removeItem(`recruitai_active_exam_${targetId}`);
+        } catch (_e) { }
+        setActiveAssignment(null);
+        setExamState(null);
+        setActiveTab('dashboard');
+      }
     } finally {
       setIsSubmittingManual(false);
     }
