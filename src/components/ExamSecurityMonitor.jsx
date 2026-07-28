@@ -24,7 +24,7 @@ import {
  */
 export const ExamSecurityMonitor = ({
   securityState,
-  assessmentName = 'Active Evaluation',
+  _assessmentName = 'Active Evaluation',
   onAutoSubmit = null,
 }) => {
   const {
@@ -60,7 +60,6 @@ export const ExamSecurityMonitor = ({
     setSubmitting(false);
   };
 
-  // Determine modal header and message based on full-screen exit count
   // Determine modal header and message based on full-screen exit count
   const getWarningContent = () => {
     switch (fullscreenExitCount) {

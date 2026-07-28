@@ -7,15 +7,12 @@ import { useExamSecurity } from '../hooks/useExamSecurity';
 import { ExamSecurityMonitor } from '../components/ExamSecurityMonitor';
 import {
   Briefcase,
-  Users,
-  Settings,
   LogOut,
   Menu,
   X,
   FileText,
   Award,
   TrendingUp,
-  Plus,
   Volume2,
   Terminal,
   Sparkles,
@@ -26,18 +23,13 @@ import {
   UploadCloud,
   Play,
   Bell,
-  ArrowLeft,
-  ArrowRight,
   Check,
   Loader2,
   Eye,
-  AlertTriangle,
-  ShieldAlert,
   Maximize2,
   Minimize2,
   RotateCcw,
   Code,
-  HelpCircle,
   Database,
   Table,
   Key,
@@ -328,7 +320,243 @@ const DatabaseSchemaVisualizer = ({ schemaLines, dataLines }) => {
   );
 };
 
+<<<<<<< HEAD
 /* CandidateResultsView removed */
+=======
+const CandidateResultsView = ({ showToast }) => {
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedResult, setSelectedResult] = useState(null);
+
+  useEffect(() => {
+    fetchCandidateResults();
+  }, []);
+
+  const fetchCandidateResults = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/api/candidate/results');
+      setResults(response.data || []);
+    } catch (err) {
+      console.error("Failed to fetch candidate results:", err);
+      showToast("Error loading your assessment results.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOpenDetail = async (assignmentId) => {
+    try {
+      setDetailLoading(true);
+      const response = await api.get(`/api/results/${assignmentId}`);
+      setSelectedResult(response.data);
+    } catch (err) {
+      console.error("Failed to load result details:", err);
+      showToast("Error loading result details.");
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-12 flex flex-col items-center justify-center gap-3">
+        <Loader2 className="animate-spin text-dash-primary-purple" size={36} />
+        <span className="text-xs font-bold text-dash-light-purple">Loading your evaluation results...</span>
+      </div>
+    );
+  }
+
+  if (results.length === 0) {
+    return (
+      <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-12 text-center flex flex-col items-center justify-center gap-4">
+        <div className="w-14 h-14 rounded-2xl bg-dash-primary-purple/10 flex items-center justify-center text-dash-primary-purple">
+          <Award size={28} />
+        </div>
+        <div>
+          <h3 className="font-plus-jakarta font-extrabold text-base text-dash-dark-purple">No Assessment Results Yet</h3>
+          <p className="text-xs text-dash-light-purple font-semibold mt-1 max-w-md mx-auto">
+            Complete assigned technical assessments to view your detailed AI score reports and evaluation feedback here.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        {results.map((res) => {
+          const scoreVal = res.percentage || 0;
+          let scoreColor = '#149470';
+          let scoreBg = 'rgba(20, 148, 112, 0.1)';
+          if (scoreVal < 50) {
+            scoreColor = '#E11D48';
+            scoreBg = 'rgba(225, 29, 72, 0.1)';
+          } else if (scoreVal < 80) {
+            scoreColor = '#D97706';
+            scoreBg = 'rgba(217, 119, 6, 0.1)';
+          }
+
+          return (
+            <div
+              key={res.id}
+              className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-6 shadow-sm flex flex-col justify-between gap-5 hover:shadow-md transition-all duration-300"
+            >
+              <div className="flex items-center justify-between">
+                <span className="px-3 py-1 rounded-full text-[10px] font-extrabold bg-dash-primary-purple/10 text-dash-primary-purple uppercase tracking-wider">
+                  {res.assessmentName}
+                </span>
+                <span
+                  className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border"
+                  style={{ color: scoreColor, backgroundColor: scoreBg, borderColor: `${scoreColor}30` }}
+                >
+                  {scoreVal}%
+                </span>
+              </div>
+
+              <div>
+                <h4 className="font-plus-jakarta font-extrabold text-base text-dash-dark-purple">
+                  {res.assessmentName}
+                </h4>
+                <p className="text-xs font-semibold text-dash-light-purple mt-1">
+                  Submitted: {new Date(res.createdAt).toLocaleDateString()} at {new Date(res.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+
+              <div className="space-y-2 bg-slate-50 border border-slate-200/60 rounded-2xl p-4 text-xs font-semibold">
+                <div className="flex justify-between items-center">
+                  <span className="text-dash-light-purple">Total Questions:</span>
+                  <span className="text-dash-dark-purple font-bold">{res.totalQuestions}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-dash-light-purple">Correct Answers:</span>
+                  <span className="text-emerald-600 font-bold">{res.correctAnswers} / {res.totalQuestions}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-dash-light-purple">Status:</span>
+                  <span className={`font-bold ${res.passFail === 'Pass' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    {res.passFail}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => handleOpenDetail(res.assignmentId)}
+                className="w-full py-3 rounded-2xl bg-dash-primary-purple text-white font-extrabold text-xs hover:bg-dash-dark-purple transition-all duration-200 shadow-md flex items-center justify-center gap-2 cursor-pointer border-0"
+              >
+                <Eye size={14} />
+                <span>View Detailed Feedback</span>
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Modal / Drawer for Detailed Results */}
+      <AnimatePresence>
+        {selectedResult && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.4 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedResult(null)}
+              className="fixed inset-0 bg-dash-dark-purple/40 z-45"
+            />
+
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
+              className="fixed top-0 bottom-0 right-0 w-full sm:w-[600px] bg-dash-white-card border-l border-dash-border-gray shadow-2xl z-50 p-6 flex flex-col justify-between overflow-y-auto"
+            >
+              <div className="space-y-6">
+                <div className="flex items-center justify-between pb-4 border-b border-dash-border-gray">
+                  <div>
+                    <span className="text-[10px] text-dash-primary-purple font-extrabold tracking-widest uppercase">Candidate Score Card</span>
+                    <h3 className="text-base font-bold text-dash-dark-purple font-outfit mt-1">{selectedResult.assessmentName}</h3>
+                  </div>
+                  <button
+                    onClick={() => setSelectedResult(null)}
+                    className="p-1.5 rounded-lg hover:bg-dash-soft-pink text-dash-light-purple hover:text-dash-dark-purple transition-all duration-200 cursor-pointer border-none bg-transparent"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="bg-dash-soft-pink/50 border border-dash-border-gray/50 rounded-2xl p-5 space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-bold text-dash-light-purple uppercase tracking-wider">Overall AI Grade</span>
+                    <span className="font-plus-jakarta font-extrabold text-2xl text-dash-primary-purple">{selectedResult.percentage}%</span>
+                  </div>
+
+                  {selectedResult.overallFeedback && (
+                    <div className="text-xs text-dash-dark-purple leading-relaxed space-y-2">
+                      <div>
+                        <strong className="text-dash-primary-purple">AI Evaluation Feedback:</strong>
+                        <p className="mt-1 font-medium text-slate-700">{selectedResult.overallFeedback}</p>
+                      </div>
+                      {selectedResult.overallStrengths && (
+                        <div>
+                          <strong className="text-emerald-600">Key Strengths:</strong>
+                          <p className="mt-0.5 font-medium text-slate-700">{selectedResult.overallStrengths}</p>
+                        </div>
+                      )}
+                      {selectedResult.overallWeaknesses && (
+                        <div>
+                          <strong className="text-rose-600">Areas for Improvement:</strong>
+                          <p className="mt-0.5 font-medium text-slate-700">{selectedResult.overallWeaknesses}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Question Breakdown */}
+                {selectedResult.questionsAnalysis && selectedResult.questionsAnalysis.length > 0 && (
+                  <div className="space-y-4">
+                    <h4 className="font-plus-jakarta font-extrabold text-sm text-dash-dark-purple">
+                      Question-by-Question Analysis ({selectedResult.questionsAnalysis.length})
+                    </h4>
+                    <div className="space-y-3">
+                      {selectedResult.questionsAnalysis.map((q, idx) => (
+                        <div key={idx} className="p-4 rounded-2xl border border-dash-border-gray/60 bg-slate-50/50 space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-extrabold text-dash-primary-purple uppercase">Question {idx + 1} ({q.type})</span>
+                            <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border ${q.status === 'Correct' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : (q.status === 'Partially Correct' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-rose-50 text-rose-700 border-rose-200')}`}>
+                              {q.status}
+                            </span>
+                          </div>
+
+                          <p className="text-xs font-bold text-dash-dark-purple">{q.questionText}</p>
+
+                          <div className="bg-white p-3 rounded-xl border border-slate-200 text-xs space-y-1 font-mono">
+                            <div><span className="text-dash-light-purple">Your Answer: </span><span className="text-dash-dark-purple">{q.candidateAnswer || 'N/A'}</span></div>
+                            <div><span className="text-dash-light-purple">Correct Answer: </span><span className="text-emerald-600">{q.correctAnswer || 'N/A'}</span></div>
+                          </div>
+
+                          {q.aiExplanation && (
+                            <div className="text-[11px] text-dash-light-purple font-medium bg-dash-primary-purple/5 border border-dash-primary-purple/10 p-3 rounded-xl">
+                              <span className="font-bold text-dash-primary-purple block mb-0.5">✨ AI Explanation</span>
+                              {q.aiExplanation}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+>>>>>>> 48310e00e9f62e00d1c459426dbcb2b8c1b27a10
 
 const sortQuestionsForCandidate = (rawQuestions) => {
   if (!Array.isArray(rawQuestions) || rawQuestions.length === 0) return [];
@@ -874,9 +1102,94 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
   const [examState, setExamState] = useState({
     currentQuestionIndex: 0,
     answers: {},
+    executionOutputs: {},
     timeLeft: 0,
     submitted: false
   });
+
+  const prevQuestionIndexRef = useRef(examState.currentQuestionIndex);
+
+  // Sync compiler output state and starter code when navigating between questions
+  useEffect(() => {
+    const currentIdx = examState.currentQuestionIndex;
+    const prevIdx = prevQuestionIndexRef.current;
+
+    if (prevIdx !== undefined && prevIdx !== null && prevIdx !== currentIdx) {
+      // Save output of previous question into examState.executionOutputs
+      const currentOutputs = {
+        consoleOutput,
+        runtimeError,
+        syntaxError,
+        executionStatus,
+        executionTime,
+        sqlQueryResult,
+        customInput,
+        consoleTab
+      };
+      setExamState(prev => ({
+        ...prev,
+        executionOutputs: {
+          ...(prev.executionOutputs || {}),
+          [prevIdx]: currentOutputs
+        }
+      }));
+    }
+
+    // Load execution outputs for the new question (if any exist)
+    const savedOutputs = examState.executionOutputs?.[currentIdx];
+    if (savedOutputs) {
+      setConsoleOutput(savedOutputs.consoleOutput || '');
+      setRuntimeError(savedOutputs.runtimeError || '');
+      setSyntaxError(savedOutputs.syntaxError || '');
+      setExecutionStatus(savedOutputs.executionStatus || '');
+      setExecutionTime(savedOutputs.executionTime || 0);
+      setSqlQueryResult(savedOutputs.sqlQueryResult || null);
+      setCustomInput(savedOutputs.customInput || '');
+      setConsoleTab(savedOutputs.consoleTab || 'output');
+    } else {
+      // Reset console & compiler output for unexecuted question
+      setConsoleOutput('');
+      setRuntimeError('');
+      setSyntaxError('');
+      setExecutionStatus('');
+      setExecutionTime(0);
+      setSqlQueryResult(null);
+      setCustomInput('');
+      setConsoleTab('output');
+    }
+
+    // Initialize starter code for new question if candidate hasn't typed code yet
+    const asm = activeAssignment?.assessment || activeAssignment || {};
+    const questions = asm.questions || [];
+    const question = questions[currentIdx];
+    if (question && (examState.answers[currentIdx] === undefined || examState.answers[currentIdx] === null)) {
+      const isSql = (question.type === 'SCENARIO' || question.type === 'SCENARIO_CODING' || question.type === 'CODING') &&
+        (question.subject || question.language || '').toLowerCase().includes('sql');
+      const isCoding = question.type === 'CODING' || question.type === 'PYTHON_CODING' ||
+        (question.subject || '').toLowerCase().includes('python');
+
+      let starter = question.starterCode || question.starter_code || question.codeTemplate || question.exampleCode || null;
+      if (!starter) {
+        if (isSql) {
+          starter = '-- Write your SQL query here\n';
+        } else if (isCoding) {
+          starter = `def solution():\n    pass\n\nif __name__ == "__main__":\n    solution()`;
+        } else {
+          starter = '';
+        }
+      }
+
+      setExamState(prev => ({
+        ...prev,
+        answers: {
+          ...prev.answers,
+          [currentIdx]: starter
+        }
+      }));
+    }
+
+    prevQuestionIndexRef.current = currentIdx;
+  }, [examState.currentQuestionIndex, activeAssignment]);
 
   const isExamActive = !!(activeAssignment && !examState.submitted && activeTab === 'technical' && !isSubmitModalOpen && !isSubmittingManual);
 
@@ -992,7 +1305,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       try {
         const key = `recruitai_active_exam_${activeAssignment.id}`;
         localStorage.removeItem(key);
-      } catch (e) {}
+      } catch (_e) {}
     }
   }, [activeAssignment, examState]);
 
@@ -1030,9 +1343,13 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
       const initialAnswers = {};
       sortedQuestions.forEach((q, idx) => {
-        const isCoding = q.type === 'CODING' || q.type === 'PYTHON_CODING';
-        const isSql = (q.type === 'SCENARIO' || q.type === 'SCENARIO_CODING' || q.type === 'CODING') && (q.subject || q.language || '').toLowerCase() === 'sql';
-        if (isSql) {
+        const isCoding = q.type === 'CODING' || q.type === 'PYTHON_CODING' || (q.subject || '').toLowerCase().includes('python');
+        const isSql = (q.type === 'SCENARIO' || q.type === 'SCENARIO_CODING' || q.type === 'CODING') && (q.subject || q.language || '').toLowerCase().includes('sql');
+        const starter = q.starterCode || q.starter_code || q.codeTemplate || q.exampleCode;
+
+        if (starter) {
+          initialAnswers[idx] = starter;
+        } else if (isSql) {
           initialAnswers[idx] = '-- Write your SQL query here\n';
         } else if (isCoding) {
           initialAnswers[idx] = `def solution():\n    pass\n\nif __name__ == "__main__":\n    solution()`;
@@ -1058,6 +1375,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       setExamState({
         currentQuestionIndex: 0,
         answers: initialAnswers,
+        executionOutputs: {},
         timeLeft: parseDuration(asm.duration || "30") * 60,
         submitted: false
       });
@@ -1091,7 +1409,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     try {
       try {
         localStorage.removeItem(`recruitai_active_exam_${targetId}`);
-      } catch (e) {}
+      } catch (_e) {}
 
       const asm = activeAssignment?.assessment || activeAssignment || {};
       const questions = asm.questions || [];
@@ -1150,7 +1468,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     if (!parsedInputs && customInput) {
       try {
         parsedInputs = JSON.parse(customInput);
-      } catch (e) {
+      } catch (_e) {
         // Fallback to plain string input
       }
     }
@@ -1211,13 +1529,50 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
           setSyntaxError('');
           setExecutionTime((data.executionTime || 0) / 1000);
           setExecutionStatus('Success');
+
+          setExamState(prev => ({
+            ...prev,
+            executionOutputs: {
+              ...(prev.executionOutputs || {}),
+              [examState.currentQuestionIndex]: {
+                consoleOutput: tableText,
+                runtimeError: '',
+                syntaxError: '',
+                executionTime: (data.executionTime || 0) / 1000,
+                executionStatus: 'Success',
+                sqlQueryResult: data,
+                customInput,
+                consoleTab: 'output'
+              }
+            }
+          }));
         } else {
+          const rErr = data.runtime_error || 'SQL Query Execution Error';
+          const sErr = data.syntax_error || '';
+          const exTime = (data.executionTime || 0) / 1000;
           setSqlQueryResult(null);
           setConsoleOutput('');
-          setRuntimeError(data.runtime_error || 'SQL Query Execution Error');
-          setSyntaxError(data.syntax_error || '');
-          setExecutionTime((data.executionTime || 0) / 1000);
+          setRuntimeError(rErr);
+          setSyntaxError(sErr);
+          setExecutionTime(exTime);
           setExecutionStatus('Error');
+
+          setExamState(prev => ({
+            ...prev,
+            executionOutputs: {
+              ...(prev.executionOutputs || {}),
+              [examState.currentQuestionIndex]: {
+                consoleOutput: '',
+                runtimeError: rErr,
+                syntaxError: sErr,
+                executionTime: exTime,
+                executionStatus: 'Error',
+                sqlQueryResult: null,
+                customInput,
+                consoleTab: 'output'
+              }
+            }
+          }));
         }
       } catch (err) {
         console.error("Failed to run SQL query:", err);
@@ -1225,6 +1580,23 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
         setSqlQueryResult(null);
         setRuntimeError(errMsg);
         setExecutionStatus('Error');
+
+        setExamState(prev => ({
+          ...prev,
+          executionOutputs: {
+            ...(prev.executionOutputs || {}),
+            [examState.currentQuestionIndex]: {
+              consoleOutput: '',
+              runtimeError: errMsg,
+              syntaxError: '',
+              executionTime: 0,
+              executionStatus: 'Error',
+              sqlQueryResult: null,
+              customInput,
+              consoleTab: 'output'
+            }
+          }
+        }));
       } finally {
         setIsExecuting(false);
       }
@@ -1242,16 +1614,56 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
       const res = await api.post('/run-python', payload);
       const data = res.data;
-      setConsoleOutput(data.output || data.stdout || '');
-      setRuntimeError(data.runtime_error || '');
-      setSyntaxError(data.syntax_error || '');
-      setExecutionTime(data.execution_time || 0);
-      setExecutionStatus(data.status || 'Success');
+      const outText = data.output || data.stdout || '';
+      const rErr = data.runtime_error || '';
+      const sErr = data.syntax_error || '';
+      const exTime = data.execution_time || 0;
+      const exStat = data.status || 'Success';
+
+      setConsoleOutput(outText);
+      setRuntimeError(rErr);
+      setSyntaxError(sErr);
+      setExecutionTime(exTime);
+      setExecutionStatus(exStat);
+
+      setExamState(prev => ({
+        ...prev,
+        executionOutputs: {
+          ...(prev.executionOutputs || {}),
+          [examState.currentQuestionIndex]: {
+            consoleOutput: outText,
+            runtimeError: rErr,
+            syntaxError: sErr,
+            executionTime: exTime,
+            executionStatus: exStat,
+            sqlQueryResult: null,
+            customInput,
+            consoleTab: 'output'
+          }
+        }
+      }));
     } catch (err) {
       console.error("Failed to run code:", err);
       const errMsg = err.response?.data?.detail || err.message || "Execution error.";
       setRuntimeError(errMsg);
       setExecutionStatus('Error');
+
+      setExamState(prev => ({
+        ...prev,
+        executionOutputs: {
+          ...(prev.executionOutputs || {}),
+          [examState.currentQuestionIndex]: {
+            consoleOutput: '',
+            runtimeError: errMsg,
+            syntaxError: '',
+            executionTime: 0,
+            executionStatus: 'Error',
+            sqlQueryResult: null,
+            customInput,
+            consoleTab: 'output'
+          }
+        }
+      }));
     } finally {
       setIsExecuting(false);
     }
@@ -1288,25 +1700,41 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     }
   };
 
-
   const handleResetCode = (currentIdx) => {
     if (window.confirm("Are you sure you want to reset your code to the default template? Any unsaved changes will be lost.")) {
       const asm = activeAssignment?.assessment || activeAssignment || {};
       const questions = asm.questions || [];
       const q = questions[currentIdx];
-      const isSql = q && (q.type === 'SCENARIO' || q.type === 'SCENARIO_CODING' || q.type === 'CODING') && (q.subject || q.language || '').toLowerCase() === 'sql';
-      const template = isSql
-        ? 'SELECT * FROM '
-        : `def solution():\n    pass\n\nif __name__ == "__main__":\n    solution()`;
+      const isSql = q && (q.type === 'SCENARIO' || q.type === 'SCENARIO_CODING' || q.type === 'CODING') && (q.subject || q.language || '').toLowerCase().includes('sql');
+      const isCoding = q && (q.type === 'CODING' || q.type === 'PYTHON_CODING' || (q.subject || '').toLowerCase().includes('python'));
+      const starter = q?.starterCode || q?.starter_code || q?.codeTemplate || q?.exampleCode;
+      const template = starter || (isSql
+        ? '-- Write your SQL query here\n'
+        : isCoding
+          ? `def solution():\n    pass\n\nif __name__ == "__main__":\n    solution()`
+          : '');
 
       setExamState(prev => ({
         ...prev,
         answers: {
           ...prev.answers,
           [currentIdx]: template
+        },
+        executionOutputs: {
+          ...(prev.executionOutputs || {}),
+          [currentIdx]: null
         }
       }));
-      showToast("Code reset to template.");
+
+      setConsoleOutput('');
+      setRuntimeError('');
+      setSyntaxError('');
+      setExecutionStatus('');
+      setExecutionTime(0);
+      setSqlQueryResult(null);
+      setCustomInput('');
+      setConsoleTab('output');
+      showToast("Code and compiler output reset to starter template.");
     }
   };
 
@@ -1846,7 +2274,6 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                   const asm = assignment?.assessment || assignment || {};
                   const isCompleted = assignment.status === 'COMPLETED';
                   const isInProgress = assignment.status === 'IN_PROGRESS';
-                  const isAssigned = assignment.status === 'ASSIGNED';
 
                   return (
                     <div
@@ -2321,6 +2748,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                         {/* Monaco Editor Component */}
                         <div className={`w-full overflow-hidden rounded-xl border border-zinc-800 ${isFullscreen ? 'h-[60vh]' : 'h-[300px]'}`}>
                           <Editor
+                            key={`editor_${currentIdx}_${isSql ? 'sql' : 'python'}`}
                             height="100%"
                             defaultLanguage={isSql ? "sql" : "python"}
                             language={isSql ? "sql" : "python"}
