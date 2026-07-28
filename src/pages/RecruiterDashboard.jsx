@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
+import logo from '../assets/systech.jpg';
 import {
   Briefcase,
   Users,
@@ -491,6 +492,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
   const [selectedSubjects, setSelectedSubjects] = useState(['Python', 'SQL']);
   const [assessmentTitle, setAssessmentTitle] = useState('Python & SQL Technical Assessment');
   const [durationInput, setDurationInput] = useState('60 minutes');
+  const [selectedPreviewAssessmentId, setSelectedPreviewAssessmentId] = useState(null);
 
   // Percentage distribution states
   const [questionDist, setQuestionDist] = useState({ mcq: 70, scenario: 30 });
@@ -715,12 +717,38 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
           databaseSchema: q.databaseSchema || null,
           sampleData: q.sampleData || null
         }));
+
         setGeneratedQuestions(formatted);
-        showToast(`Successfully generated assessment containing ${formatted.length} questions across ${selectedSubjects.join(', ')}! Saved to list.`);
         setActiveAssessmentsCount(prev => prev + 1);
 
-        // Redirect to Assessment List after creation without automatically forcing preview tab
-        setActiveTab('assessments');
+        // Automatically save assessment in database to generate assessment ID
+        const savePayload = {
+          name: assessmentTitle || `${selectedSubjects.join(' & ')} Technical Assessment`,
+          subjects: selectedSubjects,
+          difficulty: 'Medium',
+          duration: durationInput || '60 minutes',
+          questionsCount: formatted.length,
+          createdDate: new Date().toISOString().split('T')[0],
+          status: 'Active',
+          candidatesAssigned: 0,
+          questions: formatted
+        };
+
+        try {
+          const saveRes = await api.post('/api/assessment', savePayload);
+          if (saveRes.data && saveRes.data.id) {
+            const savedAsm = saveRes.data;
+            setSavedAssessments(prev => [savedAsm, ...prev]);
+            setSelectedPreviewAssessmentId(savedAsm.id);
+            showToast(`Assessment created & saved successfully! Redirecting to preview...`);
+          }
+        } catch (saveErr) {
+          console.warn("Auto-save of generated assessment failed:", saveErr);
+          showToast(`Generated ${formatted.length} questions. Redirecting to preview...`);
+        }
+
+        // Automatically redirect recruiter to Assessment Preview page
+        setActiveTab('preview-questions');
       } else {
         throw new Error('Invalid questions format returned from backend');
       }
@@ -755,6 +783,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
       if (response.data) {
         const savedAsm = response.data;
         setSavedAssessments(prev => [savedAsm, ...prev]);
+        setSelectedPreviewAssessmentId(savedAsm.id);
         showToast('Assessment saved successfully!');
         setActiveAssessmentsCount(prev => prev + 1);
 
@@ -762,7 +791,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
           setAssigningAssessment(savedAsm);
           setActiveTab('assessments');
         } else {
-          setActiveTab('assessments');
+          setActiveTab('preview-questions');
         }
       }
     } catch (err) {
@@ -878,9 +907,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
           <div className="flex flex-col gap-6">
             {/* Branding */}
             <div className="flex items-center gap-3 px-2 py-2">
-              <div className="w-9 h-9 rounded-xl bg-dash-primary-purple flex items-center justify-center shadow-md shrink-0">
-                <span className="font-outfit font-extrabold text-dash-white-card text-lg tracking-wider">R</span>
-              </div>
+              <img src={logo} alt="RecruitAI Logo" className="w-12 h-12 rounded-2xl object-cover shadow-md shrink-0" />
               <div>
                 <h1 className="font-outfit font-bold text-base tracking-tight text-dash-white-card leading-none">RecruitAI</h1>
                 <span className="text-[10px] text-dash-light-purple font-medium tracking-widest uppercase">Recruiter Portal</span>
@@ -892,12 +919,11 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
               {[
                 { id: 'dashboard', label: 'Dashboard', icon: Briefcase },
                 { id: 'create-assessment', label: 'Create Assessment', icon: Plus },
-                { id: 'preview-questions', label: 'Preview Questions', icon: FileText },
-                { id: 'assessments', label: 'Assessments', icon: Save },
+                { id: 'preview-questions', label: 'Preview Questions', icon: Eye },
+                { id: 'assessments', label: 'Active Assessments', icon: Save },
                 { id: 'results', label: 'Technical Assessment Result', icon: Award },
                 { id: 'english-results', label: 'English Assessment Result', icon: Volume2 },
-                { id: 'overall-results', label: 'Overall Result', icon: BarChart2 },
-                { id: 'groups', label: 'Candidate Groups', icon: Users }
+                { id: 'overall-results', label: 'Overall Result', icon: BarChart2 }
               ].map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
@@ -980,9 +1006,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
               <div className="flex flex-col gap-6">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-dash-primary-purple flex items-center justify-center shrink-0">
-                      <span className="font-outfit font-extrabold text-dash-white-card text-base">R</span>
-                    </div>
+                    <img src={logo} alt="RecruitAI Logo" className="w-10 h-10 rounded-xl object-cover shadow-sm shrink-0" />
                     <h1 className="font-outfit font-bold text-base text-dash-white-card">RecruitAI</h1>
                   </div>
                   <button
@@ -997,12 +1021,11 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
                   {[
                     { id: 'dashboard', label: 'Dashboard', icon: Briefcase },
                     { id: 'create-assessment', label: 'Create Assessment', icon: Plus },
-                    { id: 'preview-questions', label: 'Preview Questions', icon: FileText },
-                    { id: 'assessments', label: 'Assessments', icon: Save },
+                    { id: 'preview-questions', label: 'Preview Questions', icon: Eye },
+                    { id: 'assessments', label: 'Active Assessments', icon: Save },
                     { id: 'results', label: 'Technical Assessment Result', icon: Award },
                     { id: 'english-results', label: 'English Assessment Result', icon: Volume2 },
-                    { id: 'overall-results', label: 'Overall Result', icon: BarChart2 },
-                    { id: 'groups', label: 'Candidate Groups', icon: Users }
+                    { id: 'overall-results', label: 'Overall Result', icon: BarChart2 }
                   ].map((item) => {
                     const Icon = item.icon;
                     const isActive = activeTab === item.id;
@@ -1098,6 +1121,14 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
                   </p>
                 </div>
               </div>
+
+              <button
+                onClick={() => setActiveTab('create-assessment')}
+                className="px-4 py-2.5 rounded-xl bg-dash-primary-purple text-white font-bold text-xs hover:bg-dash-dark-purple transition-all duration-200 shadow-sm flex items-center gap-2 cursor-pointer border-none shrink-0 z-10"
+              >
+                <Plus size={16} />
+                <span>Create Assessment</span>
+              </button>
             </header>
             {/* 3. STATISTICS CARDS */}
             <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4.5">
@@ -1715,6 +1746,15 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
             setActiveTab={setActiveTab}
             setSelectedAssessmentForView={setSelectedAssessmentForView}
             onAssignClick={setAssigningAssessment}
+          />
+        )}
+
+        {/* EXPIRED ASSESSMENTS SCREEN */}
+        {activeTab === 'expired-assessments' && (
+          <ExpiredAssessmentsManager
+            assignments={assignments}
+            fetchAssignments={fetchAssignments}
+            showToast={showToast}
           />
         )}
 
@@ -2562,31 +2602,78 @@ const SyntaxHighlighter = ({ code, language }) => {
   return <pre className="font-mono text-xs leading-relaxed overflow-x-auto whitespace-pre-wrap text-[#0f172a]">{code}</pre>;
 };
 
-const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToast, onSave, onSaveAndAssign }) => {
-  const [selectedId, setSelectedId] = useState(generatedQuestions?.[0]?.id || null);
-  const [isEditing, setIsEditing] = useState(false);
+const QuestionPreviewHub = ({
+  previewAssessmentId,
+  savedAssessments,
+  generatedQuestions,
+  setGeneratedQuestions,
+  showToast,
+  onSave,
+  onSaveAndAssign,
+  onSelectAssessment
+}) => {
+  const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState(null);
+  const [activeAssessment, setActiveAssessment] = useState(null);
+  const [selectedId, setSelectedId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
 
-  // Clean empty state when no questions/assessments exist
-  if (!generatedQuestions || generatedQuestions.length === 0) {
-    return (
-      <div className="flex flex-col gap-6 w-full animate-fade-in">
-        <div className="bg-dash-white-card border border-dash-border-gray rounded-[24px] p-12 shadow-[0_4px_20px_rgba(87,82,170,0.03)] flex flex-col items-center justify-center text-center my-auto min-h-[420px]">
-          <div className="w-16 h-16 rounded-2xl bg-dash-primary-purple/10 border border-dash-primary-purple/20 flex items-center justify-center text-dash-primary-purple mb-4 shadow-sm">
-            <FileText size={32} />
-          </div>
-          <h3 className="font-outfit font-extrabold text-lg sm:text-xl text-dash-dark-purple mb-2">
-            No Assessment Preview
-          </h3>
-          <p className="text-xs sm:text-sm text-dash-light-purple font-semibold max-w-md leading-relaxed">
-            No assessment created yet. Create and save an assessment to preview the generated questions.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // Dynamic assessment data fetching from backend
+  const fetchAssessmentData = React.useCallback(async (asmId) => {
+    if (!asmId) return;
+    setLoading(true);
+    setFetchError(null);
+    try {
+      const res = await api.get(`/api/assessment/${asmId}?t=${Date.now()}`);
+      if (res.data) {
+        setActiveAssessment(res.data);
+        if (res.data.questions && Array.isArray(res.data.questions)) {
+          const formatted = res.data.questions.map((q, idx) => ({
+            id: idx + 1,
+            subject: q.subject || (res.data.subjects?.[0] || 'General'),
+            topic: q.topic || 'General',
+            type: q.type || 'MCQ',
+            difficulty: q.difficulty || res.data.difficulty || 'Medium',
+            scenario: q.scenario || q.problemStatement || '',
+            question: q.question || q.problemStatement || '',
+            options: q.options || [],
+            correctAnswer: q.correctAnswer || '',
+            explanation: q.explanation || '',
+            problemStatement: q.problemStatement || q.scenario || '',
+            candidateTask: q.candidateTask || '',
+            expectedAnswer: q.expectedAnswer || q.correctAnswer || '',
+            exampleInput: q.exampleInput || '',
+            exampleOutput: q.exampleOutput || '',
+            inputFormat: q.inputFormat || '',
+            outputFormat: q.outputFormat || '',
+            sampleInput: q.sampleInput || '',
+            sampleOutput: q.sampleOutput || '',
+            constraints: q.constraints || [],
+            marks: q.marks || (q.type === 'MCQ' ? 1 : 10),
+            estimatedTime: q.estimatedTime || (q.type === 'MCQ' ? '2 Minutes' : '15 Minutes')
+          }));
+          setGeneratedQuestions(formatted);
+          if (formatted.length > 0) setSelectedId(formatted[0].id);
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching assessment details:", err);
+      setFetchError(err.response?.data?.detail || "Failed to load assessment data from server.");
+    } finally {
+      setLoading(false);
+    }
+  }, [setGeneratedQuestions]);
+
+  React.useEffect(() => {
+    const targetId = previewAssessmentId || (savedAssessments && savedAssessments.length > 0 ? savedAssessments[0].id : null);
+    if (targetId) {
+      fetchAssessmentData(targetId);
+    } else if (generatedQuestions && generatedQuestions.length > 0 && !selectedId) {
+      setSelectedId(generatedQuestions[0].id);
+    }
+  }, [previewAssessmentId, fetchAssessmentData, savedAssessments]);
 
   // Edit form state
   const [editForm, setEditForm] = useState({
@@ -2612,7 +2699,7 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
     marks: 10
   });
 
-  const selectedQuestion = generatedQuestions.find(q => q.id === selectedId);
+  const selectedQuestion = generatedQuestions?.find(q => q.id === selectedId) || generatedQuestions?.[0];
 
   // Sync edit form when selected question changes
   React.useEffect(() => {
@@ -2638,7 +2725,7 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
         sampleInput: selectedQuestion.sampleInput || '',
         sampleOutput: selectedQuestion.sampleOutput || '',
         hiddenTestCases: selectedQuestion.hiddenTestCases ? JSON.stringify(selectedQuestion.hiddenTestCases, null, 2) : '[]',
-        marks: selectedQuestion.marks || 10
+        marks: selectedQuestion.marks || (selectedQuestion.type === 'MCQ' ? 1 : 10)
       });
       setIsEditing(false);
     }
@@ -2656,17 +2743,6 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
     showToast(`Updated difficulty to ${newDiff}`);
   };
 
-  const handleSaveQuestionToggle = (qId) => {
-    setGeneratedQuestions(prev => prev.map(q => {
-      if (q.id === qId) {
-        const nextSaved = !q.isSaved;
-        showToast(nextSaved ? "Question saved to assessment pool!" : "Question removed from saved pool.");
-        return { ...q, isSaved: nextSaved };
-      }
-      return q;
-    }));
-  };
-
   const handleDeleteQuestion = (qId) => {
     const confirmDelete = window.confirm("Are you sure you want to delete this question?");
     if (!confirmDelete) return;
@@ -2675,7 +2751,6 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
     setGeneratedQuestions(remaining);
     showToast("Question deleted from pool.");
 
-    // Select another question
     if (remaining.length > 0) {
       setSelectedId(remaining[0].id);
     } else {
@@ -2683,77 +2758,11 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
     }
   };
 
-  // Simulates AI regeneration of the question
-  const handleRegenerateQuestion = (qId) => {
-    setIsGenerating(true);
-    showToast("Generating alternative scenario with AI...");
-
-    setTimeout(() => {
-      setIsGenerating(false);
-      setGeneratedQuestions(prev => prev.map(q => {
-        if (q.id === qId) {
-          if (q.type?.includes('CODING') || q.type === 'SCENARIO_CODING' || q.type === 'SCENARIO') {
-            if (q.subject === 'Python') {
-              return {
-                ...q,
-                question: 'Write a Python function to find the length of the longest substring without repeating characters.',
-                problemStatement: 'Write a Python function to find the length of the longest substring without repeating characters.',
-                exampleInput: 'abcabcbb',
-                exampleOutput: '3',
-                constraints: ['Length <= 5 * 10^4', 'ASCII characters only', 'Time complexity O(N)'],
-                expectedAnswer: 'def length_of_longest_substring(s):\n    char_map = {}\n    max_len = start = 0\n    for idx, char in enumerate(s):\n        if char in char_map and char_map[char] >= start:\n            start = char_map[char] + 1\n        char_map[char] = idx\n        max_len = max(max_len, idx - start + 1)\n    return max_len',
-                explanation: 'A sliding window approach is used. The start pointer is moved to one position past the last occurrence of the duplicate character when a duplicate is found in the current window.',
-                difficulty: 'Hard',
-                estimatedTime: '20 Minutes'
-              };
-            } else {
-              // SQL
-              return {
-                ...q,
-                question: 'Write an SQL query to find employees who have the highest salary in each of the departments.',
-                problemStatement: 'Write an SQL query to find employees who have the highest salary in each of the departments. Return the Department, Employee name, and Salary.',
-                exampleInput: 'Employee Table:\n+----+-------+--------+--------------+\n| Id | Name  | Salary | DepartmentId |\n+----+-------+--------+--------------+\n| 1  | Joe   | 70000  | 1            |\n| 2  | Jim   | 90000  | 1            |\n| 3  | Henry | 80000  | 2            |\n| 4  | Sam   | 60000  | 2            |\n+----+-------+--------+--------------+\n\nDepartment Table:\n+----+-------+\n| Id | Name  |\n+----+-------+\n| 1  | IT    |\n| 2  | Sales |\n+----+-------+',
-                exampleOutput: '+------------+----------+--------+\n| Department | Employee | Salary |\n+------------+----------+--------+\n| IT         | Jim      | 90000  |\n| Sales      | Henry    | 80000  |\n+------------+----------+--------+',
-                constraints: ['Handle department empty cases', 'Include multiple employees if salaries tie'],
-                expectedAnswer: 'SELECT d.Name AS Department, e.Name AS Employee, e.Salary\nFROM Employee e\nJOIN Department d ON e.DepartmentId = d.Id\nWHERE (e.DepartmentId, e.Salary) IN (\n    SELECT DepartmentId, MAX(Salary)\n    FROM Employee\n    GROUP BY DepartmentId\n);',
-                explanation: 'The query joins the Employee and Department tables. It filters rows where the employee\'s department and salary match the department maximum salary computed in the subquery.',
-                difficulty: 'Medium',
-                estimatedTime: '15 Minutes'
-              };
-            }
-          } else {
-            // MCQ
-            return {
-              ...q,
-              question: 'Which of the following is correct about Python decorators?',
-              options: [
-                'Decorators are function modifiers that alter a function dynamically',
-                'Decorators must always return the input function unmodified',
-                'Decorators can only be applied to class methods, not plain functions',
-                'Decorators are executed every time the decorated function is called'
-              ],
-              correctAnswer: 'Decorators are function modifiers that alter a function dynamically',
-              explanation: 'Decorators allow wrapping another function to extend the behavior of the wrapped function without permanently modifying it.',
-              difficulty: 'Hard'
-            };
-          }
-        }
-        return q;
-      }));
-      showToast("Question successfully regenerated with alternative AI scenario!");
-    }, 1200);
-  };
-
   const handleSaveChanges = (e) => {
     e.preventDefault();
-    
     let parsedHiddenTestCases = [];
     try {
       parsedHiddenTestCases = JSON.parse(editForm.hiddenTestCases || '[]');
-      if (!Array.isArray(parsedHiddenTestCases)) {
-        showToast("Hidden test cases must be a JSON array.");
-        return;
-      }
     } catch (_err) {
       showToast("Invalid JSON syntax in Hidden Test Cases.");
       return;
@@ -2783,7 +2792,7 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
           sampleInput: editForm.sampleInput,
           sampleOutput: editForm.sampleOutput,
           hiddenTestCases: parsedHiddenTestCases,
-          marks: parseFloat(editForm.marks) || 10
+          marks: parseFloat(editForm.marks) || (editForm.type === 'MCQ' ? 1 : 10)
         };
       }
       return q;
@@ -2791,6 +2800,72 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
     setIsEditing(false);
     showToast("Changes saved successfully!");
   };
+
+  // Loading state render
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-6 w-full animate-fade-in">
+        <div className="bg-dash-white-card border border-dash-border-gray rounded-[24px] p-12 shadow-sm flex flex-col items-center justify-center text-center my-auto min-h-[420px]">
+          <div className="w-16 h-16 rounded-2xl bg-dash-primary-purple/10 border border-dash-primary-purple/20 flex items-center justify-center text-dash-primary-purple mb-4 shadow-sm">
+            <RefreshCw size={32} className="animate-spin" />
+          </div>
+          <h3 className="font-outfit font-extrabold text-lg sm:text-xl text-dash-dark-purple mb-2">
+            Loading Assessment Preview...
+          </h3>
+          <p className="text-xs sm:text-sm text-dash-light-purple font-semibold max-w-md leading-relaxed">
+            Fetching latest assessment questions and configuration dynamically from the database.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state render
+  if (fetchError) {
+    return (
+      <div className="flex flex-col gap-6 w-full animate-fade-in">
+        <div className="bg-dash-white-card border border-red-200 rounded-[24px] p-12 shadow-sm flex flex-col items-center justify-center text-center my-auto min-h-[420px]">
+          <div className="w-16 h-16 rounded-2xl bg-red-50 border border-red-200 flex items-center justify-center text-red-500 mb-4 shadow-sm">
+            <AlertCircle size={32} />
+          </div>
+          <h3 className="font-outfit font-extrabold text-lg sm:text-xl text-red-900 mb-2">
+            Failed to Load Assessment
+          </h3>
+          <p className="text-xs sm:text-sm text-red-600 font-semibold max-w-md leading-relaxed mb-6">
+            {fetchError}
+          </p>
+          <button
+            onClick={() => fetchAssessmentData(previewAssessmentId || savedAssessments?.[0]?.id)}
+            className="px-5 py-2.5 rounded-xl bg-dash-primary-purple text-white font-bold text-xs hover:bg-dash-dark-purple transition-all shadow-md flex items-center gap-2 cursor-pointer border-none"
+          >
+            <RefreshCw size={15} />
+            <span>Retry Loading</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Empty state when no questions/assessments exist
+  if (!generatedQuestions || generatedQuestions.length === 0) {
+    return (
+      <div className="flex flex-col gap-6 w-full animate-fade-in">
+        <div className="bg-dash-white-card border border-dash-border-gray rounded-[24px] p-12 shadow-[0_4px_20px_rgba(87,82,170,0.03)] flex flex-col items-center justify-center text-center my-auto min-h-[420px]">
+          <div className="w-16 h-16 rounded-2xl bg-dash-primary-purple/10 border border-dash-primary-purple/20 flex items-center justify-center text-dash-primary-purple mb-4 shadow-sm">
+            <FileText size={32} />
+          </div>
+          <h3 className="font-outfit font-extrabold text-lg sm:text-xl text-dash-dark-purple mb-2">
+            No Assessment Preview
+          </h3>
+          <p className="text-xs sm:text-sm text-dash-light-purple font-semibold max-w-md leading-relaxed">
+            No assessment created yet. Create and save an assessment to preview the generated questions.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const totalMarks = generatedQuestions.reduce((sum, q) => sum + (q.marks || (q.type === 'MCQ' ? 1 : 10)), 0);
 
   const filteredQuestions = generatedQuestions.filter(q => {
     const query = searchQuery.toLowerCase();
@@ -2805,12 +2880,44 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
       {/* Assessment Question Pool Sub-Header */}
       <div className="bg-dash-white-card border border-dash-border-gray rounded-[24px] p-5 px-6 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[10px] font-extrabold text-dash-primary-purple bg-dash-primary-purple/10 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+              Assessment Preview Mode
+            </span>
+            {savedAssessments && savedAssessments.length > 0 && (
+              <select
+                value={previewAssessmentId || (savedAssessments[0]?.id || '')}
+                onChange={(e) => {
+                  if (onSelectAssessment) onSelectAssessment(e.target.value);
+                  fetchAssessmentData(e.target.value);
+                }}
+                className="bg-dash-white-card border border-dash-border-gray/70 rounded-xl py-1 px-3 text-xs font-bold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple cursor-pointer"
+              >
+                {savedAssessments.map(asm => (
+                  <option key={asm.id} value={asm.id}>
+                    {asm.name} ({asm.questions_count || asm.questions?.length || 0} Qs)
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
           <h3 className="font-outfit font-extrabold text-base text-dash-dark-purple">
-            Confirm AI Assessment Question Pool
+            {activeAssessment?.name || 'Assessment Question Pool Preview'}
           </h3>
-          <p className="text-xs text-dash-light-purple font-medium mt-1">
-            Review the questions generated by AI before finalizing and assigning.
-          </p>
+          <div className="flex flex-wrap items-center gap-2 mt-2 text-[11px] font-semibold text-dash-light-purple">
+            <span className="flex items-center gap-1 bg-dash-light-blue-bg border border-dash-border-gray/40 px-2.5 py-0.5 rounded-lg text-dash-dark-purple font-bold">
+              <Clock size={12} className="text-dash-primary-purple" />
+              {activeAssessment?.duration || '60 minutes'}
+            </span>
+            <span className="flex items-center gap-1 bg-dash-light-blue-bg border border-dash-border-gray/40 px-2.5 py-0.5 rounded-lg text-dash-dark-purple font-bold">
+              <FileText size={12} className="text-dash-primary-purple" />
+              {generatedQuestions.length} Questions
+            </span>
+            <span className="flex items-center gap-1 bg-dash-light-blue-bg border border-dash-border-gray/40 px-2.5 py-0.5 rounded-lg text-dash-dark-purple font-bold">
+              <Award size={12} className="text-dash-primary-purple" />
+              {totalMarks} Total Marks
+            </span>
+          </div>
         </div>
 
         <div className="flex items-center gap-3 shrink-0">
@@ -2843,7 +2950,7 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-dash-primary-purple animate-pulse" />
             <h3 className="font-outfit font-extrabold text-sm text-dash-dark-purple uppercase tracking-wider">
-              AI Question Pool
+              Question Pool
             </h3>
           </div>
           <span className="text-xs font-bold text-dash-primary-purple bg-dash-primary-purple/10 px-2.5 py-0.5 rounded-full border border-dash-primary-purple/10">
@@ -2868,11 +2975,9 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
           )}
         </div>
 
-
-
         {/* Question List container */}
         <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 dashboard-scrollbar">
-          {filteredQuestions.map((q, _idx) => {
+          {filteredQuestions.map((q) => {
             const isSelected = q.id === selectedId;
             const actualIndex = generatedQuestions.findIndex(item => item.id === q.id) + 1;
             const isCoding = q.type?.includes('CODING') || q.type === 'SCENARIO_CODING' || q.type === 'SCENARIO';
@@ -2892,15 +2997,15 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
               >
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <span className={`text-[10px] font-extrabold font-outfit uppercase tracking-wider ${isSelected ? 'text-dash-primary-purple' : 'text-dash-light-purple'}`}>
-                    {isCoding ? 'Scenario Coding' : 'MCQ'} #{actualIndex}
+                    Question #{actualIndex} ({q.type || (isCoding ? 'Scenario' : 'MCQ')})
                   </span>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md border ${diffColor}`}>
-                      {q.difficulty}
+                      {q.difficulty || 'Medium'}
                     </span>
-                    {q.isSaved && (
-                      <CheckCircle className="w-3.5 h-3.5 text-dash-success-green" fill="currentColor" stroke="white" strokeWidth={2.5} />
-                    )}
+                    <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-dash-primary-purple/10 text-dash-primary-purple">
+                      {q.marks || (q.type === 'MCQ' ? 1 : 10)} M
+                    </span>
                   </div>
                 </div>
 
@@ -2929,7 +3034,7 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
         </div>
       </div>
 
-      {/* RIGHT PANEL: SCENARIO-BASED PREVIEW CARD / EDIT INTERFACE */}
+      {/* RIGHT PANEL: QUESTION PREVIEW CARD & EDIT INTERFACE */}
       <div className="lg:col-span-8 bg-dash-white-card border border-dash-border-gray rounded-[24px] p-6 shadow-[0_4px_20px_rgba(87,82,170,0.02)] flex flex-col min-h-[500px] lg:h-[720px] overflow-y-auto">
         {!selectedQuestion ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
@@ -2940,7 +3045,7 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
               No Question Selected
             </h3>
             <p className="text-xs text-dash-light-purple font-medium mt-1.5 max-w-xs">
-              Select an AI generated question from the pool on the left to preview and customize it.
+              Select a question from the pool on the left to preview and customize it.
             </p>
           </div>
         ) : isEditing ? (
@@ -3145,16 +3250,6 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
                       placeholder="def solution(): ..."
                     />
                   </div>
-                  <div>
-                    <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Hidden Test Cases (JSON Array of input/output objects)</label>
-                    <textarea
-                      rows="3"
-                      value={editForm.hiddenTestCases}
-                      onChange={(e) => setEditForm(prev => ({ ...prev, hiddenTestCases: e.target.value }))}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-xs font-mono text-slate-700 focus:outline-none focus:border-dash-primary-purple resize-y"
-                      placeholder='[\n  {"input": "racecar", "output": "True"},\n  {"input": "hello", "output": "False"}\n]'
-                    />
-                  </div>
                 </div>
               ) : (
                 /* DEFAULTS TO SCENARIO EDIT FIELDS */
@@ -3236,85 +3331,76 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
           /* HIGH-FIDELITY PREVIEW CARD VIEW */
           <div className="flex-1 flex flex-col justify-between">
             <div className="space-y-5.5 relative">
-              {/* Loader overlay for Simulated AI Regeneration */}
-              {isGenerating && (
-                <div className="absolute inset-0 bg-dash-white-card/90 z-20 flex flex-col items-center justify-center gap-3 animate-fade-in">
-                  <div className="p-3 rounded-full bg-dash-primary-purple/10 text-dash-primary-purple animate-spin">
-                    <Sparkles size={28} />
-                  </div>
-                  <span className="text-xs font-bold text-dash-primary-purple font-outfit uppercase tracking-widest animate-pulse">
-                    AI Generating Scenario...
-                  </span>
-                </div>
-              )}
-
               {/* Preview Header Row */}
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 border-b border-dash-border-gray/25 pb-3">
                 <div>
                   <span className="text-[10px] text-dash-primary-purple font-extrabold tracking-widest uppercase font-outfit">
-                    {selectedQuestion.type === 'PYTHON_CODING' ? 'Python Coding Question' : (selectedQuestion.type === 'MCQ' ? 'Multiple Choice Question' : 'Scenario Based Question')}
+                    Question {generatedQuestions.findIndex(q => q.id === selectedId) + 1} of {generatedQuestions.length} ({selectedQuestion?.type || 'MCQ'})
                   </span>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="font-outfit font-extrabold text-base text-dash-dark-purple">
                       Previewing Question Details
                     </span>
-                    {selectedQuestion.isSaved && (
-                      <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-dash-success-green/10 text-dash-success-green border border-dash-success-green/20 flex items-center gap-1">
-                        <Check size={10} strokeWidth={3} />
-                        Saved
-                      </span>
-                    )}
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2 text-xs font-bold text-dash-light-purple">
                   <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-dash-dark-purple/80 bg-dash-light-blue-bg border border-dash-border-gray/30 px-2.5 py-1 rounded-xl">
                     <BookOpen size={12} className="text-dash-primary-purple" />
-                    {selectedQuestion.subject}
+                    {selectedQuestion?.subject}
                   </span>
                   <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-dash-dark-purple/80 bg-dash-light-blue-bg border border-dash-border-gray/30 px-2.5 py-1 rounded-xl">
                     <Clock size={12} className="text-dash-primary-purple" />
-                    {selectedQuestion.estimatedTime || '15 Minutes'}
+                    {selectedQuestion?.estimatedTime || '15 Minutes'}
                   </span>
                 </div>
               </div>
 
-              {/* Premium Question Card Details Metadata Block */}
-              <div className="bg-dash-light-blue-bg/30 border border-dash-border-gray/40 rounded-2xl p-4.5 grid grid-cols-3 gap-4 items-center">
+              {/* Metadata Cards Grid */}
+              <div className="bg-dash-light-blue-bg/30 border border-dash-border-gray/40 rounded-2xl p-4.5 grid grid-cols-4 gap-4 items-center">
                 <div>
                   <span className="text-[10px] font-bold text-dash-light-purple uppercase tracking-wider block mb-1">
                     Question No
                   </span>
                   <span className="text-xs font-extrabold text-dash-dark-purple font-outfit">
-                    {generatedQuestions.findIndex(q => q.id === selectedId) + 1}
+                    #{generatedQuestions.findIndex(q => q.id === selectedId) + 1}
                   </span>
                 </div>
 
                 <div>
                   <span className="text-[10px] font-bold text-dash-light-purple uppercase tracking-wider block mb-1">
-                    Category
+                    Question Type
                   </span>
-                  <span className="text-xs font-extrabold text-dash-dark-purple font-outfit">
-                    {selectedQuestion.subject}
+                  <span className="text-xs font-extrabold text-dash-primary-purple font-outfit">
+                    {selectedQuestion?.type || 'MCQ'}
                   </span>
                 </div>
 
                 <div>
                   <span className="text-[10px] font-bold text-dash-light-purple uppercase tracking-wider block mb-1">
-                    Estimated Time
+                    Marks
                   </span>
                   <span className="text-xs font-extrabold text-dash-dark-purple font-outfit">
-                    {selectedQuestion.estimatedTime || '15 Minutes'}
+                    {selectedQuestion?.marks || (selectedQuestion?.type === 'MCQ' ? 1 : 10)} Marks
                   </span>
                 </div>
 
-                <div className="col-span-3 pt-3.5 mt-1.5 border-t border-dash-border-gray/40 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-bold text-dash-light-purple uppercase tracking-wider block mb-1">
+                    Est. Duration
+                  </span>
+                  <span className="text-xs font-extrabold text-dash-dark-purple font-outfit">
+                    {selectedQuestion?.estimatedTime || '5 Minutes'}
+                  </span>
+                </div>
+
+                <div className="col-span-4 pt-3.5 mt-1.5 border-t border-dash-border-gray/40 flex items-center justify-between">
                   <span className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider">
                     Difficulty Level
                   </span>
                   <div className="flex items-center gap-1 bg-dash-white-card border border-dash-border-gray/80 p-0.5 rounded-lg">
                     {['Easy', 'Medium', 'Hard'].map((lvl) => {
-                      const isActive = selectedQuestion.difficulty === lvl;
+                      const isActive = selectedQuestion?.difficulty === lvl;
                       let activeStyle = '';
                       if (isActive) {
                         if (lvl === 'Easy') activeStyle = 'bg-green-600 text-white shadow-sm';
@@ -3328,7 +3414,7 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
                         <button
                           key={lvl}
                           type="button"
-                          onClick={() => handleDifficultyChange(selectedQuestion.id, lvl)}
+                          onClick={() => handleDifficultyChange(selectedQuestion?.id, lvl)}
                           className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all border-none cursor-pointer ${activeStyle}`}
                         >
                           {lvl}
@@ -3341,26 +3427,26 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
 
               {/* Main Content Area */}
               <div className="space-y-4.5">
-                {/* 1. Problem Statement */}
+                {/* Problem Statement */}
                 <div className="space-y-1.5">
                   <h4 className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
-                    Problem Statement
+                    Question / Problem Statement
                   </h4>
                   <p className="text-xs font-semibold text-dash-dark-purple leading-relaxed bg-dash-white-card border border-dash-border-gray/40 p-4 rounded-2xl shadow-[0_2px_8px_rgba(87,82,170,0.01)] select-text">
-                    {selectedQuestion.problemStatement || selectedQuestion.question || selectedQuestion.scenario}
+                    {selectedQuestion?.problemStatement || selectedQuestion?.question || selectedQuestion?.scenario}
                   </p>
                 </div>
 
-                {/* MCQ Options Display (for MCQ type) */}
-                {!(selectedQuestion.type?.includes('CODING') || selectedQuestion.type === 'SCENARIO_CODING' || selectedQuestion.type === 'SCENARIO') && (
+                {/* MCQ Options Display */}
+                {!(selectedQuestion?.type?.includes('CODING') || selectedQuestion?.type === 'SCENARIO_CODING' || selectedQuestion?.type === 'SCENARIO') && selectedQuestion?.options?.length > 0 && (
                   <div className="space-y-2">
                     <h4 className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
                       Options & Correct Answer
                     </h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                      {selectedQuestion.options?.map((opt, idx) => {
+                      {selectedQuestion.options.map((opt, idx) => {
                         const isCorrect = opt === selectedQuestion.correctAnswer;
-                        const label = ['A', 'B', 'C', 'D'][idx] || '';
+                        const label = ['A', 'B', 'C', 'D'][idx] || `${idx + 1}`;
                         return (
                           <div
                             key={idx}
@@ -3386,91 +3472,43 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
                   </div>
                 )}
 
-                {/* Example Input / Output (only for coding scenario) */}
-                {selectedQuestion.type === 'PYTHON_CODING' ? (
-                  <div className="space-y-3.5 bg-slate-50 border border-slate-200/50 rounded-2xl p-4 shadow-[0_2px_8px_rgba(87,82,170,0.01)]">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-b border-slate-200/40 pb-3">
-                      <div>
-                        <span className="block font-bold text-slate-400 uppercase tracking-wider text-[9px] mb-1">Input Format:</span>
-                        <p className="text-xs font-semibold text-slate-700">{selectedQuestion.inputFormat || "N/A"}</p>
-                      </div>
-                      <div>
-                        <span className="block font-bold text-slate-400 uppercase tracking-wider text-[9px] mb-1">Output Format:</span>
-                        <p className="text-xs font-semibold text-slate-700">{selectedQuestion.outputFormat || "N/A"}</p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
-                      <div className="space-y-1">
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Sample Input</span>
-                        <pre className="bg-white border border-slate-200 rounded-xl p-2.5 font-mono text-[11px] text-slate-700 whitespace-pre-wrap select-text">{selectedQuestion.sampleInput || "N/A"}</pre>
-                      </div>
-                      <div className="space-y-1">
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Sample Output</span>
-                        <pre className="bg-white border border-slate-200 rounded-xl p-2.5 font-mono text-[11px] text-slate-700 whitespace-pre-wrap select-text">{selectedQuestion.sampleOutput || "N/A"}</pre>
-                      </div>
-                    </div>
-                    {selectedQuestion.hiddenTestCases && selectedQuestion.hiddenTestCases.length > 0 && (
-                      <div className="space-y-1 mt-2 border-t border-slate-200/40 pt-3">
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Hidden Test Cases Configured</span>
-                        <span className="text-xs font-bold text-dash-primary-purple bg-dash-primary-purple/10 px-3 py-1 rounded-md border border-dash-primary-purple/10">{selectedQuestion.hiddenTestCases.length} Test Cases</span>
-                      </div>
-                    )}
-                  </div>
-                ) : (selectedQuestion.type?.includes('CODING') || selectedQuestion.type === 'SCENARIO_CODING' || selectedQuestion.type === 'SCENARIO') ? (
+                {/* Example Input / Output for Scenario/Coding */}
+                {(selectedQuestion?.exampleInput || selectedQuestion?.exampleOutput || selectedQuestion?.sampleInput || selectedQuestion?.sampleOutput) && (
                   <div className="space-y-2">
                     <h4 className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
-                      Example
+                      Sample Input & Output
                     </h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {/* Input Box */}
                       <div className="space-y-1">
                         <span className="text-[9px] font-bold text-dash-light-purple uppercase tracking-wider">Input</span>
                         <div className="bg-[#fafafc] border border-dash-border-gray/50 rounded-xl p-3 font-mono text-[11px] text-dash-dark-purple flex items-center gap-2">
                           <Terminal size={12} className="text-dash-light-purple shrink-0" />
-                          <span className="select-text whitespace-pre-wrap">{selectedQuestion.exampleInput || 'No input details'}</span>
+                          <span className="select-text whitespace-pre-wrap">{selectedQuestion?.exampleInput || selectedQuestion?.sampleInput || 'N/A'}</span>
                         </div>
                       </div>
-                      {/* Output Box */}
                       <div className="space-y-1">
                         <span className="text-[9px] font-bold text-dash-light-purple uppercase tracking-wider">Output</span>
                         <div className="bg-[#fafafc] border border-dash-border-gray/50 rounded-xl p-3 font-mono text-[11px] text-dash-dark-purple flex items-center gap-2">
                           <Play size={12} className="text-dash-light-purple shrink-0" />
-                          <span className="select-text whitespace-pre-wrap">{selectedQuestion.exampleOutput || 'No output details'}</span>
+                          <span className="select-text whitespace-pre-wrap">{selectedQuestion?.exampleOutput || selectedQuestion?.sampleOutput || 'N/A'}</span>
                         </div>
                       </div>
                     </div>
                   </div>
-                ) : null}
-
-                {/* Constraints (only for coding scenario) */}
-                {(selectedQuestion.type?.includes('CODING') || selectedQuestion.type === 'SCENARIO_CODING' || selectedQuestion.type === 'SCENARIO') && selectedQuestion.constraints && selectedQuestion.constraints.length > 0 && (
-                  <div className="space-y-1.5">
-                    <h4 className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
-                      Constraints
-                    </h4>
-                    <div className="bg-[#fefaf6] border border-[#f59e0b]/15 rounded-2xl p-4 flex flex-col gap-2 shadow-sm">
-                      {selectedQuestion.constraints.map((c, i) => (
-                        <div key={i} className="flex items-center gap-2 text-xs font-semibold text-dash-dark-purple/85">
-                          <div className="w-1.5 h-1.5 rounded-full bg-[#f59e0b] shrink-0" />
-                          <span>{c}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
                 )}
 
-                {/* Expected Answer (Code Box or correct option) */}
+                {/* Expected Answer Details */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <h4 className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
-                      {selectedQuestion.type === 'MCQ' ? 'Correct Answer Details' : 'Expected Answer'}
+                      {selectedQuestion?.type === 'MCQ' ? 'Correct Answer Details' : 'Expected Solution'}
                     </h4>
-                    {selectedQuestion.expectedAnswer && (
+                    {selectedQuestion?.expectedAnswer && (
                       <button
                         onClick={() => handleCopyCode(selectedQuestion.expectedAnswer, selectedQuestion.id)}
                         className="px-2.5 py-1 rounded-lg border border-dash-border-gray text-[9px] font-bold text-dash-primary-purple hover:bg-dash-soft-pink transition-all flex items-center gap-1 cursor-pointer"
                       >
-                        {copiedId === selectedQuestion.id ? (
+                        {copiedId === selectedQuestion?.id ? (
                           <>
                             <Check size={10} strokeWidth={3} className="text-green-600" />
                             <span className="text-green-600">Copied!</span>
@@ -3485,7 +3523,7 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
                     )}
                   </div>
 
-                  {selectedQuestion.type === 'MCQ' ? (
+                  {selectedQuestion?.type === 'MCQ' ? (
                     <div className="bg-green-50/40 border border-green-200 text-green-700 rounded-xl p-3.5 font-semibold text-xs flex items-center gap-2">
                       <CheckCircle className="text-green-600 shrink-0" size={16} />
                       <span>{selectedQuestion.correctAnswer}</span>
@@ -3493,18 +3531,18 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
                   ) : (
                     <div className="bg-[#fafafc] border border-dash-border-gray/50 rounded-2xl p-4.5 overflow-hidden shadow-inner border-l-4 border-l-dash-primary-purple relative">
                       <div className="absolute right-3.5 top-3.5 text-[9px] font-bold text-dash-light-purple/60 font-mono uppercase tracking-wider select-none">
-                        python
+                        {selectedQuestion?.subject?.toLowerCase() === 'sql' ? 'sql' : 'python'}
                       </div>
                       <SyntaxHighlighter
-                        code={selectedQuestion.expectedAnswer}
-                        language={selectedQuestion.subject.toLowerCase() === 'sql' ? 'sql' : 'python'}
+                        code={selectedQuestion?.expectedAnswer || selectedQuestion?.correctAnswer || '# Solution code'}
+                        language={selectedQuestion?.subject?.toLowerCase() === 'sql' ? 'sql' : 'python'}
                       />
                     </div>
                   )}
                 </div>
 
                 {/* Explanation */}
-                {selectedQuestion.explanation && (
+                {selectedQuestion?.explanation && (
                   <div className="space-y-1.5 pb-2">
                     <h4 className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
                       Explanation
@@ -3517,7 +3555,7 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
               </div>
             </div>
 
-            {/* Preview Action Buttons Footer */}
+            {/* Action buttons footer */}
             <div className="flex items-center gap-3 border-t border-dash-border-gray/25 pt-4 mt-4">
               <button
                 type="button"
@@ -3530,7 +3568,7 @@ const QuestionPreviewHub = ({ generatedQuestions, setGeneratedQuestions, showToa
 
               <button
                 type="button"
-                onClick={() => handleDeleteQuestion(selectedQuestion.id)}
+                onClick={() => handleDeleteQuestion(selectedQuestion?.id)}
                 className="flex-1 py-3 rounded-xl border border-red-200 hover:border-red-300 bg-red-50/50 hover:bg-red-50 text-red-600 font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer"
                 title="Delete Question"
               >
@@ -4178,6 +4216,148 @@ const AssessmentsManager = ({
           onClose={() => setViewingAssignedModalAssessment(null)}
         />
       )}
+    </div>
+  );
+};
+
+// ==========================================
+// EXPIRED ASSESSMENTS MANAGER COMPONENT
+// ==========================================
+const ExpiredAssessmentsManager = ({ assignments = [], fetchAssignments, showToast }) => {
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const expiredAssignments = useMemo(() => {
+    const list = Array.isArray(assignments) ? assignments : [];
+    const now = Date.now();
+    return list.filter(a => {
+      if (!a) return false;
+      const st = (a.status || '').toUpperCase();
+      if (st === 'EXPIRED') return true;
+      
+      if (st !== 'COMPLETED' && st !== 'SUBMITTED') {
+        const endTimeVal = a.endTime || a.end_time || a.dueDate || a.due_date;
+        if (endTimeVal && new Date(endTimeVal).getTime() < now) {
+          return true;
+        }
+      }
+      return false;
+    });
+  }, [assignments]);
+
+  const filteredExpired = expiredAssignments.filter(a => {
+    const q = searchQuery.toLowerCase();
+    const candName = (a.candidateName || a.candidate?.full_name || a.candidate?.name || '').toLowerCase();
+    const candEmail = (a.candidateEmail || a.candidate?.email || '').toLowerCase();
+    const asmName = (a.assessmentName || a.assessment?.name || '').toLowerCase();
+    return candName.includes(q) || candEmail.includes(q) || asmName.includes(q);
+  });
+
+  return (
+    <div className="flex flex-col gap-6 animate-fade-in w-full">
+      {/* Tab Header */}
+      <div className="flex items-center justify-between bg-dash-white-card border border-dash-border-gray/50 rounded-[20px] p-5 shadow-sm">
+        <div>
+          <h2 className="font-outfit font-bold text-lg text-dash-dark-purple leading-tight flex items-center gap-2">
+            <Clock size={20} className="text-rose-500" />
+            <span>Expired Candidates & Assessments</span>
+          </h2>
+          <p className="text-xs text-dash-light-purple font-semibold mt-1">
+            Track candidates whose assigned assessments have passed their expiration window or due date.
+          </p>
+        </div>
+        <button
+          onClick={fetchAssignments}
+          className="p-2 border border-dash-border-gray hover:bg-dash-light-blue-bg/40 rounded-xl text-dash-dark-purple font-semibold text-xs transition-all flex items-center gap-1.5 cursor-pointer bg-white"
+        >
+          <RefreshCw size={13} />
+          <span>Refresh</span>
+        </button>
+      </div>
+
+      {/* Main Table Card */}
+      <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-[28px] p-6 shadow-sm overflow-hidden flex flex-col gap-5">
+        {/* Search */}
+        <div className="relative w-full sm:max-w-md">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-dash-light-purple" />
+          <input
+            type="text"
+            placeholder="Search candidate name, email, or assessment..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-white border border-dash-border-gray rounded-xl py-2.5 pl-10 pr-4 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple"
+          />
+        </div>
+
+        {/* Content */}
+        {filteredExpired.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center gap-2">
+            <AlertCircle size={36} className="text-dash-light-purple/40" />
+            <h4 className="font-plus-jakarta font-extrabold text-sm text-dash-dark-purple">No Expired Assessments</h4>
+            <p className="text-xs text-dash-light-purple font-medium max-w-xs">
+              {searchQuery ? `No expired assessments match "${searchQuery}".` : 'There are currently no expired candidate assessments.'}
+            </p>
+          </div>
+        ) : (
+          <div className="w-full overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-dash-border-gray/25 text-[10px] text-dash-light-purple font-extrabold uppercase tracking-wider">
+                  <th className="pb-3.5 pl-2">Candidate Name</th>
+                  <th className="pb-3.5">Assessment Name</th>
+                  <th className="pb-3.5">Assigned Date</th>
+                  <th className="pb-3.5">Expiration Date</th>
+                  <th className="pb-3.5 text-right pr-2">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-dash-border-gray/10 text-xs font-semibold">
+                {filteredExpired.map((a) => {
+                  const candidateName = a.candidateName || a.candidate?.full_name || a.candidate?.name || 'Candidate';
+                  const candidateEmail = a.candidateEmail || a.candidate?.email || '';
+                  const assessmentName = a.assessmentName || a.assessment?.name || 'Assessment';
+                  const rawAssigned = a.assignedAt || a.assigned_at || a.created_at;
+                  const rawExp = a.dueDate || a.due_date || a.endTime || a.end_time;
+
+                  const assignedFormatted = rawAssigned ? new Date(rawAssigned).toLocaleString(undefined, {
+                    year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                  }) : 'N/A';
+
+                  const expFormatted = rawExp ? new Date(rawExp).toLocaleString(undefined, {
+                    year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                  }) : 'Expired';
+
+                  return (
+                    <tr key={a.id} className="hover:bg-rose-50/20 transition-colors">
+                      <td className="py-4 pl-2">
+                        <div className="flex flex-col">
+                          <span className="text-dash-dark-purple font-bold text-xs">{candidateName}</span>
+                          {candidateEmail && <span className="text-[10px] text-dash-light-purple font-medium">{candidateEmail}</span>}
+                        </div>
+                      </td>
+                      <td className="py-4">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-dash-light-blue-bg/60 border border-dash-border-gray text-dash-primary-purple font-bold text-xs">
+                          {assessmentName}
+                        </span>
+                      </td>
+                      <td className="py-4 text-dash-light-purple">
+                        {assignedFormatted}
+                      </td>
+                      <td className="py-4 text-rose-600 font-bold">
+                        {expFormatted}
+                      </td>
+                      <td className="py-4 text-right pr-2">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wide bg-rose-50 border border-rose-200 text-rose-700">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                          Expired
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
@@ -5406,6 +5586,10 @@ const ResultsManager = ({ showToast, candidateGroups = [], candidates = [] }) =>
                           <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider block">Full-screen Exits</span>
                           <span className="text-xs font-extrabold text-rose-600">{summary.fullScreenExits || 0}</span>
                         </div>
+                        <div className="bg-white border border-slate-200/70 rounded-xl p-2.5">
+                          <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider block">Right-Click Attempts</span>
+                          <span className="text-xs font-extrabold text-slate-700">{summary.rightClickAttempts || 0}</span>
+                        </div>
                       </div>
 
                       {/* Candidate Justification Reason */}
@@ -5808,7 +5992,8 @@ const GroupsManager = ({ candidateGroups, setCandidateGroups, candidates, showTo
       )}
     </div>
   );
-};
+}
+
 
 
 const EnglishResultsManager = ({ showToast, handleOpenEnglishReport }) => {

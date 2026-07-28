@@ -4,7 +4,7 @@ import { AnimatePresence } from 'framer-motion';
 import LoginCard from '../components/LoginCard';
 import RecruiterAnimation from '../components/RecruiterAnimation';
 import CandidateAnimation from '../components/CandidateAnimation';
-import logo from '../assets/logo.svg';
+import logo from '../assets/systech.jpg';
 
 const Login = () => {
   const [role, setRole] = useState('recruiter'); // 'recruiter' or 'candidate'
@@ -58,12 +58,11 @@ const Login = () => {
           }`}
       >
         {/* Brand Header */}
-        <div className="flex items-center gap-3 max-w-[220px]">
+        <div className="flex items-center gap-3">
           <img
             src={logo}
             alt="RecruitAI Logo"
-            className={`h-12 w-auto transition-colors duration-500 ${isRecruiter ? 'text-recruiter-text-main' : 'text-candidate-text-main'
-              }`}
+            className="h-16 md:h-20 w-auto rounded-xl object-contain shadow-md"
           />
         </div>
 

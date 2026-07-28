@@ -163,14 +163,19 @@ export const useExamSecurity = ({
       type.includes('Fullscreen') ? 'FULLSCREEN_EXIT' : 'OTHER_VIOLATION'
     );
 
-    // Prevent duplicate events of the same activityType within 1000ms
-    const duplicate = violationsRef.current.find(
-      (v) => (v.activityType === mappedType || v.type === type) && now - v.timestamp < 1000
-    );
+    // Prevent duplicate warning events (fullscreen exit, esc key, tab switch, blur) within 1500ms
+    const isWarningType = isWarningViolation || ['TAB_SWITCH', 'WINDOW_BLUR', 'ESC_KEY', 'FULLSCREEN_EXIT'].includes(mappedType);
+    const duplicate = violationsRef.current.find((v) => {
+      if (now - v.timestamp >= 1500) return false;
+      if (isWarningType && ['TAB_SWITCH', 'WINDOW_BLUR', 'ESC_KEY', 'FULLSCREEN_EXIT'].includes(v.activityType)) {
+        return true;
+      }
+      return v.activityType === mappedType || v.type === type;
+    });
     if (duplicate) return;
 
     let currentWarnCount = exitCountRef.current;
-    if (isWarningViolation || ['TAB_SWITCH', 'WINDOW_BLUR', 'ESC_KEY', 'FULLSCREEN_EXIT'].includes(mappedType)) {
+    if (isWarningType) {
       currentWarnCount = incrementWarningAndCheckLock(`${type}: ${description}`);
     }
 
@@ -186,15 +191,15 @@ export const useExamSecurity = ({
 
     lastViolationTimeRef.current = now;
 
+    // Synchronously update ref so rapid browser event callbacks (keydown -> fullscreenchange) recognize duplicate
+    const updatedViolations = [...violationsRef.current, newViolation];
+    violationsRef.current = updatedViolations;
+
     let deduction = 15;
     if (severity === 'Low') deduction = 5;
     if (severity === 'High') deduction = 30;
 
-    setViolations((prev) => {
-      const updated = [...prev, newViolation];
-      violationsRef.current = updated;
-      return updated;
-    });
+    setViolations(updatedViolations);
 
     setTrustScore((prev) => {
       const updatedScore = Math.max(0, prev - deduction);
@@ -433,15 +438,14 @@ export const useExamSecurity = ({
         // Prevent duplicate events within 1500ms
         if (now - lastExitTimeRef.current > 1500) {
           lastExitTimeRef.current = now;
-          const nextCount = incrementWarningAndCheckLock('Exited full-screen mode 4 times.');
-
           triggerViolation(
             `Fullscreen Exit`,
-            `Exited full-screen mode (Warning ${nextCount} of 3).`,
-            nextCount >= 3 ? 'High' : 'Medium',
+            `Exited full-screen mode.`,
+            'Medium',
             'FULLSCREEN_EXIT',
-            false
+            true
           );
+          const nextCount = exitCountRef.current;
           if (nextCount < 4) {
             setIsFullscreenGraceActive(true);
             setGraceSecondsLeft(gracePeriodSeconds);

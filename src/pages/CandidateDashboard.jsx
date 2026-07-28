@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import Editor from '@monaco-editor/react';
+import logo from '../assets/systech.jpg';
 import api from '../api';
 import { useExamSecurity } from '../hooks/useExamSecurity';
 import { ExamSecurityMonitor } from '../components/ExamSecurityMonitor';
@@ -371,6 +372,29 @@ const sortQuestionsForCandidate = (rawQuestions) => {
   return sorted;
 };
 
+const isQuestionAnswered = (q, idx, answers) => {
+  if (!q || answers === undefined || answers === null) return false;
+  const ans = answers[idx];
+  if (ans === undefined || ans === null || ans === '') return false;
+
+  const isMcq = (q.type || q.question_type || '').toUpperCase() === 'MCQ' || (Array.isArray(q.options) && q.options.length > 0);
+  if (isMcq) {
+    return String(ans).trim() !== '';
+  }
+
+  // Default starter templates
+  const starter = q.starterCode || q.starter_code || q.codeTemplate || q.exampleCode || '';
+  const isSql = (q.subject || q.language || '').toLowerCase().includes('sql') || (q.question || '').toUpperCase().includes('SELECT');
+  const isCoding = isSql || (q.type || '').includes('CODING') || (q.subject || q.language || '').toLowerCase().includes('python');
+
+  const trimmedAns = String(ans).trim();
+  if (starter && trimmedAns === String(starter).trim()) return false;
+  if (isSql && trimmedAns === '-- Write your SQL query here') return false;
+  if (isCoding && trimmedAns === 'def solution():\n    pass\n\nif __name__ == "__main__":\n    solution()') return false;
+
+  return trimmedAns.length > 0;
+};
+
 const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -426,12 +450,12 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
   useEffect(() => {
     return () => {
       if (recognitionRef.current) {
-        try { recognitionRef.current.stop(); } catch (e) {}
+        try { recognitionRef.current.stop(); } catch (e) { }
       }
       if (mediaStreamRef.current) {
         try {
           mediaStreamRef.current.getTracks().forEach(track => track.stop());
-        } catch (e) {}
+        } catch (e) { }
       }
     };
   }, []);
@@ -466,12 +490,12 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       setEnglishInterview(res.data);
       setEnglishTimeLeft(900);
       setEnglishText('');
-      
+
       // Auto TTS first question if not muted
       if (res.data && res.data.ai_question && !isMuted) {
         setTimeout(() => speakQuestion(res.data.ai_question), 800);
       }
-      
+
       showToast("English Interview started! Welcome aboard.");
     } catch (err) {
       console.error("Failed to start English Assessment:", err);
@@ -487,7 +511,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
   const handleRespondEnglish = async (textToSend) => {
     const finalAnswer = (textToSend && typeof textToSend === 'string') ? textToSend : englishText;
     if (!finalAnswer.trim()) return;
-    
+
     // Stop recording if active
     if (isRecording) {
       stopRecording();
@@ -500,14 +524,14 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
         answer: finalAnswer.trim(),
         voice_used: voiceUsed
       };
-      
+
       const res = await api.post('/api/english-assessment/respond', answerPayload);
-      
+
       setEnglishText('');
-      
+
       // Fetch latest status to refresh conversation list
       await fetchEnglishStatus();
-      
+
       showToast("Answer saved successfully!");
       // Speak next question out loud if not muted
       if (res.data && res.data.ai_question && !isMuted) {
@@ -596,7 +620,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       });
 
       showToast('Resume uploaded and analyzed successfully!');
-      
+
       // Update candidate user state so profile contains parsed details
       setCandidate(prev => ({
         ...prev,
@@ -625,7 +649,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       window.speechSynthesis.cancel();
       setAiIsSpeaking(true);
-      
+
       // If mic is recording, temporarily stop it to avoid feedback loop
       if (isRecording) {
         stopRecording();
@@ -634,11 +658,11 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       const cleanText = text.replace(/Welcome to the English Assessment.*?Click "Start Interview" to begin\./gi, '');
       const utterance = new SpeechSynthesisUtterance(cleanText);
       utterance.lang = 'en-US';
-      
+
       const voices = window.speechSynthesis.getVoices();
-      const englishVoice = voices.find(v => v.lang.startsWith('en') && v.name.includes('Google')) || 
-                          voices.find(v => v.lang.startsWith('en')) || 
-                          voices[0];
+      const englishVoice = voices.find(v => v.lang.startsWith('en') && v.name.includes('Google')) ||
+        voices.find(v => v.lang.startsWith('en')) ||
+        voices[0];
       if (englishVoice) {
         utterance.voice = englishVoice;
       }
@@ -720,12 +744,12 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       rec.continuous = true; // Continuous listening, no silence-based auto-stop
       rec.interimResults = true; // Show words as candidate speaks
       rec.lang = 'en-US';
-      
+
       rec.onstart = () => {
         setIsRecording(true);
         setVoiceUsed(true);
       };
-      
+
       rec.onresult = (event) => {
         let localFinalTranscript = '';
         let interimTranscript = '';
@@ -739,12 +763,12 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
         const text = localFinalTranscript + interimTranscript;
         setEnglishText(text);
       };
-      
+
       rec.onerror = (e) => {
         console.error("Speech Recognition Error:", e.error);
         setIsRecording(false);
       };
-      
+
       rec.onend = () => {
         setIsRecording(false);
       };
@@ -765,7 +789,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     if (mediaStreamRef.current) {
       try {
         mediaStreamRef.current.getTracks().forEach(track => track.stop());
-      } catch (e) {}
+      } catch (e) { }
       mediaStreamRef.current = null;
     }
     setIsRecording(false);
@@ -1069,7 +1093,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       try {
         const key = `recruitai_active_exam_${activeAssignment.id}`;
         localStorage.removeItem(key);
-      } catch (_e) {}
+      } catch (_e) { }
     }
   }, [activeAssignment, examState]);
 
@@ -1165,35 +1189,46 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
   };
 
   const handleSubmitExam = async (assignmentIdOverride, securityMetadata = {}) => {
-    const targetId = assignmentIdOverride || activeAssignment?.id;
-    if (!targetId) return;
+    const targetId = assignmentIdOverride || activeAssignment?.id || activeAssignment?.assignmentId || activeAssignment?._id;
+    if (!targetId) {
+      console.error("No active target assignment ID found for submission.");
+      showToast("Error: No active assignment ID found.");
+      return;
+    }
+
+    if (isSubmittingManual) {
+      return;
+    }
 
     setIsSubmittingManual(true);
 
     try {
       try {
         localStorage.removeItem(`recruitai_active_exam_${targetId}`);
-      } catch (_e) {}
+      } catch (_e) { }
 
       const asm = activeAssignment?.assessment || activeAssignment || {};
       const questions = asm.questions || [];
-      const answersPayload = questions.map((q, idx) => ({
-        questionId: String(q.id || q.question),
-        answer: examState.answers[idx] || ""
-      }));
+      const answersPayload = questions.map((q, idx) => {
+        const qId = q.id !== undefined && q.id !== null ? q.id : (q.question || idx);
+        return {
+          questionId: String(qId),
+          answer: examState.answers[idx] !== undefined && examState.answers[idx] !== null ? String(examState.answers[idx]) : ""
+        };
+      });
 
       const durationSeconds = parseDuration(asm.duration || "30") * 60;
-      const timeTaken = Math.max(0, durationSeconds - examState.timeLeft);
+      const timeTaken = Math.max(0, durationSeconds - (examState.timeLeft || 0));
       const isAuto = securityMetadata?.autoSubmitted === true;
 
       const payload = {
         assignmentId: targetId,
         answers: answersPayload,
-        timeTaken: timeTaken,
+        timeTaken: Math.round(timeTaken),
         autoSubmitted: isAuto,
         submissionReason: securityMetadata?.submissionReason || null,
-        warningCount: securityMetadata?.warningCount ?? examSecurity.fullscreenExitCount ?? 0,
-        warningHistory: securityMetadata?.warningHistory || examSecurity.warningHistory || []
+        warningCount: securityMetadata?.warningCount ?? examSecurity?.fullscreenExitCount ?? 0,
+        warningHistory: securityMetadata?.warningHistory || examSecurity?.warningHistory || []
       };
 
       await api.post('/api/assessment/submit', payload);
@@ -1203,7 +1238,9 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       await fetchAssignments();
     } catch (err) {
       console.error("Failed to submit exam:", err);
-      showToast("Error submitting assessment. Please try again.");
+      const detail = err?.response?.data?.detail;
+      const errMsg = typeof detail === 'string' ? detail : (detail?.message || "Error submitting assessment. Please try again.");
+      showToast(errMsg);
     } finally {
       setIsSubmittingManual(false);
     }
@@ -1711,81 +1748,79 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       {/* 1. SIDEBAR (Full-Height Solid Layout matching Recruiter) */}
       {!isExamActive && (
         <aside className="hidden lg:flex flex-col w-[260px] h-screen shrink-0 bg-dash-sidebar-bg pt-8 pb-8 pl-6 pr-0 relative z-30 text-dash-dark-purple shadow-[4px_0_24px_rgba(0,0,0,0.03)] justify-between">
-        <div>
-          {/* Branding */}
-          <div className="flex items-center gap-3 px-2 py-4 mb-6">
-            <div className="w-9 h-9 rounded-xl bg-dash-primary-purple flex items-center justify-center shadow-md">
-              <span className="font-outfit font-extrabold text-dash-white-card text-lg tracking-wider">R</span>
-            </div>
-            <div>
-              <h1 className="font-outfit font-bold text-base tracking-tight text-dash-dark-purple leading-none">RecruitAI</h1>
-              <span className="text-[10px] text-dash-light-purple font-medium tracking-widest uppercase">Candidate Portal</span>
-            </div>
-          </div>
-
-          {/* Navigation Menu */}
-          <nav className="space-y-2">
-            {[
-              { id: 'technical', label: 'Technical Test', icon: Terminal },
-              { id: 'english', label: 'English Speaking', icon: Volume2 },
-            ].map((item) => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    setActiveTab(item.id);
-                    if (item.id !== 'resume' && item.id !== 'technical' && item.id !== 'english') {
-                      showToast(`"${item.label}" feature is coming soon!`);
-                    }
-                  }}
-                  className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-l-[24px] rounded-r-none text-sm font-bold transition-all duration-300 relative group ${isActive
-                    ? 'sidebar-active-tab shadow-sm'
-                    : 'text-dash-light-purple hover:text-dash-dark-purple hover:bg-dash-primary-purple/20'
-                    }`}
-                >
-                  <Icon size={18} className="relative z-10" />
-                  <span className="relative z-10">{item.label}</span>
-                </button>
-              );
-            })}
-          </nav>
-          {/* Centered Lottie Animation */}
-          <div className="flex items-center justify-center py-4 px-6 mt-2">
-            <div className="w-48 h-48 flex items-center justify-center">
-              <DotLottieReact
-                src="https://lottie.host/f5bd2f6c-67a9-44d5-954d-96176d4cb3df/USuWgujLWd.lottie"
-                loop
-                autoplay
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* User Profile & Logout */}
-        <div className="space-y-4">
-          <div className="border-t border-dash-border-gray/25 pt-4 px-2">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-dash-primary-purple flex items-center justify-center font-semibold text-dash-white-card">
-                {(candidate?.name || candidate?.full_name || 'Candidate').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+          <div>
+            {/* Branding */}
+            <div className="flex items-center gap-3 px-2 py-4 mb-6">
+              <img src={logo} alt="RecruitAI Logo" className="w-12 h-12 rounded-2xl object-cover shadow-md shrink-0" />
+              <div>
+                <h1 className="font-outfit font-bold text-base tracking-tight text-dash-dark-purple leading-none">RecruitAI</h1>
+                <span className="text-[10px] text-dash-light-purple font-medium tracking-widest uppercase">Candidate Portal</span>
               </div>
-              <div className="overflow-hidden">
-                <h4 className="text-xs font-semibold text-dash-dark-purple truncate">{candidate?.name || candidate?.full_name || 'Candidate'}</h4>
-                <span className="text-[10px] text-dash-light-purple truncate block">Candidate</span>
+            </div>
+
+            {/* Navigation Menu */}
+            <nav className="space-y-2">
+              {[
+                { id: 'technical', label: 'Technical Test', icon: Terminal },
+                { id: 'english', label: 'English Speaking', icon: Volume2 },
+              ].map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setActiveTab(item.id);
+                      if (item.id !== 'resume' && item.id !== 'technical' && item.id !== 'english') {
+                        showToast(`"${item.label}" feature is coming soon!`);
+                      }
+                    }}
+                    className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-l-[24px] rounded-r-none text-sm font-bold transition-all duration-300 relative group ${isActive
+                      ? 'sidebar-active-tab shadow-sm'
+                      : 'text-dash-light-purple hover:text-dash-dark-purple hover:bg-dash-primary-purple/20'
+                      }`}
+                  >
+                    <Icon size={18} className="relative z-10" />
+                    <span className="relative z-10">{item.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+            {/* Centered Lottie Animation */}
+            <div className="flex items-center justify-center py-4 px-6 mt-2">
+              <div className="w-48 h-48 flex items-center justify-center">
+                <DotLottieReact
+                  src="https://lottie.host/f5bd2f6c-67a9-44d5-954d-96176d4cb3df/USuWgujLWd.lottie"
+                  loop
+                  autoplay
+                />
               </div>
             </div>
           </div>
 
-          <button
-            onClick={handleSignOut}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-dash-light-purple hover:bg-dash-primary-purple/20 transition-all duration-200 cursor-pointer"
-          >
-            <LogOut size={16} />
-            <span>Sign Out</span>
-          </button>
-        </div>
-      </aside>
+          {/* User Profile & Logout */}
+          <div className="space-y-4">
+            <div className="border-t border-dash-border-gray/25 pt-4 px-2">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-dash-primary-purple flex items-center justify-center font-semibold text-dash-white-card">
+                  {(candidate?.name || candidate?.full_name || 'Candidate').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                </div>
+                <div className="overflow-hidden">
+                  <h4 className="text-xs font-semibold text-dash-dark-purple truncate">{candidate?.name || candidate?.full_name || 'Candidate'}</h4>
+                  <span className="text-[10px] text-dash-light-purple truncate block">Candidate</span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={handleSignOut}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-dash-light-purple hover:bg-dash-primary-purple/20 transition-all duration-200 cursor-pointer"
+            >
+              <LogOut size={16} />
+              <span>Sign Out</span>
+            </button>
+          </div>
+        </aside>
       )}
 
       {/* Mobile Sidebar Backdrop & Content */}
@@ -1814,9 +1849,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
               >
                 <div className="flex items-center justify-between mb-8">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-dash-primary-purple flex items-center justify-center">
-                      <span className="font-outfit font-extrabold text-dash-white-card text-base">R</span>
-                    </div>
+                    <img src={logo} alt="RecruitAI Logo" className="w-10 h-10 rounded-xl object-cover shadow-sm shrink-0" />
                     <h1 className="font-outfit font-bold text-base text-dash-dark-purple">RecruitAI</h1>
                   </div>
                   <button
@@ -2203,8 +2236,8 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
           const phaseTotalQuestions = isMcqPhase ? totalMcqs : totalScenarios;
           const currentTopic = question.topic || question.subject || "General";
-          const answeredCount = Object.keys(examState.answers).filter(k => examState.answers[k] !== undefined && examState.answers[k] !== '').length;
-          const overallProgressPercent = Math.round((answeredCount / questions.length) * 100);
+          const answeredCount = questions.filter((q, idx) => isQuestionAnswered(q, idx, examState.answers)).length;
+          const overallProgressPercent = questions.length > 0 ? Math.round((answeredCount / questions.length) * 100) : 0;
 
           const hasOptions = question && Array.isArray(question.options) && question.options.length > 0;
           const isSql = !hasOptions && question ? (((question.type === 'SCENARIO' || question.type === 'SCENARIO_CODING' || question.type === 'CODING') && (question.subject || question.language || '').toLowerCase() === 'sql') || (question.question || '').toUpperCase().includes('SELECT')) : false;
@@ -2244,7 +2277,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                       <div className="grid grid-cols-4 gap-2">
                         {mcqQuestions.map((q, idx) => {
                           const isCurrent = idx === currentIdx;
-                          const isAnswered = examState.answers[idx] !== undefined && examState.answers[idx] !== '';
+                          const isAnswered = isQuestionAnswered(q, idx, examState.answers);
                           return (
                             <button
                               key={idx}
@@ -2274,7 +2307,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                         {scenarioQuestions.map((q, sIdx) => {
                           const realIdx = totalMcqs + sIdx;
                           const isCurrent = realIdx === currentIdx;
-                          const isAnswered = examState.answers[realIdx] !== undefined && examState.answers[realIdx] !== '';
+                          const isAnswered = isQuestionAnswered(q, realIdx, examState.answers);
                           return (
                             <button
                               key={realIdx}
@@ -2835,11 +2868,10 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                           }
                         }}
                         onClick={() => englishFileInputRef.current && englishFileInputRef.current.click()}
-                        className={`w-full py-8 border-2 border-dashed rounded-[20px] transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${
-                          englishDragOver
+                        className={`w-full py-8 border-2 border-dashed rounded-[20px] transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${englishDragOver
                             ? 'border-dash-primary-purple bg-dash-primary-purple/5 scale-[0.99]'
                             : 'border-dash-border-gray hover:border-dash-primary-purple hover:bg-dash-light-blue-bg/40'
-                        }`}
+                          }`}
                       >
                         <input
                           type="file"
@@ -2941,11 +2973,11 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                   {voiceMode ? (
                     /* VOICE CALL MODE CONTAINER */
                     <div className="w-full flex flex-col items-center justify-between bg-gradient-to-b from-[#1c133a] to-[#0a0614] border border-[#2d1b54]/40 rounded-[32px] p-6 sm:p-10 shadow-[0_10px_35px_rgba(45,27,84,0.3)] min-h-[500px] text-center gap-8 relative overflow-hidden select-none">
-                      
+
                       {/* Interactive Waveform / Avatar center */}
                       <div className="flex flex-col items-center gap-5 my-auto relative z-10 w-full">
                         <div className="relative w-44 h-44 flex items-center justify-center rounded-full bg-white/5 border border-white/10 shadow-[0_0_50px_rgba(139,92,246,0.15)]">
-                          
+
                           {/* Pulse wave rings based on state */}
                           {isRecording && (
                             <>
@@ -2971,33 +3003,31 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                           )}
 
                           {/* Inner Avatar Box */}
-                          <div className={`w-28 h-28 rounded-full flex items-center justify-center text-white shadow-2xl relative z-10 transition-all duration-500 ${
-                            isRecording 
-                              ? 'bg-emerald-600 shadow-emerald-500/30 border-2 border-emerald-400/40' 
-                              : aiIsSpeaking 
-                                ? 'bg-violet-600 shadow-violet-500/30 border-2 border-violet-400/40' 
+                          <div className={`w-28 h-28 rounded-full flex items-center justify-center text-white shadow-2xl relative z-10 transition-all duration-500 ${isRecording
+                              ? 'bg-emerald-600 shadow-emerald-500/30 border-2 border-emerald-400/40'
+                              : aiIsSpeaking
+                                ? 'bg-violet-600 shadow-violet-500/30 border-2 border-violet-400/40'
                                 : 'bg-[#231b42] border border-[#40356c]'
-                          }`}>
+                            }`}>
                             <Volume2 size={40} className={isRecording ? "animate-pulse" : aiIsSpeaking ? "animate-bounce" : ""} />
                           </div>
                         </div>
 
                         {/* Speech status label */}
                         <div className="bg-white/5 border border-white/10 rounded-full px-5 py-1.5 text-xs font-bold text-white shadow-sm flex items-center gap-2">
-                          <span className={`w-2 h-2 rounded-full ${
-                            isRecording 
-                              ? 'bg-emerald-500 animate-ping' 
-                              : aiIsSpeaking 
-                                ? 'bg-violet-500 animate-pulse' 
+                          <span className={`w-2 h-2 rounded-full ${isRecording
+                              ? 'bg-emerald-500 animate-ping'
+                              : aiIsSpeaking
+                                ? 'bg-violet-500 animate-pulse'
                                 : 'bg-slate-400'
-                          }`} />
+                            }`} />
                           <span>
-                            {isRecording 
-                              ? 'Listening... Please speak' 
-                              : aiIsSpeaking 
-                                ? 'Sophia is speaking...' 
-                                : aiTyping || englishLoading 
-                                  ? 'Thinking...' 
+                            {isRecording
+                              ? 'Listening... Please speak'
+                              : aiIsSpeaking
+                                ? 'Sophia is speaking...'
+                                : aiTyping || englishLoading
+                                  ? 'Thinking...'
                                   : 'Sophia is ready'}
                           </span>
                         </div>
@@ -3038,11 +3068,10 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                           <button
                             type="button"
                             onClick={toggleMute}
-                            className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-200 cursor-pointer shadow-md ${
-                              isMuted 
-                                ? 'bg-amber-600 border-amber-600 text-white hover:bg-amber-700' 
+                            className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-200 cursor-pointer shadow-md ${isMuted
+                                ? 'bg-amber-600 border-amber-600 text-white hover:bg-amber-700'
                                 : 'bg-white/10 border-white/10 text-white hover:bg-white/20'
-                            }`}
+                              }`}
                             title={isMuted ? "Unmute Sophia's Voice" : "Mute Sophia's Voice"}
                           >
                             {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
@@ -3053,11 +3082,10 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                             type="button"
                             onClick={toggleRecording}
                             disabled={englishLoading || aiTyping || aiIsSpeaking}
-                            className={`w-14 h-14 rounded-full flex items-center justify-center border transition-all duration-200 cursor-pointer shadow-lg disabled:opacity-40 disabled:cursor-not-allowed ${
-                              isRecording 
-                                ? 'bg-red-600 border-red-600 text-white hover:bg-red-700 animate-pulse' 
+                            className={`w-14 h-14 rounded-full flex items-center justify-center border transition-all duration-200 cursor-pointer shadow-lg disabled:opacity-40 disabled:cursor-not-allowed ${isRecording
+                                ? 'bg-red-600 border-red-600 text-white hover:bg-red-700 animate-pulse'
                                 : 'bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700'
-                            }`}
+                              }`}
                             title={isRecording ? "Stop Recording" : "Start Speaking"}
                           >
                             <Mic size={24} className={isRecording ? "animate-pulse" : ""} />
@@ -3097,10 +3125,10 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                   ) : (
                     /* CHAT TEXT MODE CONTAINER */
                     <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-stretch w-full flex-1 min-h-[550px]">
-                      
+
                       {/* LEFT PANEL: AI HR Avatar & Status */}
                       <div className="xl:col-span-1 bg-dash-white-card border border-dash-border-gray/50 rounded-[28px] p-6 shadow-[0_4px_20px_rgba(87,82,170,0.02)] flex flex-col justify-between items-center text-center gap-6">
-                        
+
                         <div className="flex flex-col items-center gap-4 w-full">
                           {/* Visual Pulse Avatar */}
                           <div className="relative w-36 h-36 flex items-center justify-center rounded-full bg-dash-primary-purple/10 border-4 border-dash-primary-purple/20 shadow-[0_0_30px_rgba(87,82,170,0.1)] overflow-hidden">
@@ -3155,7 +3183,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
                       {/* RIGHT PANEL: Chat History & Input */}
                       <div className="xl:col-span-2 bg-dash-white-card border border-dash-border-gray/50 rounded-[28px] p-6 shadow-[0_4px_20px_rgba(87,82,170,0.02)] flex flex-col justify-between gap-4">
-                        
+
                         {/* Chat Messages Log */}
                         <div className="flex-1 min-h-[300px] max-h-[380px] overflow-y-auto pr-1 flex flex-col gap-4 border-b border-dash-border-gray/20 pb-4">
                           {conversations.map((msg, index) => {
@@ -3169,7 +3197,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                                     {msg.ai_question}
                                   </div>
                                 </div>
-                                
+
                                 {/* Candidate Answer */}
                                 {msg.candidate_answer && (
                                   <div className="flex items-start gap-2.5 max-w-[85%] self-end justify-end animate-fade-in">
@@ -3366,7 +3394,11 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                 <button
                   type="button"
                   disabled={isSubmittingManual}
-                  onClick={() => handleSubmitExam()}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleSubmitExam();
+                  }}
                   className="flex-1 py-3 px-4 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 transition-all shadow-md cursor-pointer flex items-center justify-center gap-2 disabled:bg-indigo-400 disabled:cursor-not-allowed"
                 >
                   {isSubmittingManual ? (

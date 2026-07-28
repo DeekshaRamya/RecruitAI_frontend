@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Lock, LogIn, Check, User, Phone, Loader2 } from 'lucide-react';
 import RoleSwitcher from './RoleSwitcher';
 import InputField from './InputField';
-import logo from '../assets/logo.svg';
+import logo from '../assets/systech.jpg';
 import api from '../api';
 
 const MicrosoftIcon = () => (
@@ -266,7 +266,7 @@ const LoginCard = ({ role, setRole, onLogin }) => {
     >
       {/* Mobile Logo: displayed only on tablet/mobile screens */}
       <div className="max-md:flex hidden justify-center mb-8">
-        <img src={logo} alt="RecruitAI Logo" className="h-10" />
+        <img src={logo} alt="RecruitAI Logo" className="h-14 w-auto rounded-xl object-contain shadow-md" />
       </div>
 
       {/* Role Switcher */}
