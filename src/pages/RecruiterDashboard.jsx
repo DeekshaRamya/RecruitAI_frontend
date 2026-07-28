@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import {
@@ -47,7 +47,11 @@ import {
   Code,
   Database,
   Brain,
-  PieChart
+  PieChart,
+  Loader2,
+  Volume2,
+  BarChart2,
+  Activity
 } from 'lucide-react';
 import api from '../api';
 
@@ -307,6 +311,27 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
 
   // Interactive UI Drawer states
   const [selectedCandidate, setSelectedCandidate] = useState(null);
+
+  // English report visualizer states
+  const [englishReport, setEnglishReport] = useState(null);
+  const [loadingEnglishReport, setLoadingEnglishReport] = useState(false);
+  const [showEnglishReportModal, setShowEnglishReportModal] = useState(false);
+
+  const handleOpenEnglishReport = async (candidateId) => {
+    try {
+      setLoadingEnglishReport(true);
+      setShowEnglishReportModal(true);
+      setEnglishReport(null);
+      const res = await api.get(`/api/recruiter/candidate/${candidateId}/english-assessment`);
+      setEnglishReport(res.data);
+    } catch (err) {
+      console.error("Failed to load candidate English report:", err);
+      showToast("English Assessment Report not found or not completed yet.");
+      setShowEnglishReportModal(false);
+    } finally {
+      setLoadingEnglishReport(false);
+    }
+  };
 
   // Candidate Pagination & Dropdown states
   const [candidatePage, setCandidatePage] = useState(1);
@@ -987,8 +1012,10 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
               { id: 'create-assessment', label: 'Create Assessment', icon: Plus },
               { id: 'preview-questions', label: 'Preview Questions', icon: FileText },
               { id: 'assessments', label: 'Assessments', icon: Save },
-              { id: 'results', label: 'Results', icon: Award },
-              { id: 'groups', label: 'Candidate Groups', icon: Users },
+              { id: 'results', label: 'Technical Assessment Result', icon: Award },
+              { id: 'english-results', label: 'English Assessment Result', icon: Volume2 },
+              { id: 'overall-results', label: 'Overall Result', icon: BarChart2 },
+              { id: 'groups', label: 'Candidate Groups', icon: Users }
             ].map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
@@ -1102,8 +1129,10 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
                 { id: 'create-assessment', label: 'Create Assessment', icon: Plus },
                 { id: 'preview-questions', label: 'Preview Questions', icon: FileText },
                 { id: 'assessments', label: 'Assessments', icon: Save },
-                { id: 'results', label: 'Results', icon: Award },
-                { id: 'groups', label: 'Candidate Groups', icon: Users },
+                { id: 'results', label: 'Technical Assessment Result', icon: Award },
+                { id: 'english-results', label: 'English Assessment Result', icon: Volume2 },
+                { id: 'overall-results', label: 'Overall Result', icon: BarChart2 },
+                { id: 'groups', label: 'Candidate Groups', icon: Users }
               ].map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
@@ -1908,6 +1937,8 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
         {activeTab === 'results' && (
           <ResultsManager
             showToast={showToast}
+            candidateGroups={candidateGroups}
+            candidates={candidates}
           />
         )}
 
@@ -1920,6 +1951,21 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
             showToast={showToast}
             setAssigningGroup={setAssigningGroup}
             setActiveTab={setActiveTab}
+          />
+        )}
+
+        {/* 11. ENGLISH ASSESSMENT RESULTS TAB SCREEN */}
+        {activeTab === 'english-results' && (
+          <EnglishResultsManager
+            showToast={showToast}
+            handleOpenEnglishReport={handleOpenEnglishReport}
+          />
+        )}
+
+        {/* 12. OVERALL RESULTS COMPARISON SCREEN */}
+        {activeTab === 'overall-results' && (
+          <OverallResultsManager
+            showToast={showToast}
           />
         )}
       </main>
@@ -2003,18 +2049,29 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
                         { name: 'Python Score', value: selectedCandidate.python },
                         { name: 'SQL Score', value: selectedCandidate.sql },
                         { name: 'Aptitude Score', value: selectedCandidate.aptitude },
-                        { name: 'English Score', value: selectedCandidate.english },
+                        { name: 'English Score', value: selectedCandidate.english, isEnglish: true },
                         { name: 'Final Score', value: selectedCandidate.final }
                       ].map((skill) => (
                         <div key={skill.name}>
-                          <div className="flex justify-between text-xs font-medium mb-1.5">
-                            <span className="text-dash-light-purple">{skill.name}</span>
-                            <span className="text-dash-dark-purple font-bold">{skill.value}%</span>
+                          <div className="flex justify-between text-xs font-medium mb-1.5 items-center">
+                            <span className="text-dash-light-purple flex items-center gap-1.5">
+                              <span>{skill.name}</span>
+                              {skill.isEnglish && skill.value !== undefined && skill.value !== null && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEnglishReport(selectedCandidate.id)}
+                                  className="text-[10px] text-dash-primary-purple font-extrabold hover:underline cursor-pointer bg-transparent border-0 p-0"
+                                >
+                                  (View Report)
+                                </button>
+                              )}
+                            </span>
+                            <span className="text-dash-dark-purple font-bold">{skill.value !== undefined && skill.value !== null ? `${skill.value}%` : '--'}</span>
                           </div>
                           <div className="h-1.5 rounded-full bg-dash-soft-pink overflow-hidden">
                             <div
                               className="h-full bg-dash-primary-purple rounded-full"
-                              style={{ width: `${skill.value}%` }}
+                              style={{ width: `${skill.value || 0}%` }}
                             />
                           </div>
                         </div>
@@ -2068,6 +2125,199 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
                 </button>
               </div>
 
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Modal for English Speaking Assessment Report */}
+      <AnimatePresence>
+        {showEnglishReportModal && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.4 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowEnglishReportModal(false)}
+              className="fixed inset-0 bg-dash-dark-purple/40 z-[9999]"
+            />
+            {/* Modal Box */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed inset-4 sm:inset-10 m-auto w-full max-w-4xl h-fit max-h-[85vh] bg-dash-white-card border border-dash-border-gray rounded-[28px] shadow-2xl z-[10000] p-6 sm:p-8 flex flex-col justify-between overflow-y-auto select-text"
+            >
+              {loadingEnglishReport ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-4 w-full">
+                  <Loader2 className="animate-spin text-dash-primary-purple" size={40} />
+                  <p className="text-xs font-semibold text-dash-light-purple">Loading English Assessment Report...</p>
+                </div>
+              ) : englishReport ? (() => {
+                const rep = englishReport.report || {};
+                const conversations = englishReport.conversations || [];
+                const formatTimeVal = (sec) => {
+                  if (!sec) return '0s';
+                  const m = Math.floor(sec / 60);
+                  const s = sec % 60;
+                  return `${m}m ${s}s`;
+                };
+
+                return (
+                  <div className="flex flex-col gap-6">
+                    {/* Header */}
+                    <div className="flex items-center justify-between border-b border-dash-border-gray/25 pb-4">
+                      <div>
+                        <span className="text-[10px] text-dash-primary-purple font-extrabold tracking-widest uppercase">Linguistic & Communication Profile</span>
+                        <h3 className="text-lg font-bold text-dash-dark-purple font-outfit mt-0.5">
+                          {selectedCandidate?.name || 'Candidate'} - English Assessment
+                        </h3>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowEnglishReportModal(false)}
+                        className="p-1.5 rounded-lg hover:bg-dash-soft-pink text-dash-light-purple hover:text-dash-dark-purple transition-all duration-200 cursor-pointer border-none bg-transparent"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    {/* Stats & Overview Row */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-stretch">
+                      
+                      {/* Overall Level Card */}
+                      <div className="md:col-span-1 bg-dash-soft-pink border border-dash-border-gray/40 rounded-2xl p-5 flex flex-col justify-center items-center text-center">
+                        <span className="text-[9px] font-extrabold text-dash-light-purple uppercase tracking-wider mb-1">Overall English Level</span>
+                        <span className="font-plus-jakarta font-extrabold text-xl text-dash-primary-purple leading-tight">{rep.overall_level}</span>
+                        <span className="text-[9px] font-extrabold text-dash-success-green bg-dash-success-green/10 border border-dash-success-green/20 px-3 py-1 rounded-full uppercase mt-3.5 tracking-wider">
+                          {rep.recommendation || 'Recommended'}
+                        </span>
+                      </div>
+
+                      {/* Summary Text Box */}
+                      <div className="md:col-span-3 bg-slate-50 border border-slate-200/50 rounded-2xl p-5 flex flex-col gap-2.5">
+                        <div className="grid grid-cols-2 gap-4 text-[10px] border-b border-slate-200/50 pb-2 text-slate-500 font-bold uppercase tracking-wider">
+                          <div>
+                            <span>Interview Date:</span>
+                            <span className="text-slate-800 font-extrabold ml-1.5">{englishReport.start_time ? new Date(englishReport.start_time).toLocaleDateString() : '--'}</span>
+                          </div>
+                          <div>
+                            <span>Duration:</span>
+                            <span className="text-slate-800 font-extrabold ml-1.5">{formatTimeVal(englishReport.duration)}</span>
+                          </div>
+                        </div>
+                        <div className="text-xs font-semibold text-slate-700 leading-relaxed mt-1">
+                          <span className="block font-bold text-dash-primary-purple uppercase tracking-wider text-[9px] mb-1">AI HR Review summary:</span>
+                          <p>{rep.summary}</p>
+                        </div>
+                      </div>
+
+                    </div>
+
+                    {/* Scores & Observation Bullets Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch border-t border-dash-border-gray/25 pt-5">
+                      
+                      {/* Scores Breakdown */}
+                      <div className="flex flex-col gap-4">
+                        <h4 className="text-xs font-bold text-dash-dark-purple tracking-wider uppercase border-b border-dash-border-gray/10 pb-1.5">Linguistic Competence</h4>
+                        <div className="space-y-3.5">
+                          {[
+                            { name: 'Communication', val: rep.communication_score },
+                            { name: 'Grammar Accuracy', val: rep.grammar_score },
+                            { name: 'Vocabulary range', val: rep.vocabulary_score },
+                            { name: 'Confidence Estimation', val: rep.confidence_score },
+                            { name: 'Oral Fluency', val: rep.fluency_score },
+                            { name: 'Professional Etiquette', val: rep.professionalism_score },
+                            { name: 'Pronunciation (Speech)', val: rep.pronunciation_score }
+                          ].map((item, idx) => {
+                            if (item.val === undefined || item.val === null) return null;
+                            return (
+                              <div key={idx} className="flex flex-col gap-1">
+                                <div className="flex justify-between text-xs font-semibold">
+                                  <span className="text-dash-light-purple">{item.name}</span>
+                                  <span className="text-dash-dark-purple font-extrabold">{item.val}/100</span>
+                                </div>
+                                <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                                  <div className="h-full bg-dash-primary-purple rounded-full" style={{ width: `${item.val}%` }} />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Observations Bullets */}
+                      <div className="flex flex-col gap-4 justify-between">
+                        <div className="flex flex-col gap-2.5">
+                          <span className="text-[10px] font-extrabold text-[#22c55e] uppercase tracking-wider font-semibold">Observed Strengths</span>
+                          <div className="flex flex-col gap-2">
+                            {(rep.strengths || []).map((s, idx) => (
+                              <div key={idx} className="flex items-start gap-2 p-2 bg-[#22c55e]/5 border border-[#22c55e]/10 rounded-xl text-xs font-medium text-slate-700 leading-normal">
+                                <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e] mt-1.5 shrink-0" />
+                                <span>{s}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col gap-2.5 border-t border-dash-border-gray/25 pt-4">
+                          <span className="text-[10px] font-extrabold text-[#ef4444] uppercase tracking-wider font-semibold">Specific Mistakes / Weaknesses</span>
+                          <div className="flex flex-col gap-2">
+                            {(rep.weaknesses || []).map((s, idx) => (
+                              <div key={idx} className="flex items-start gap-2 p-2 bg-[#ef4444]/5 border border-[#ef4444]/10 rounded-xl text-xs font-medium text-slate-700 leading-normal">
+                                <span className="w-1.5 h-1.5 rounded-full bg-[#ef4444] mt-1.5 shrink-0" />
+                                <span>{s}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col gap-2.5 border-t border-dash-border-gray/25 pt-4">
+                          <span className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider font-semibold">Areas for Improvement</span>
+                          <div className="flex flex-col gap-2">
+                            {(rep.areas_for_improvement || []).map((s, idx) => (
+                              <div key={idx} className="flex items-start gap-2 p-2 bg-dash-primary-purple/5 border border-dash-primary-purple/10 rounded-xl text-xs font-medium text-slate-700 leading-normal">
+                                <span className="w-1.5 h-1.5 rounded-full bg-dash-primary-purple mt-1.5 shrink-0" />
+                                <span>{s}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                    </div>
+
+                    {/* Dialog Transcripts Details */}
+                    <div className="flex flex-col gap-4 border-t border-dash-border-gray/25 pt-5">
+                      <h4 className="text-xs font-bold text-dash-dark-purple tracking-wider uppercase border-b border-dash-border-gray/10 pb-1.5">
+                        AI HR Interview Chat Log ({conversations.length} turns)
+                      </h4>
+                      <div className="space-y-4 max-h-[250px] overflow-y-auto pr-1">
+                        {conversations.map((msg, idx) => (
+                          <div key={idx} className="border border-slate-100 rounded-xl bg-slate-50/50 p-4 space-y-3.5 text-xs font-semibold">
+                            <div className="flex items-start gap-2 text-slate-800 leading-relaxed">
+                              <span className="px-2 py-0.5 rounded bg-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[9px] shrink-0 mt-0.5">AI HR</span>
+                              <p className="flex-1">{msg.ai_question}</p>
+                            </div>
+                            {msg.candidate_answer && (
+                              <div className="flex items-start gap-2 text-dash-dark-purple leading-relaxed pl-4 border-l-2 border-dash-primary-purple/40">
+                                <span className="px-2 py-0.5 rounded bg-dash-primary-purple/15 text-dash-primary-purple font-bold uppercase tracking-wider text-[9px] shrink-0 mt-0.5">Candidate</span>
+                                <p className="flex-1">{msg.candidate_answer}</p>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                  </div>
+                );
+              })() : (
+                <div className="text-center py-10 text-xs text-dash-light-purple font-semibold">
+                  English Assessment details not available or error occurred.
+                </div>
+              )}
             </motion.div>
           </>
         )}
@@ -3961,7 +4211,7 @@ const AssessmentDetailsDrawer = ({ assessment, onClose, showToast }) => {
   );
 };
 
-const ResultsManager = ({ showToast }) => {
+const ResultsManager = ({ showToast, candidateGroups = [], candidates = [] }) => {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -3971,6 +4221,55 @@ const ResultsManager = ({ showToast }) => {
   const [detailLoading, setDetailLoading] = useState(false);
   const [expandedQuestions, setExpandedQuestions] = useState({});
   const [recalculating, setRecalculating] = useState(false);
+
+  const [viewMode, setViewMode] = useState('flat'); // 'flat' | 'groups'
+  const [selectedGroupForView, setSelectedGroupForView] = useState(null); // null | group object
+
+  const candidateIdToEmailMap = useMemo(() => {
+    const map = {};
+    (candidates || []).forEach(c => {
+      if (c && c.email) {
+        map[c.id] = c.email.toLowerCase().trim();
+      }
+    });
+    return map;
+  }, [candidates]);
+
+  const groupsWithResults = useMemo(() => {
+    return (candidateGroups || []).map(group => {
+      const groupEmails = (group.candidateIds || []).map(id => candidateIdToEmailMap[id]).filter(Boolean);
+      const groupResults = results.filter(res => {
+        const email = res.candidateEmail?.toLowerCase().trim();
+        return email && groupEmails.includes(email);
+      });
+
+      const totalScore = groupResults.reduce((acc, curr) => acc + (curr.percentage || 0), 0);
+      const averageScore = groupResults.length > 0 ? Math.round(totalScore / groupResults.length) : null;
+
+      return {
+        ...group,
+        results: groupResults,
+        averageScore
+      };
+    });
+  }, [candidateGroups, candidateIdToEmailMap, results]);
+
+  const ungroupedResults = useMemo(() => {
+    const allGroupedEmails = new Set();
+    (candidateGroups || []).forEach(group => {
+      (group.candidateIds || []).forEach(id => {
+        const email = candidateIdToEmailMap[id];
+        if (email) {
+          allGroupedEmails.add(email);
+        }
+      });
+    });
+
+    return results.filter(res => {
+      const email = res.candidateEmail?.toLowerCase().trim();
+      return !email || !allGroupedEmails.has(email);
+    });
+  }, [candidateGroups, candidateIdToEmailMap, results]);
 
   useEffect(() => {
     fetchResults();
@@ -4413,7 +4712,11 @@ const ResultsManager = ({ showToast }) => {
     printWindow.document.close();
   };
 
-  const filteredAndSortedResults = results
+  const resultsToFilter = selectedGroupForView 
+    ? (selectedGroupForView.id === 'ungrouped' ? ungroupedResults : selectedGroupForView.results || [])
+    : results;
+
+  const filteredAndSortedResults = resultsToFilter
     .filter(res => {
       const query = searchQuery.toLowerCase();
       const nameMatch = res.candidateName?.toLowerCase().includes(query);
@@ -4441,15 +4744,41 @@ const ResultsManager = ({ showToast }) => {
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-dash-light-purple" size={18} />
-          <input
-            type="text"
-            placeholder="Search candidates or assessments..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-dash-white-card border border-dash-border-gray/50 rounded-2xl pl-11 pr-4 py-3 text-xs font-bold text-dash-dark-purple placeholder:text-dash-light-purple focus:border-dash-primary-purple outline-none transition-all duration-200"
-          />
+        <div className="flex items-center gap-3 flex-1 max-w-2xl">
+          {/* View Mode Switcher */}
+          <div className="flex bg-slate-100 p-1 rounded-xl shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setViewMode('flat');
+                setSelectedGroupForView(null);
+              }}
+              className={`px-3.5 py-2 text-xs font-bold rounded-lg cursor-pointer border-none transition-all ${viewMode === 'flat' ? 'bg-white text-dash-primary-purple shadow-sm font-extrabold' : 'bg-transparent text-dash-light-purple hover:text-dash-dark-purple'}`}
+            >
+              All Results
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setViewMode('groups');
+                setSelectedGroupForView(null);
+              }}
+              className={`px-3.5 py-2 text-xs font-bold rounded-lg cursor-pointer border-none transition-all ${viewMode === 'groups' ? 'bg-white text-dash-primary-purple shadow-sm font-extrabold' : 'bg-transparent text-dash-light-purple hover:text-dash-dark-purple'}`}
+            >
+              Group Results
+            </button>
+          </div>
+
+          <div className="relative flex-1">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-dash-light-purple" size={18} />
+            <input
+              type="text"
+              placeholder="Search candidates or assessments..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-dash-white-card border border-dash-border-gray/50 rounded-2xl pl-11 pr-4 py-3 text-xs font-bold text-dash-dark-purple placeholder:text-dash-light-purple focus:border-dash-primary-purple outline-none transition-all duration-200"
+            />
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -4482,6 +4811,20 @@ const ResultsManager = ({ showToast }) => {
         </div>
       </div>
 
+      {/* Group Navigation Bar */}
+      {selectedGroupForView && (
+        <div className="flex items-center gap-2 bg-dash-primary-purple/5 border border-dash-primary-purple/15 px-4 py-3 rounded-2xl animate-fade-in">
+          <button
+            onClick={() => setSelectedGroupForView(null)}
+            className="px-3 py-1.5 rounded-lg border border-dash-primary-purple text-dash-primary-purple hover:bg-dash-primary-purple hover:text-white transition-all text-xs font-bold flex items-center gap-1.5 cursor-pointer bg-white"
+          >
+            ← Back to Groups
+          </button>
+          <span className="text-xs text-dash-light-purple font-medium">Viewing results for Group:</span>
+          <strong className="text-sm text-dash-dark-purple font-outfit">{selectedGroupForView.name}</strong>
+        </div>
+      )}
+
       <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] shadow-[0_4px_25px_rgba(87,82,170,0.02)] overflow-hidden flex flex-col min-h-[400px]">
         {loading ? (
           <div className="flex-1 flex flex-col justify-center items-center py-20 text-dash-light-purple gap-3">
@@ -4490,8 +4833,117 @@ const ResultsManager = ({ showToast }) => {
           </div>
         ) : (
           <>
-            <div className="flex-1 overflow-x-auto dashboard-scrollbar">
-              <table className="w-full min-w-[900px] border-collapse text-left text-sm">
+            {viewMode === 'groups' && selectedGroupForView === null ? (
+              // RENDER GROUPS GRID CARDS
+              <div className="p-6 animate-fade-in">
+                {groupsWithResults.length === 0 && ungroupedResults.length === 0 ? (
+                  <div className="text-center py-12 text-sm text-dash-light-purple">
+                    <AlertCircle className="mx-auto mb-3 text-dash-light-purple" size={32} />
+                    No candidate groups or results found.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {groupsWithResults.map(group => (
+                      <div
+                        key={group.id}
+                        onClick={() => setSelectedGroupForView(group)}
+                        className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-6 shadow-sm hover:shadow-md hover:border-dash-primary-purple/40 transition-all duration-300 flex flex-col justify-between gap-5 cursor-pointer group animate-fade-in"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-11 h-11 rounded-xl bg-dash-primary-purple/10 flex items-center justify-center text-dash-primary-purple group-hover:scale-110 transition-transform duration-300">
+                              <Users size={20} />
+                            </div>
+                            <div>
+                              <h3 className="font-plus-jakarta font-extrabold text-base text-dash-dark-purple group-hover:text-dash-primary-purple transition-colors duration-200">
+                                {group.name}
+                              </h3>
+                              <span className="text-[10px] text-dash-light-purple font-semibold uppercase tracking-wider block mt-0.5">
+                                {group.candidateIds?.length || 0} Members
+                              </span>
+                            </div>
+                          </div>
+
+                          {group.averageScore !== null && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-emerald-50 border border-emerald-200 text-emerald-600">
+                              {group.averageScore}% Avg
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex justify-between items-center bg-slate-50 border border-slate-200/60 rounded-2xl p-4 text-xs font-semibold">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-dash-light-purple">Evaluated Candidates</span>
+                            <span className="text-dash-dark-purple font-bold text-sm">
+                              {group.results?.length || 0} / {group.candidateIds?.length || 0}
+                            </span>
+                          </div>
+                          <div className="flex flex-col gap-0.5 items-end">
+                            <span className="text-dash-light-purple">Pending Submission</span>
+                            <span className="text-dash-light-purple font-medium text-xs">
+                              {Math.max(0, (group.candidateIds?.length || 0) - (group.results?.length || 0))}
+                            </span>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          className="w-full py-2.5 rounded-xl border border-dash-primary-purple/20 text-dash-primary-purple font-bold text-xs bg-dash-primary-purple/5 hover:bg-dash-primary-purple hover:text-white transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 border-solid"
+                        >
+                          <span>View Group Results</span>
+                          <ChevronRight size={14} />
+                        </button>
+                      </div>
+                    ))}
+
+                    {/* Ungrouped Card */}
+                    {ungroupedResults.length > 0 && (
+                      <div
+                        onClick={() => setSelectedGroupForView({ id: 'ungrouped', name: 'Individual Candidates', results: ungroupedResults })}
+                        className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-6 shadow-sm hover:shadow-md hover:border-dash-primary-purple/40 transition-all duration-300 flex flex-col justify-between gap-5 cursor-pointer group animate-fade-in"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-11 h-11 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 group-hover:scale-110 transition-transform duration-300">
+                              <User size={20} />
+                            </div>
+                            <div>
+                              <h3 className="font-plus-jakarta font-extrabold text-base text-dash-dark-purple group-hover:text-dash-primary-purple transition-colors duration-200">
+                                Individual Candidates
+                              </h3>
+                              <span className="text-[10px] text-dash-light-purple font-semibold uppercase tracking-wider block mt-0.5">
+                                Ungrouped
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex justify-between items-center bg-slate-50 border border-slate-200/60 rounded-2xl p-4 text-xs font-semibold">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-dash-light-purple">Evaluated Results</span>
+                            <span className="text-dash-dark-purple font-bold text-sm">
+                              {ungroupedResults.length}
+                            </span>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          className="w-full py-2.5 rounded-xl border border-slate-300 text-slate-600 font-bold text-xs bg-slate-50 hover:bg-slate-100 transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 border-solid"
+                        >
+                          <span>View Results</span>
+                          <ChevronRight size={14} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              // RENDER RESULTS TABLE
+              <>
+                <div className="flex-1 overflow-x-auto dashboard-scrollbar">
+                  <table className="w-full min-w-[900px] border-collapse text-left text-sm">
                 <thead>
                   <tr className="bg-dash-soft-pink border-b border-dash-border-gray text-[10px] font-extrabold text-dash-dark-purple tracking-widest uppercase">
                     <th className="px-6 py-4.5">Candidate Name</th>
@@ -4619,7 +5071,9 @@ const ResultsManager = ({ showToast }) => {
             </div>
           </>
         )}
-      </div>
+      </>
+    )}
+  </div>
 
       <AnimatePresence>
         {selectedResult && (
@@ -5149,6 +5603,382 @@ const GroupsManager = ({ candidateGroups, setCandidateGroups, candidates, showTo
           })}
         </div>
       )}
+    </div>
+  );
+};
+
+
+const EnglishResultsManager = ({ showToast, handleOpenEnglishReport }) => {
+  const [assessments, setAssessments] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [downloadingId, setDownloadingId] = useState(null);
+
+  const fetchAssessments = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get('/api/recruiter/english-assessments');
+      setAssessments(res.data);
+    } catch (err) {
+      console.error("Failed to fetch English assessments:", err);
+      showToast("Failed to load English assessment results.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAssessments();
+  }, []);
+
+  const formatDuration = (sec) => {
+    if (!sec) return '0s';
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m}m ${s}s`;
+  };
+
+  const handleDownloadTxt = async (assessment) => {
+    try {
+      setDownloadingId(assessment.interview_id);
+      const res = await api.get(`/api/recruiter/candidate/${assessment.candidate_id}/english-assessment`);
+      const details = res.data;
+      const conversations = details.conversations || [];
+      const completedAt = assessment.end_time || assessment.start_time;
+
+      let fileContent = `==================================================\n`;
+      fileContent += `RECRUITAI - ENGLISH INTERVIEW CONVERSATIONAL TRANSCRIPT\n`;
+      fileContent += `==================================================\n`;
+      fileContent += `Candidate Name: ${assessment.candidate_name}\n`;
+      fileContent += `Candidate Email: ${assessment.candidate_email}\n`;
+      fileContent += `Completed At  : ${completedAt ? new Date(completedAt).toLocaleString() : '--'}\n`;
+      fileContent += `Total Turns   : ${conversations.length}\n`;
+      fileContent += `Overall Level : ${details.report?.overall_level || 'N/A'}\n`;
+      fileContent += `Linguistic Score: ${details.report?.communication_score || 'N/A'}/100\n`;
+      fileContent += `==================================================\n\n`;
+
+      conversations.forEach((msg, idx) => {
+        fileContent += `[Question ${idx + 1}] [AI HR Sophia]:\n${msg.ai_question}\n\n`;
+        if (msg.candidate_answer) {
+          fileContent += `[Answer ${idx + 1}] [Candidate]:\n${msg.candidate_answer}\n\n`;
+        } else {
+          fileContent += `[Answer ${idx + 1}] [Candidate]:\n[No Answer/Silence]\n\n`;
+        }
+        fileContent += `--------------------------------------------------\n\n`;
+      });
+
+      const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${assessment.candidate_name.replace(/\s+/g, '_')}_English_Transcript.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      showToast("Transcript downloaded successfully!");
+    } catch (err) {
+      console.error("Failed to download transcript:", err);
+      showToast("Error generating transcript file.");
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-6 animate-fade-in w-full">
+      {/* Tab Header */}
+      <div className="flex items-center justify-between bg-dash-white-card border border-dash-border-gray/50 rounded-[20px] p-5 shadow-sm">
+        <div>
+          <h2 className="font-outfit font-bold text-lg text-dash-dark-purple leading-tight">
+            English Assessment Result
+          </h2>
+          <p className="text-xs text-dash-light-purple font-semibold mt-1">
+            Monitor and download AI HR interview transcripts and linguistic profiles.
+          </p>
+        </div>
+        <button
+          onClick={fetchAssessments}
+          disabled={loading}
+          className="p-2 border border-dash-border-gray hover:bg-dash-light-blue-bg/40 rounded-xl text-dash-dark-purple font-semibold text-xs transition-all flex items-center gap-1.5 cursor-pointer bg-white"
+        >
+          <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
+          <span>Refresh</span>
+        </button>
+      </div>
+
+      {/* Main content table card */}
+      <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-[28px] p-6 shadow-[0_4px_20px_rgba(87,82,170,0.02)] overflow-hidden">
+        {loading && assessments.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-4">
+            <Loader2 className="animate-spin text-dash-primary-purple" size={36} />
+            <p className="text-xs font-semibold text-dash-light-purple">Loading assessments list...</p>
+          </div>
+        ) : assessments.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center gap-2">
+            <Award size={36} className="text-dash-light-purple/40" />
+            <h4 className="font-plus-jakarta font-extrabold text-sm text-dash-dark-purple">No English Assessments Found</h4>
+            <p className="text-xs text-dash-light-purple font-medium max-w-xs">
+              Once candidates complete their AI HR English Interview, their results and files will appear here.
+            </p>
+          </div>
+        ) : (
+          <div className="w-full overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-dash-border-gray/25 text-[10px] text-dash-light-purple font-extrabold uppercase tracking-wider">
+                  <th className="pb-3.5 pl-2">Candidate</th>
+                  <th className="pb-3.5">Assessment Status</th>
+                  <th className="pb-3.5">Completion Date</th>
+                  <th className="pb-3.5">Duration</th>
+                  <th className="pb-3.5">Score</th>
+                  <th className="pb-3.5 pr-2 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-dash-border-gray/10 text-xs font-semibold">
+                {assessments.map((item) => (
+                  <tr key={item.interview_id} className="hover:bg-slate-50/50 transition-colors">
+                    {/* Candidate Identity */}
+                    <td className="py-4 pl-2">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-dash-dark-purple font-bold text-xs">{item.candidate_name}</span>
+                        <span className="text-[10px] text-dash-light-purple font-medium">{item.candidate_email}</span>
+                      </div>
+                    </td>
+
+                    {/* Status Badge */}
+                    <td className="py-4">
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wide border ${
+                        item.status === 'COMPLETED'
+                          ? 'bg-dash-light-green border-[#22c55e]/20 text-[#10b981]'
+                          : 'bg-amber-50 border-amber-200 text-amber-700'
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${item.status === 'COMPLETED' ? 'bg-[#10b981]' : 'bg-amber-500 animate-pulse'}`} />
+                        {item.status}
+                      </span>
+                    </td>
+
+                    {/* Completed At Timestamp */}
+                    <td className="py-4 text-slate-700 font-medium">
+                      {item.end_time 
+                        ? new Date(item.end_time).toLocaleString() 
+                        : item.start_time 
+                          ? `Started: ${new Date(item.start_time).toLocaleString()}`
+                          : '--'
+                      }
+                    </td>
+
+                    {/* Elapsed Duration */}
+                    <td className="py-4 text-slate-700 font-mono">
+                      {formatDuration(item.duration)}
+                    </td>
+
+                    {/* Interview score */}
+                    <td className="py-4 font-bold text-dash-dark-purple">
+                      {item.score !== null && item.score !== undefined ? `${item.score}/100` : '--'}
+                    </td>
+
+                    {/* Actions button list */}
+                    <td className="py-4 pr-2 text-right">
+                      <div className="flex items-center justify-end gap-2.5">
+                        {item.status === 'COMPLETED' && (
+                          <>
+                            {/* View detailed report modal trigger */}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEnglishReport(item.candidate_id)}
+                              className="px-3.5 py-1.5 rounded-xl border border-dash-border-gray hover:bg-dash-light-blue-bg/40 text-dash-dark-purple font-bold text-[11px] transition-all cursor-pointer bg-white"
+                            >
+                              View Report
+                            </button>
+
+                            {/* Download text log transcript */}
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadTxt(item)}
+                              disabled={downloadingId === item.interview_id}
+                              className="px-3.5 py-1.5 rounded-xl bg-dash-primary-purple hover:bg-dash-dark-purple text-white font-bold text-[11px] transition-all cursor-pointer border-none shadow-sm disabled:opacity-40 disabled:cursor-wait"
+                            >
+                              {downloadingId === item.interview_id ? 'Downloading...' : 'Download TXT'}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+
+const OverallResultsManager = ({ showToast }) => {
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState('');
+
+  const fetchOverallResults = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get('/api/recruiter/overall-results');
+      setData(res.data);
+    } catch (err) {
+      console.error("Failed to fetch overall comparison:", err);
+      showToast("Error loading overall assessment scores.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchOverallResults();
+  }, []);
+
+  const filtered = data.filter(item => 
+    item.candidate_name.toLowerCase().includes(search.toLowerCase()) ||
+    item.candidate_email.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="flex flex-col gap-6 animate-fade-in w-full">
+      {/* Tab Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-dash-white-card border border-dash-border-gray/50 rounded-[20px] p-5 shadow-sm font-inter">
+        <div>
+          <h2 className="font-outfit font-bold text-lg text-dash-dark-purple leading-tight">
+            Overall Result Comparison
+          </h2>
+          <p className="text-xs text-dash-light-purple font-semibold mt-1">
+            Compare candidate scores side-by-side across Technical and English Speaking assessments.
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <input
+            type="text"
+            placeholder="Search candidate..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="px-3.5 py-2 border border-dash-border-gray/50 bg-white rounded-xl text-xs font-semibold placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-dash-primary-purple w-48"
+          />
+          <button
+            onClick={fetchOverallResults}
+            disabled={loading}
+            className="p-2 border border-dash-border-gray hover:bg-dash-light-blue-bg/40 rounded-xl text-dash-dark-purple font-semibold text-xs transition-all flex items-center gap-1.5 cursor-pointer bg-white"
+          >
+            <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
+            <span>Refresh</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Comparison Grid Table */}
+      <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-[28px] p-6 shadow-[0_4px_20px_rgba(87,82,170,0.02)] overflow-hidden font-inter">
+        {loading && data.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-4">
+            <Loader2 className="animate-spin text-dash-primary-purple" size={36} />
+            <p className="text-xs font-semibold text-dash-light-purple">Computing overall averages...</p>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center gap-2">
+            <BarChart2 size={36} className="text-dash-light-purple/40 animate-pulse" />
+            <h4 className="font-plus-jakarta font-extrabold text-sm text-dash-dark-purple">No Unified Scores Found</h4>
+            <p className="text-xs text-dash-light-purple font-medium max-w-xs">
+              Complete results comparison will show here as candidates submit technical and English assessments.
+            </p>
+          </div>
+        ) : (
+          <div className="w-full overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-dash-border-gray/25 text-[10px] text-dash-light-purple font-extrabold uppercase tracking-wider">
+                  <th className="pb-3.5 pl-2">Candidate Details</th>
+                  <th className="pb-3.5">Technical Assessment</th>
+                  <th className="pb-3.5">English Speaking Assessment</th>
+                  <th className="pb-3.5 text-center">Consolidated Overall Score</th>
+                  <th className="pb-3.5 pr-2 text-right">Linguistic Level</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-dash-border-gray/10 text-xs font-semibold">
+                {filtered.map((item) => {
+                  const techPercent = item.technical_score !== null ? `${item.technical_score}%` : 'Pending';
+                  const engPercent = item.english_score !== null ? `${item.english_score}%` : 'Pending';
+                  const overallVal = item.overall_score !== null ? item.overall_score : null;
+
+                  return (
+                    <tr key={item.candidate_id} className="hover:bg-slate-50/50 transition-colors">
+                      {/* Identity Details */}
+                      <td className="py-4 pl-2">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-dash-dark-purple font-bold text-xs">{item.candidate_name}</span>
+                          <span className="text-[10px] text-dash-light-purple font-medium">{item.candidate_email}</span>
+                        </div>
+                      </td>
+
+                      {/* Technical Score with Side-By-Side Visual bar */}
+                      <td className="py-4">
+                        <div className="flex items-center gap-3 w-40">
+                          <span className={`w-14 text-left font-bold ${item.technical_score !== null ? 'text-dash-dark-purple' : 'text-slate-400 font-medium'}`}>
+                            {techPercent}
+                          </span>
+                          {item.technical_score !== null && (
+                            <div className="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden hidden sm:block">
+                              <div className="h-full bg-dash-primary-purple rounded-full" style={{ width: `${item.technical_score}%` }} />
+                            </div>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* English Score with Side-By-Side Visual bar */}
+                      <td className="py-4">
+                        <div className="flex items-center gap-3 w-40">
+                          <span className={`w-14 text-left font-bold ${item.english_score !== null ? 'text-dash-dark-purple' : 'text-slate-400 font-medium'}`}>
+                            {engPercent}
+                          </span>
+                          {item.english_score !== null && (
+                            <div className="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden hidden sm:block">
+                              <div className="h-full bg-dash-light-purple rounded-full" style={{ width: `${item.english_score}%` }} />
+                            </div>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Overall Average Radial Circle representation */}
+                      <td className="py-4">
+                        <div className="flex items-center justify-center">
+                          {overallVal !== null ? (
+                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-dash-soft-pink border border-[#2b72b5]/20 text-[#2b72b5] font-extrabold text-xs">
+                              <Activity size={12} className="text-[#2b72b5] shrink-0" />
+                              <span>{overallVal}% Average</span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 font-medium">Pending Both</span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Performance status evaluation badge */}
+                      <td className="py-4 pr-2 text-right">
+                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wide border ${
+                          overallVal && overallVal >= 80
+                            ? 'bg-[#10b981]/5 border-[#10b981]/25 text-[#10b981]'
+                            : overallVal && overallVal >= 60
+                              ? 'bg-blue-50 border-blue-200 text-blue-700'
+                              : 'bg-amber-50 border-amber-200 text-amber-700'
+                        }`}>
+                          {overallVal && overallVal >= 80 ? 'Highly Qualified' : overallVal && overallVal >= 60 ? 'Qualified' : 'Awaiting Tests'}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

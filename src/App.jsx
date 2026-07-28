@@ -42,7 +42,7 @@ const ResultsRedirect = ({ onLogout }) => {
   if (role === 'recruiter') {
     return <RecruiterDashboard onLogout={onLogout} initialTab="results" />;
   }
-  return <CandidateDashboard onLogout={onLogout} initialTab="results" />;
+  return <Navigate to="/candidate/dashboard" replace />;
 };
 
 // Microsoft OAuth Callback handler
@@ -117,7 +117,7 @@ function App() {
             path="/candidate/results" 
             element={
               <ProtectedRoute allowedRole="candidate">
-                <CandidateDashboard onLogout={handleLogout} initialTab="results" />
+                <Navigate to="/candidate/dashboard" replace />
               </ProtectedRoute>
             } 
           />

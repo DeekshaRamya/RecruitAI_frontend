@@ -40,8 +40,13 @@ import {
   HelpCircle,
   Database,
   Table,
-  Key
+  Key,
+  Send,
+  Mic,
+  VolumeX
 } from 'lucide-react';
+
+const MAX_QUESTIONS = 8;
 
 const DatabaseSchemaVisualizer = ({ schemaLines, dataLines }) => {
   const [parsedTables, setParsedTables] = React.useState([]);
@@ -323,240 +328,7 @@ const DatabaseSchemaVisualizer = ({ schemaLines, dataLines }) => {
   );
 };
 
-const CandidateResultsView = ({ showToast }) => {
-  const [results, setResults] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedResult, setSelectedResult] = useState(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-
-  useEffect(() => {
-    fetchCandidateResults();
-  }, []);
-
-  const fetchCandidateResults = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get('/api/candidate/results');
-      setResults(response.data || []);
-    } catch (err) {
-      console.error("Failed to fetch candidate results:", err);
-      showToast("Error loading your assessment results.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleOpenDetail = async (assignmentId) => {
-    try {
-      setDetailLoading(true);
-      const response = await api.get(`/api/results/${assignmentId}`);
-      setSelectedResult(response.data);
-    } catch (err) {
-      console.error("Failed to load result details:", err);
-      showToast("Error loading result details.");
-    } finally {
-      setDetailLoading(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-12 flex flex-col items-center justify-center gap-3">
-        <Loader2 className="animate-spin text-dash-primary-purple" size={36} />
-        <span className="text-xs font-bold text-dash-light-purple">Loading your evaluation results...</span>
-      </div>
-    );
-  }
-
-  if (results.length === 0) {
-    return (
-      <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-12 text-center flex flex-col items-center justify-center gap-4">
-        <div className="w-14 h-14 rounded-2xl bg-dash-primary-purple/10 flex items-center justify-center text-dash-primary-purple">
-          <Award size={28} />
-        </div>
-        <div>
-          <h3 className="font-plus-jakarta font-extrabold text-base text-dash-dark-purple">No Assessment Results Yet</h3>
-          <p className="text-xs text-dash-light-purple font-semibold mt-1 max-w-md mx-auto">
-            Complete assigned technical assessments to view your detailed AI score reports and evaluation feedback here.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {results.map((res) => {
-          const scoreVal = res.percentage || 0;
-          let scoreColor = '#149470';
-          let scoreBg = 'rgba(20, 148, 112, 0.1)';
-          if (scoreVal < 50) {
-            scoreColor = '#E11D48';
-            scoreBg = 'rgba(225, 29, 72, 0.1)';
-          } else if (scoreVal < 80) {
-            scoreColor = '#D97706';
-            scoreBg = 'rgba(217, 119, 6, 0.1)';
-          }
-
-          return (
-            <div
-              key={res.id}
-              className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-6 shadow-sm flex flex-col justify-between gap-5 hover:shadow-md transition-all duration-300"
-            >
-              <div className="flex items-center justify-between">
-                <span className="px-3 py-1 rounded-full text-[10px] font-extrabold bg-dash-primary-purple/10 text-dash-primary-purple uppercase tracking-wider">
-                  {res.assessmentName}
-                </span>
-                <span
-                  className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border"
-                  style={{ color: scoreColor, backgroundColor: scoreBg, borderColor: `${scoreColor}30` }}
-                >
-                  {scoreVal}%
-                </span>
-              </div>
-
-              <div>
-                <h4 className="font-plus-jakarta font-extrabold text-base text-dash-dark-purple">
-                  {res.assessmentName}
-                </h4>
-                <p className="text-xs font-semibold text-dash-light-purple mt-1">
-                  Submitted: {new Date(res.createdAt).toLocaleDateString()} at {new Date(res.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </p>
-              </div>
-
-              <div className="space-y-2 bg-slate-50 border border-slate-200/60 rounded-2xl p-4 text-xs font-semibold">
-                <div className="flex justify-between items-center">
-                  <span className="text-dash-light-purple">Total Questions:</span>
-                  <span className="text-dash-dark-purple font-bold">{res.totalQuestions}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-dash-light-purple">Correct Answers:</span>
-                  <span className="text-emerald-600 font-bold">{res.correctAnswers} / {res.totalQuestions}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-dash-light-purple">Status:</span>
-                  <span className={`font-bold ${res.passFail === 'Pass' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                    {res.passFail}
-                  </span>
-                </div>
-              </div>
-
-              <button
-                onClick={() => handleOpenDetail(res.assignmentId)}
-                className="w-full py-3 rounded-2xl bg-dash-primary-purple text-white font-extrabold text-xs hover:bg-dash-dark-purple transition-all duration-200 shadow-md flex items-center justify-center gap-2 cursor-pointer border-0"
-              >
-                <Eye size={14} />
-                <span>View Detailed Feedback</span>
-              </button>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Modal / Drawer for Detailed Results */}
-      <AnimatePresence>
-        {selectedResult && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 0.4 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSelectedResult(null)}
-              className="fixed inset-0 bg-dash-dark-purple/40 z-45"
-            />
-
-            <motion.div
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
-              className="fixed top-0 bottom-0 right-0 w-full sm:w-[600px] bg-dash-white-card border-l border-dash-border-gray shadow-2xl z-50 p-6 flex flex-col justify-between overflow-y-auto"
-            >
-              <div className="space-y-6">
-                <div className="flex items-center justify-between pb-4 border-b border-dash-border-gray">
-                  <div>
-                    <span className="text-[10px] text-dash-primary-purple font-extrabold tracking-widest uppercase">Candidate Score Card</span>
-                    <h3 className="text-base font-bold text-dash-dark-purple font-outfit mt-1">{selectedResult.assessmentName}</h3>
-                  </div>
-                  <button
-                    onClick={() => setSelectedResult(null)}
-                    className="p-1.5 rounded-lg hover:bg-dash-soft-pink text-dash-light-purple hover:text-dash-dark-purple transition-all duration-200 cursor-pointer border-none bg-transparent"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-
-                <div className="bg-dash-soft-pink/50 border border-dash-border-gray/50 rounded-2xl p-5 space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs font-bold text-dash-light-purple uppercase tracking-wider">Overall AI Grade</span>
-                    <span className="font-plus-jakarta font-extrabold text-2xl text-dash-primary-purple">{selectedResult.percentage}%</span>
-                  </div>
-
-                  {selectedResult.overallFeedback && (
-                    <div className="text-xs text-dash-dark-purple leading-relaxed space-y-2">
-                      <div>
-                        <strong className="text-dash-primary-purple">AI Evaluation Feedback:</strong>
-                        <p className="mt-1 font-medium text-slate-700">{selectedResult.overallFeedback}</p>
-                      </div>
-                      {selectedResult.overallStrengths && (
-                        <div>
-                          <strong className="text-emerald-600">Key Strengths:</strong>
-                          <p className="mt-0.5 font-medium text-slate-700">{selectedResult.overallStrengths}</p>
-                        </div>
-                      )}
-                      {selectedResult.overallWeaknesses && (
-                        <div>
-                          <strong className="text-rose-600">Areas for Improvement:</strong>
-                          <p className="mt-0.5 font-medium text-slate-700">{selectedResult.overallWeaknesses}</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Question Breakdown */}
-                {selectedResult.questionsAnalysis && selectedResult.questionsAnalysis.length > 0 && (
-                  <div className="space-y-4">
-                    <h4 className="font-plus-jakarta font-extrabold text-sm text-dash-dark-purple">
-                      Question-by-Question Analysis ({selectedResult.questionsAnalysis.length})
-                    </h4>
-                    <div className="space-y-3">
-                      {selectedResult.questionsAnalysis.map((q, idx) => (
-                        <div key={idx} className="p-4 rounded-2xl border border-dash-border-gray/60 bg-slate-50/50 space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-extrabold text-dash-primary-purple uppercase">Question {idx + 1} ({q.type})</span>
-                            <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border ${q.status === 'Correct' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : (q.status === 'Partially Correct' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-rose-50 text-rose-700 border-rose-200')}`}>
-                              {q.status}
-                            </span>
-                          </div>
-
-                          <p className="text-xs font-bold text-dash-dark-purple">{q.questionText}</p>
-
-                          <div className="bg-white p-3 rounded-xl border border-slate-200 text-xs space-y-1 font-mono">
-                            <div><span className="text-dash-light-purple">Your Answer: </span><span className="text-dash-dark-purple">{q.candidateAnswer || 'N/A'}</span></div>
-                            <div><span className="text-dash-light-purple">Correct Answer: </span><span className="text-emerald-600">{q.correctAnswer || 'N/A'}</span></div>
-                          </div>
-
-                          {q.aiExplanation && (
-                            <div className="text-[11px] text-dash-light-purple font-medium bg-dash-primary-purple/5 border border-dash-primary-purple/10 p-3 rounded-xl">
-                              <span className="font-bold text-dash-primary-purple block mb-0.5">✨ AI Explanation</span>
-                              {q.aiExplanation}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-};
+/* CandidateResultsView removed */
 
 const sortQuestionsForCandidate = (rawQuestions) => {
   if (!Array.isArray(rawQuestions) || rawQuestions.length === 0) return [];
@@ -607,7 +379,7 @@ const sortQuestionsForCandidate = (rawQuestions) => {
   return sorted;
 };
 
-const CandidateDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
+const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(initialTab);
   const [toastMessage, setToastMessage] = useState('');
@@ -637,6 +409,404 @@ const CandidateDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
       status: 'Completed'
     };
   });
+
+  // English Speaking Assessment states
+  const [englishLoading, setEnglishLoading] = useState(false);
+  const [englishInterview, setEnglishInterview] = useState(null);
+  const [englishText, setEnglishText] = useState('');
+  const [isRecording, setIsRecording] = useState(false);
+  const [englishTimeLeft, setEnglishTimeLeft] = useState(900); // 15 minutes = 900 seconds
+  const [aiTyping, setAiTyping] = useState(false);
+  const [voiceUsed, setVoiceUsed] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [techRedirectCountdown, setTechRedirectCountdown] = useState(null);
+  const [aiIsSpeaking, setAiIsSpeaking] = useState(false);
+  const [voiceMode, setVoiceMode] = useState(true); // default to calling mode
+  const [englishUploading, setEnglishUploading] = useState(false);
+  const [englishUploadProgress, setEnglishUploadProgress] = useState(0);
+  const [englishDragOver, setEnglishDragOver] = useState(false);
+  const [englishUploadError, setEnglishUploadError] = useState('');
+  const englishFileInputRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const mediaStreamRef = useRef(null);
+
+  // Stop recording and stream on unmount
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch (e) {}
+      }
+      if (mediaStreamRef.current) {
+        try {
+          mediaStreamRef.current.getTracks().forEach(track => track.stop());
+        } catch (e) {}
+      }
+    };
+  }, []);
+
+  // Fetch candidate English interview status
+  const fetchEnglishStatus = async () => {
+    try {
+      setEnglishLoading(true);
+      const res = await api.get('/api/english-assessment/current');
+      setEnglishInterview(res.data);
+      if (res.data && res.data.status === 'IN_PROGRESS') {
+        // Calculate remaining time
+        const startTime = new Date(res.data.start_time).getTime();
+        const now = Date.now();
+        const elapsed = Math.floor((now - startTime) / 1000);
+        const remaining = Math.max(0, 900 - elapsed);
+        setEnglishTimeLeft(remaining);
+      }
+    } catch (err) {
+      console.error("Failed to fetch English assessment status:", err);
+    } finally {
+      setEnglishLoading(false);
+    }
+  };
+
+  // Start English Interview session
+  const handleStartEnglish = async () => {
+    try {
+      setEnglishLoading(true);
+      setAiTyping(true);
+      const res = await api.post('/api/english-assessment/start');
+      setEnglishInterview(res.data);
+      setEnglishTimeLeft(900);
+      setEnglishText('');
+      
+      // Auto TTS first question if not muted
+      if (res.data && res.data.ai_question && !isMuted) {
+        setTimeout(() => speakQuestion(res.data.ai_question), 800);
+      }
+      
+      showToast("English Interview started! Welcome aboard.");
+    } catch (err) {
+      console.error("Failed to start English Assessment:", err);
+      const errMsg = err.response?.data?.detail || "Failed to start interview. Make sure your technical assessment is completed.";
+      showToast(errMsg);
+    } finally {
+      setEnglishLoading(false);
+      setAiTyping(false);
+    }
+  };
+
+  // Submit Answer to current question
+  const handleRespondEnglish = async (textToSend) => {
+    const finalAnswer = (textToSend && typeof textToSend === 'string') ? textToSend : englishText;
+    if (!finalAnswer.trim()) return;
+    
+    // Stop recording if active
+    if (isRecording) {
+      stopRecording();
+    }
+
+    try {
+      setEnglishLoading(true);
+      setAiTyping(true);
+      const answerPayload = {
+        answer: finalAnswer.trim(),
+        voice_used: voiceUsed
+      };
+      
+      const res = await api.post('/api/english-assessment/respond', answerPayload);
+      
+      setEnglishText('');
+      
+      // Fetch latest status to refresh conversation list
+      await fetchEnglishStatus();
+      
+      showToast("Answer saved successfully!");
+      // Speak next question out loud if not muted
+      if (res.data && res.data.ai_question && !isMuted) {
+        setTimeout(() => speakQuestion(res.data.ai_question), 800);
+      }
+    } catch (err) {
+      console.error("Failed to submit English Assessment response:", err);
+      showToast("Network connection error. Retrying auto-save...");
+    } finally {
+      setEnglishLoading(false);
+      setAiTyping(false);
+    }
+  };
+
+  // Conclude/Complete English Interview
+  const handleCompleteEnglish = async () => {
+    // Stop recording if active
+    if (isRecording) {
+      stopRecording();
+    }
+
+    try {
+      setEnglishLoading(true);
+      setAiTyping(true);
+      await api.post('/api/english-assessment/complete', { voice_used: voiceUsed });
+      showToast("English Assessment completed successfully!");
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+        setAiIsSpeaking(false);
+      }
+      await fetchEnglishStatus();
+    } catch (err) {
+      console.error("Failed to complete English Assessment:", err);
+      showToast("Error completing assessment. Please try again.");
+    } finally {
+      setEnglishLoading(false);
+      setAiTyping(false);
+    }
+  };
+
+  // Reset and retake the English Interview
+  const handleRetryEnglish = async () => {
+    try {
+      setEnglishLoading(true);
+      await api.post('/api/english-assessment/retry');
+      showToast("English assessment reset. You can now start a new interview.");
+      await fetchEnglishStatus();
+    } catch (err) {
+      console.error("Failed to retry English interview:", err);
+      showToast("Failed to reset interview. Please try again.");
+    } finally {
+      setEnglishLoading(false);
+    }
+  };
+
+  // Upload and parse resume specifically for English Assessment
+  const uploadEnglishResume = async (file) => {
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (ext !== 'pdf') {
+      setEnglishUploadError('Only PDF files are supported.');
+      showToast('Invalid file format');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setEnglishUploadError('File size exceeds the 5MB limit.');
+      showToast('File too large');
+      return;
+    }
+
+    setEnglishUploading(true);
+    setEnglishUploadProgress(0);
+    setEnglishUploadError('');
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await api.post('/api/candidate/upload-resume', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          setEnglishUploadProgress(percentCompleted);
+        },
+      });
+
+      showToast('Resume uploaded and analyzed successfully!');
+      
+      // Update candidate user state so profile contains parsed details
+      setCandidate(prev => ({
+        ...prev,
+        resume: response.data.resume_score || 85,
+        name: response.data.full_name || response.data.name || prev.name
+      }));
+
+      // Immediately trigger interview start!
+      await handleStartEnglish();
+
+    } catch (err) {
+      console.error("Upload error:", err);
+      let errMsg = 'Failed to upload resume. Please try again.';
+      if (err.response && err.response.data && err.response.data.detail) {
+        errMsg = err.response.data.detail;
+      }
+      setEnglishUploadError(errMsg);
+      showToast('Upload failed');
+    } finally {
+      setEnglishUploading(false);
+    }
+  };
+
+  // TTS speak helper
+  const speakQuestion = (text) => {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      setAiIsSpeaking(true);
+      
+      // If mic is recording, temporarily stop it to avoid feedback loop
+      if (isRecording) {
+        stopRecording();
+      }
+
+      const cleanText = text.replace(/Welcome to the English Assessment.*?Click "Start Interview" to begin\./gi, '');
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      utterance.lang = 'en-US';
+      
+      const voices = window.speechSynthesis.getVoices();
+      const englishVoice = voices.find(v => v.lang.startsWith('en') && v.name.includes('Google')) || 
+                          voices.find(v => v.lang.startsWith('en')) || 
+                          voices[0];
+      if (englishVoice) {
+        utterance.voice = englishVoice;
+      }
+
+      utterance.onstart = () => {
+        setAiIsSpeaking(true);
+      };
+
+      utterance.onend = () => {
+        setAiIsSpeaking(false);
+        // Automatically start recording when AI finishes speaking, in Voice Mode!
+        if (voiceMode && !isMuted) {
+          const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+          if (SpeechRecognition) {
+            setTimeout(() => {
+              startRecording(SpeechRecognition);
+            }, 500);
+          }
+        }
+      };
+
+      utterance.onerror = () => {
+        setAiIsSpeaking(false);
+      };
+
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  // Toggle voice mute
+  const toggleMute = () => {
+    setIsMuted(prev => {
+      const newVal = !prev;
+      if (newVal && typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+        setAiIsSpeaking(false);
+      } else if (!newVal) {
+        const activeQ = englishInterview?.current_question?.ai_question || englishInterview?.ai_question;
+        if (activeQ) {
+          speakQuestion(activeQ);
+        }
+      }
+      return newVal;
+    });
+  };
+
+  // Toggle Microphone / Web Speech API Speech-to-Text
+  const toggleRecording = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      showToast("Speech Recognition is not supported in this browser. Please use Chrome, Edge, or Safari.");
+      return;
+    }
+
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording(SpeechRecognition);
+    }
+  };
+
+  const startRecording = async (SpeechRecognition) => {
+    try {
+      // 1. Acquire media stream with noise suppression constraints to activate browser audio processing
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+        mediaStreamRef.current = stream;
+      } catch (err) {
+        console.warn("Failed to apply microphone noise suppression constraints:", err);
+      }
+
+      const rec = new SpeechRecognition();
+      rec.continuous = true; // Continuous listening, no silence-based auto-stop
+      rec.interimResults = true; // Show words as candidate speaks
+      rec.lang = 'en-US';
+      
+      rec.onstart = () => {
+        setIsRecording(true);
+        setVoiceUsed(true);
+      };
+      
+      rec.onresult = (event) => {
+        let localFinalTranscript = '';
+        let interimTranscript = '';
+        for (let i = 0; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            localFinalTranscript += event.results[i][0].transcript;
+          } else {
+            interimTranscript += event.results[i][0].transcript;
+          }
+        }
+        const text = localFinalTranscript + interimTranscript;
+        setEnglishText(text);
+      };
+      
+      rec.onerror = (e) => {
+        console.error("Speech Recognition Error:", e.error);
+        setIsRecording(false);
+      };
+      
+      rec.onend = () => {
+        setIsRecording(false);
+      };
+
+      recognitionRef.current = rec;
+      rec.start();
+    } catch (e) {
+      console.error(e);
+      setIsRecording(false);
+    }
+  };
+
+  const stopRecording = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+    if (mediaStreamRef.current) {
+      try {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      } catch (e) {}
+      mediaStreamRef.current = null;
+    }
+    setIsRecording(false);
+  };
+
+  // Countdown timer effect
+  useEffect(() => {
+    let timer;
+    if (activeTab === 'english' && englishInterview && englishInterview.status === 'IN_PROGRESS') {
+      timer = setInterval(() => {
+        setEnglishTimeLeft(prev => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            // End interview automatically
+            handleCompleteEnglish();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [activeTab, englishInterview]);
+
+  // Load status on mount and when tab changes
+  useEffect(() => {
+    if (activeTab === 'english') {
+      fetchEnglishStatus();
+    }
+  }, [activeTab]);
+
 
   const [assignments, setAssignments] = useState([]);
   const [loadingAssignments, setLoadingAssignments] = useState(true);
@@ -917,7 +1087,6 @@ const CandidateDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
     if (!targetId) return;
 
     setIsSubmittingManual(true);
-    setIsSubmitModalOpen(false);
 
     try {
       try {
@@ -948,6 +1117,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
       await api.post('/api/assessment/submit', payload);
 
       setExamState(prev => ({ ...prev, submitted: true }));
+      setIsSubmitModalOpen(false);
       await fetchAssignments();
     } catch (err) {
       console.error("Failed to submit exam:", err);
@@ -1300,12 +1470,6 @@ const CandidateDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
 
   const getHeaderContent = () => {
     switch (activeTab) {
-      case 'dashboard':
-        return {
-          title: 'Candidate Dashboard',
-          tag: 'Portal',
-          subtitle: `Welcome back, ${firstName}. Track your assessment progress here.`
-        };
       case 'resume':
         return {
           title: 'Resume Upload',
@@ -1324,12 +1488,6 @@ const CandidateDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
           tag: 'Speaking',
           subtitle: 'AI-generated questions based on your resume. Speak clearly and confidently.'
         };
-      case 'results':
-        return {
-          title: 'My Assessment Results',
-          tag: 'Results',
-          subtitle: 'View your overall AI scores, detailed evaluations, and feedback report.'
-        };
       default:
         return {
           title: 'Candidate Portal',
@@ -1339,87 +1497,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
     }
   };
 
-  const stats = [
-    {
-      label: 'Resume',
-      value: candidate.resume > 0 ? 'Uploaded' : 'Pending',
-      subtext: candidate.resume > 0 ? (candidate.resume_filename || `${candidate.name.replace(/\s+/g, '_')}_CV.pdf`) : 'No file uploaded',
-      icon: FileText,
-      colorClass: 'text-white bg-white/20',
-      cardBg: 'bg-gradient-to-br from-[#5E80B4] to-[#4D6D9E] text-white border-0 shadow-md'
-    },
-    {
-      label: 'Avg Skill Match',
-      value: candidate?.final > 0 ? `${candidate.final}%` : '—',
-      subtext: 'Across 4 categories',
-      icon: Award,
-      colorClass: 'text-white bg-white/20',
-      cardBg: 'bg-gradient-to-br from-[#8B95C9] to-[#7380BD] text-white border-0 shadow-md'
-    },
-    {
-      label: 'Assessment',
-      value: `${[candidate?.python || 0, candidate?.sql || 0, candidate?.aptitude || 0, candidate?.english || 0].filter(s => s > 0).length} / 4`,
-      subtext: 'Modules completed',
-      icon: Briefcase,
-      colorClass: 'text-white bg-white/20',
-      cardBg: 'bg-gradient-to-br from-[#E57E88] to-[#D06774] text-white border-0 shadow-md'
-    },
-    {
-      label: 'Final Score',
-      value: candidate?.final > 0 ? `${candidate.final}%` : '—',
-      subtext: candidate?.final > 0 ? 'Unlock complete' : 'Complete all to unlock',
-      icon: TrendingUp,
-      colorClass: 'text-white bg-white/20',
-      cardBg: 'bg-gradient-to-br from-[#768CB5] to-[#5C7CAE] text-white border-0 shadow-md'
-    }
-  ];
-
-  // Journey steps based on mock
-  const journeySteps = [
-    {
-      title: 'Resume Upload',
-      description: candidate?.resume > 0 ? `${(candidate?.name || candidate?.full_name || 'Candidate').replace(/\s+/g, '_')}_CV.pdf uploaded successfully` : 'Upload your resume to begin',
-      status: candidate?.resume > 0 ? 'Completed' : 'Pending',
-      statusColor: candidate.resume > 0 ? 'text-dash-success-green bg-dash-success-green/10 border-dash-success-green/20' : 'text-dash-light-purple bg-dash-border-gray/30 border-dash-border-gray/40'
-    },
-    {
-      title: 'AI Analysis',
-      description: candidate.resume > 0 ? 'Skills extracted & matched against 4 categories' : 'Awaiting resume upload',
-      status: candidate.resume > 0 ? 'Completed' : 'Pending',
-      statusColor: candidate.resume > 0 ? 'text-dash-success-green bg-dash-success-green/10 border-dash-success-green/20' : 'text-dash-light-purple bg-dash-border-gray/30 border-dash-border-gray/40'
-    },
-    {
-      title: 'Technical Assessment',
-      description: '30 questions · 60 min · Python, SQL, Aptitude',
-      status: (candidate.python > 0 || candidate.sql > 0 || candidate.aptitude > 0)
-        ? ((candidate.python > 0 && candidate.sql > 0 && candidate.aptitude > 0) ? 'Completed' : 'In Progress')
-        : 'Pending',
-      statusColor: (candidate.python > 0 && candidate.sql > 0 && candidate.aptitude > 0)
-        ? 'text-dash-success-green bg-dash-success-green/10 border-dash-success-green/20'
-        : (candidate.python > 0 || candidate.sql > 0 || candidate.aptitude > 0)
-          ? 'text-dash-primary-purple bg-dash-primary-purple/10 border-dash-primary-purple/20'
-          : 'text-dash-light-purple bg-dash-border-gray/30 border-dash-border-gray/40'
-    },
-    {
-      title: 'English Speaking',
-      description: '5 AI-generated resume-based questions',
-      status: candidate.english > 0 ? 'Completed' : 'Pending',
-      statusColor: candidate.english > 0
-        ? 'text-dash-success-green bg-dash-success-green/10 border-dash-success-green/20'
-        : 'text-dash-light-purple bg-dash-border-gray/30 border-dash-border-gray/40'
-    }
-  ];
-
-  // Skills progress based on mock
-  const skills = [
-    { name: 'Python', percent: candidate.python || 0, colorClass: 'bg-gradient-to-r from-[#5E80B4] to-[#4D6D9E]' },
-    { name: 'SQL', percent: candidate.sql || 0, colorClass: 'bg-gradient-to-r from-[#8B95C9] to-[#7380BD]' },
-    { name: 'Aptitude', percent: candidate.aptitude || 0, colorClass: 'bg-gradient-to-r from-[#E57E88] to-[#D06774]' },
-    { name: 'English', percent: candidate.english || 0, colorClass: 'bg-gradient-to-r from-[#768CB5] to-[#5C7CAE]' }
-  ];
-
-  // Strengths tags
-  const strengths = candidate.resume > 0 ? ['Python', 'SQL', 'Aptitude', 'English'] : ['Pending Assessment'];
+  /* Removed dashboard-specific local statistics and skill lists */
 
   return (
     <div className="candidate-dashboard-theme bg-dash-light-blue-bg text-dash-dark-purple min-h-screen relative overflow-hidden font-inter flex w-full">
@@ -1456,11 +1534,8 @@ const CandidateDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
           {/* Navigation Menu */}
           <nav className="space-y-2">
             {[
-              { id: 'dashboard', label: 'Dashboard', icon: Briefcase },
-              { id: 'resume', label: 'Resume Upload', icon: FileText },
               { id: 'technical', label: 'Technical Test', icon: Terminal },
               { id: 'english', label: 'English Speaking', icon: Volume2 },
-              { id: 'results', label: 'My Results', icon: Award },
             ].map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
@@ -1469,7 +1544,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
                   key={item.id}
                   onClick={() => {
                     setActiveTab(item.id);
-                    if (item.id !== 'dashboard' && item.id !== 'resume' && item.id !== 'technical' && item.id !== 'results') {
+                    if (item.id !== 'resume' && item.id !== 'technical' && item.id !== 'english') {
                       showToast(`"${item.label}" feature is coming soon!`);
                     }
                   }}
@@ -1562,11 +1637,8 @@ const CandidateDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
 
                 <nav className="space-y-1 flex-1">
                   {[
-                    { id: 'dashboard', label: 'Dashboard', icon: Briefcase },
-                    { id: 'resume', label: 'Resume Upload', icon: FileText },
                     { id: 'technical', label: 'Technical Test', icon: Terminal },
                     { id: 'english', label: 'English Speaking', icon: Volume2 },
-                    { id: 'results', label: 'My Results', icon: Award },
                   ].map((item) => {
                     const Icon = item.icon;
                     const isActive = activeTab === item.id;
@@ -1576,7 +1648,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
                         onClick={() => {
                           setActiveTab(item.id);
                           setSidebarOpen(false);
-                          if (item.id !== 'dashboard' && item.id !== 'resume' && item.id !== 'technical' && item.id !== 'results') {
+                          if (item.id !== 'resume' && item.id !== 'technical' && item.id !== 'english') {
                             showToast(`"${item.label}" feature is coming soon!`);
                           }
                         }}
@@ -1745,370 +1817,9 @@ const CandidateDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
           </header>
         )}
 
-        {activeTab === 'dashboard' && (
-          <>
-            {/* 3. STATISTICS CARDS */}
-            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4.5">
-              {stats.map((stat, idx) => {
-                const Icon = stat.icon;
-                return (
-                  <motion.div
-                    key={stat.label}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, delay: idx * 0.08 }}
-                    whileHover={{ y: -5 }}
-                    className={`border rounded-[24px] p-5.5 flex flex-col justify-between shadow-[0_4px_15px_rgba(87,82,170,0.02)] transition-all duration-300 group cursor-default min-h-[135px] ${stat.cardBg || 'bg-dash-white-card border-dash-border-gray/50 text-dash-dark-purple hover:bg-dash-soft-pink'}`}
-                  >
-                    <div className="flex justify-between items-start">
-                      <span className={`text-xs font-bold uppercase tracking-wider transition-colors ${stat.cardBg ? 'text-white/80' : 'text-dash-light-purple group-hover:text-dash-primary-purple'}`}>
-                        {stat.label}
-                      </span>
-                      <div className={`p-2 rounded-xl transition-all duration-300 ${stat.colorClass} group-hover:scale-110`}>
-                        <Icon size={18} />
-                      </div>
-                    </div>
-                    <div>
-                      <h3 className={`text-2xl font-plus-jakarta font-extrabold mt-2 tracking-tight ${stat.cardBg ? 'text-white' : 'text-dash-dark-purple'}`}>
-                        {stat.value}
-                      </h3>
-                      <p className={`text-xs font-semibold mt-1 ${stat.cardBg ? 'text-white/90' : 'text-dash-light-purple'}`}>
-                        {stat.subtext}
-                      </p>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </section>
 
-            {/* 4. DETAILS SECTION (JOURNEY & SKILLS MATRIX) */}
-            <div className="grid grid-cols-1 xl:grid-cols-5 gap-6 items-start">
-              {/* LEFT: ASSESSMENT JOURNEY */}
-              <section className="xl:col-span-3 bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-6 shadow-[0_4px_20px_rgba(87,82,170,0.02)] flex flex-col gap-5">
-                <div className="flex items-center justify-between border-b border-dash-border-gray/25 pb-4">
-                  <h3 className="font-plus-jakarta font-extrabold text-base text-dash-dark-purple tracking-tight">
-                    Assessment Journey
-                  </h3>
-                  <span className="text-xs font-bold text-dash-light-purple">4 Steps Total</span>
-                </div>
 
-                <div className="flex flex-col gap-4">
-                  {journeySteps.map((step, idx) => (
-                    <motion.div
-                      key={step.title}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.3, delay: idx * 0.1 }}
-                      whileHover={{ x: 4 }}
-                      className="p-4 rounded-2xl bg-dash-soft-pink border border-dash-border-gray/50 flex items-center justify-between gap-4 hover:bg-dash-border-gray transition-all duration-200"
-                    >
-                      <div className="flex items-start gap-3.5">
-                        <div className="mt-1 flex items-center justify-center text-dash-primary-purple">
-                          <CheckCircle2 size={18} className={step.status === 'Completed' ? 'text-dash-success-green' : 'text-dash-light-purple/60'} />
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-sm text-dash-dark-purple tracking-tight">
-                            {step.title}
-                          </h4>
-                          <p className="text-xs text-dash-light-purple font-medium mt-0.5">
-                            {step.description}
-                          </p>
-                        </div>
-                      </div>
 
-                      <div className="flex items-center gap-3">
-                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase border ${step.statusColor}`}>
-                          {step.status}
-                        </span>
-                        <ChevronRight size={16} className="text-dash-light-purple/40" />
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-              </section>
-
-              {/* RIGHT: SKILLS MATRIX */}
-              <section className="xl:col-span-2 bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-6 shadow-[0_4px_20px_rgba(87,82,170,0.02)] flex flex-col gap-5">
-                <div className="flex items-center justify-between border-b border-dash-border-gray/25 pb-4">
-                  <h3 className="font-plus-jakarta font-extrabold text-base text-dash-dark-purple tracking-tight">
-                    Resume Skill Match
-                  </h3>
-                  <span className="text-xs font-bold text-dash-light-purple">Core Strength Match</span>
-                </div>
-
-                {/* Progress bars list */}
-                <div className="space-y-4">
-                  {skills.map((skill) => (
-                    <div key={skill.name} className="space-y-1.5">
-                      <div className="flex justify-between text-xs font-bold">
-                        <span className="text-dash-dark-purple">{skill.name}</span>
-                        <span className="text-dash-primary-purple">{skill.percent}%</span>
-                      </div>
-                      <div className="w-full h-2 rounded-full bg-dash-light-blue-bg overflow-hidden">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${skill.percent}%` }}
-                          transition={{ duration: 0.8, ease: 'easeOut' }}
-                          className={`h-full rounded-full ${skill.colorClass}`}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Strengths tags */}
-                <div className="border-t border-dash-border-gray/25 pt-4">
-                  <h4 className="text-xs font-bold text-dash-light-purple uppercase tracking-wider mb-3">
-                    Your Strengths
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {strengths.map((tag) => (
-                      <span
-                        key={tag}
-                        className="px-3 py-1.5 rounded-xl bg-dash-soft-pink border border-dash-border-gray/50 text-xs font-bold text-dash-dark-purple hover:bg-dash-primary-purple hover:text-dash-white-card transition-all duration-200 cursor-default"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </section>
-            </div>
-          </>
-        )}
-
-        {activeTab === 'resume' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start animate-fade-in">
-            {/* Left Area: Drag & Drop Upload Zone or AI Analysis Results */}
-            <div className="lg:col-span-2 flex flex-col gap-6">
-              {(!candidate.resume || candidate.resume === 0 || uploading) ? (
-                <div
-                  className={`bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-8 shadow-[0_4px_20px_rgba(87,82,170,0.02)] min-h-[400px] flex flex-col items-center justify-center text-center transition-all duration-300 ${dragOver ? 'bg-dash-primary-purple/5 border-dash-primary-purple border-2' : ''}`}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                >
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileChange}
-                    accept=".pdf"
-                    className="hidden"
-                  />
-
-                  {uploading ? (
-                    <div className="flex flex-col items-center gap-4 w-full max-w-xs">
-                      <Loader2 className="animate-spin text-dash-primary-purple" size={48} />
-                      <div>
-                        <h3 className="font-plus-jakarta font-extrabold text-base text-dash-dark-purple">
-                          Analyzing Resume...
-                        </h3>
-                        <p className="text-xs text-dash-light-purple font-medium mt-1">
-                          Our AI is extracting skills and matching experience.
-                        </p>
-                      </div>
-                      <div className="w-full bg-dash-light-blue-bg h-2 rounded-full mt-2 overflow-hidden">
-                        <div
-                          className="bg-dash-primary-purple h-full transition-all duration-300"
-                          style={{ width: `${uploadProgress}%` }}
-                        />
-                      </div>
-                      <span className="text-xs font-bold text-dash-primary-purple">{uploadProgress}%</span>
-                    </div>
-                  ) : (
-                    <div className="border-2 border-dashed border-dash-border-gray rounded-2xl p-12 w-full flex flex-col items-center justify-center gap-4 hover:bg-dash-soft-pink/30 transition-all duration-300">
-                      <div className="w-14 h-14 rounded-full bg-dash-primary-purple/10 flex items-center justify-center text-dash-primary-purple">
-                        <UploadCloud size={28} />
-                      </div>
-                      <div>
-                        <h3 className="font-plus-jakarta font-extrabold text-base text-dash-dark-purple">
-                          Drag & drop your resume
-                        </h3>
-                        <p className="text-xs text-dash-light-purple font-medium mt-1">
-                          Supports PDF files up to 5MB
-                        </p>
-                      </div>
-                      {uploadError && (
-                        <p className="text-xs text-red-500 font-semibold bg-red-50 border border-red-100 rounded-xl px-4 py-2 mt-1">
-                          {uploadError}
-                        </p>
-                      )}
-                      <button
-                        onClick={() => fileInputRef.current.click()}
-                        className="mt-2 px-6 py-2.5 rounded-xl bg-dash-primary-purple text-dash-white-card font-bold text-sm hover:bg-dash-dark-purple transition-all duration-200 shadow-md cursor-pointer border-0"
-                      >
-                        Browse Files
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                /* Premium AI Analysis Dashboard Card */
-                <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-6.5 shadow-[0_4px_20px_rgba(87,82,170,0.02)] flex flex-col gap-6 animate-fade-in">
-                  {/* Card Header */}
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-dash-border-gray/25 pb-5">
-                    <div className="flex items-center gap-3">
-                      <div className="w-11 h-11 rounded-xl bg-dash-success-green/10 flex items-center justify-center text-dash-success-green">
-                        <CheckCircle2 size={22} />
-                      </div>
-                      <div>
-                        <h3 className="font-plus-jakarta font-extrabold text-base text-dash-dark-purple">
-                          Resume Analyzed
-                        </h3>
-                        <p className="text-xs text-dash-light-purple font-semibold mt-0.5">
-                          File: <span className="text-dash-primary-purple font-bold">{candidate?.resume_filename || `${(candidate?.name || candidate?.full_name || 'Candidate').replace(/\s+/g, '_')}_CV.pdf`}</span>
-                        </p>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => {
-                        // Reset resume to allow upload again
-                        setCandidate(prev => ({ ...prev, resume: 0 }));
-                      }}
-                      className="px-4 py-2 rounded-xl border border-dash-border-gray hover:bg-dash-soft-pink text-xs font-bold text-dash-dark-purple transition-all duration-200 cursor-pointer bg-transparent"
-                    >
-                      Upload New Resume
-                    </button>
-                  </div>
-
-                  {/* Score & Profile Summary Row */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center bg-dash-soft-pink/40 border border-dash-border-gray/50 rounded-[20px] p-5">
-                    {/* SVG Circular Progress Gauge */}
-                    <div className="flex flex-col items-center justify-center text-center">
-                      <div className="relative w-28 h-28 flex items-center justify-center">
-                        <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                          <circle
-                            cx="50"
-                            cy="50"
-                            r="42"
-                            stroke="currentColor"
-                            strokeWidth="8"
-                            className="text-dash-border-gray/30"
-                            fill="transparent"
-                          />
-                          <motion.circle
-                            cx="50"
-                            cy="50"
-                            r="42"
-                            stroke="currentColor"
-                            strokeWidth="8"
-                            className="text-dash-primary-purple"
-                            strokeDasharray="264"
-                            initial={{ strokeDashoffset: 264 }}
-                            animate={{ strokeDashoffset: 264 - (264 * candidate.resume) / 100 }}
-                            transition={{ duration: 1, ease: "easeOut" }}
-                            fill="transparent"
-                            strokeLinecap="round"
-                          />
-                        </svg>
-                        <div className="absolute flex flex-col items-center justify-center">
-                          <span className="font-plus-jakarta font-extrabold text-2xl text-dash-dark-purple">{candidate.resume}%</span>
-                          <span className="text-[9px] font-bold text-dash-light-purple uppercase tracking-wider">Score</span>
-                        </div>
-                      </div>
-                      <h4 className="font-outfit font-bold text-xs text-dash-dark-purple mt-2.5">AI Resume Grade</h4>
-                    </div>
-
-                    {/* Skill profile and overview */}
-                    <div className="md:col-span-2 flex flex-col gap-3">
-                      <h4 className="font-plus-jakarta font-extrabold text-sm text-dash-dark-purple">
-                        Profile Overview
-                      </h4>
-                      <p className="text-xs text-dash-light-purple font-medium leading-relaxed">
-                        Our AI models evaluated your credentials against core role competencies. Your skill matching metrics have been updated below. You are now prepared to complete the remaining assessment steps.
-                      </p>
-
-                      {/* Dashboard updated alert */}
-                      <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-dash-primary-purple/10 border border-dash-primary-purple/20 text-[11px] font-bold text-dash-primary-purple animate-pulse">
-                        <Sparkles size={14} className="shrink-0" />
-                        <span>Core skill metrics have been synchronized with your profile.</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* AI Feedback & Analysis Bullet Points */}
-                  <div className="flex flex-col gap-4">
-                    <h4 className="font-plus-jakarta font-extrabold text-sm text-dash-dark-purple">
-                      AI Strengths & Observations
-                    </h4>
-
-                    <div className="flex flex-col gap-3">
-                      {(candidate.resume_analysis || [
-                        "Demonstrates solid background in core Python development.",
-                        "Demonstrates practical hands-on experience in SQL database schema design.",
-                        "Clear project organization and excellent written communication."
-                      ]).map((point, index) => (
-                        <motion.div
-                          key={index}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: index * 0.15 }}
-                          className="p-3.5 rounded-xl bg-dash-soft-pink border-l-4 border-l-dash-primary-purple border border-dash-border-gray/40 flex items-start gap-3 hover:bg-dash-border-gray/30 transition-all duration-200"
-                        >
-                          <span className="w-5 h-5 rounded-full bg-dash-primary-purple/10 flex items-center justify-center text-[10px] font-extrabold text-dash-primary-purple shrink-0 mt-0.5">
-                            {index + 1}
-                          </span>
-                          <span className="text-xs font-semibold text-dash-dark-purple leading-relaxed">
-                            {point}
-                          </span>
-                        </motion.div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Right Area: Stacked Cards */}
-            <div className="flex flex-col gap-6">
-              {/* Card 1: Supported Formats */}
-              <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-6 shadow-[0_4px_20px_rgba(87,82,170,0.02)] hover:bg-dash-soft-pink transition-all duration-300">
-                <h4 className="font-plus-jakarta font-extrabold text-sm text-dash-dark-purple tracking-tight mb-4">
-                  Supported Formats
-                </h4>
-                <div className="space-y-3">
-                  {[
-                    'PDF (.pdf)',
-                    'Max size: 5MB'
-                  ].map((item) => (
-                    <div key={item} className="flex items-center gap-2.5 text-xs font-semibold text-dash-dark-purple">
-                      <CheckCircle2 size={16} className="text-dash-success-green" />
-                      <span>{item}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Card 2: AI Extracts */}
-              <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-6 shadow-[0_4px_20px_rgba(87,82,170,0.02)] hover:bg-dash-soft-pink transition-all duration-300">
-                <h4 className="font-plus-jakarta font-extrabold text-sm text-dash-dark-purple tracking-tight mb-4">
-                  AI Extracts
-                </h4>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    'Skills', 'Languages', 'Projects', 'Experience',
-                    'Education', 'Certifications', 'Tools', 'Technologies'
-                  ].map((tag) => (
-                    <span
-                      key={tag}
-                      className="px-3 py-1.5 rounded-xl bg-dash-light-blue-bg border border-dash-border-gray/30 text-xs font-bold text-dash-dark-purple hover:bg-dash-primary-purple hover:text-dash-white-card transition-all duration-200 cursor-default"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              {/* Card 3: Information Card */}
-              <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-6 shadow-[0_4px_20px_rgba(87,82,170,0.02)] hover:bg-dash-soft-pink transition-all duration-300">
-                <p className="text-xs text-dash-dark-purple font-medium leading-relaxed">
-                  AI analyzes your resume and compares it against assessment categories to personalize your test experience.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
 
         {activeTab === 'technical' && !activeAssignment && (
           <div className="w-full flex flex-col gap-6 animate-fade-in">
@@ -2875,96 +2586,536 @@ const CandidateDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
         })()}
 
         {activeTab === 'english' && (
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start animate-fade-in">
-            {/* LEFT: Question + Mic + AI Criteria (col-span-2) */}
-            <div className="xl:col-span-2 flex flex-col gap-6">
-              {/* Question Card */}
-              <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-6 shadow-[0_4px_20px_rgba(87,82,170,0.02)]">
-                <div className="flex items-center justify-between mb-5">
-                  <span className="text-xs font-bold text-dash-light-purple uppercase tracking-wider">Question 1 of 5</span>
-                  <span className="px-3 py-1.5 rounded-full text-[10px] font-bold tracking-wide uppercase border text-dash-primary-purple bg-dash-primary-purple/10 border-dash-primary-purple/20">AI Generated from Resume</span>
-                </div>
-
-                {/* Question Text Box */}
-                <div className="bg-dash-soft-pink border border-dash-border-gray/50 rounded-2xl p-5 mb-6">
-                  <p className="font-plus-jakarta font-bold text-base text-dash-dark-purple leading-relaxed">
-                    "Can you briefly introduce yourself and walk me through your background?"
-                  </p>
-                </div>
-
-                {/* Mic Button */}
-                <div className="flex flex-col items-center gap-3 py-4">
-                  <button
-                    onClick={() => showToast('Recording started...')}
-                    className="w-16 h-16 rounded-full bg-dash-primary-purple text-dash-white-card flex items-center justify-center hover:bg-dash-dark-purple transition-all duration-200 shadow-lg hover:scale-110 cursor-pointer border-0"
-                  >
-                    <Volume2 size={28} />
-                  </button>
-                  <span className="text-xs font-semibold text-dash-primary-purple">Click the mic to start recording</span>
-                </div>
+          <div className="w-full flex-1 flex flex-col gap-6 animate-fade-in select-text">
+            {englishLoading && !englishInterview && (
+              <div className="flex flex-col items-center justify-center py-20 gap-4">
+                <Loader2 className="animate-spin text-dash-primary-purple" size={40} />
+                <p className="text-sm font-semibold text-dash-light-purple">Initializing English Assessment...</p>
               </div>
+            )}
 
-              {/* AI Evaluation Criteria */}
-              <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-6 shadow-[0_4px_20px_rgba(87,82,170,0.02)]">
-                <h4 className="text-xs font-bold text-dash-dark-purple uppercase tracking-wider mb-4">AI Evaluation Criteria</h4>
-                <div className="grid grid-cols-5 gap-3">
-                  {['Fluency', 'Pronunciation', 'Grammar', 'Vocabulary', 'Confidence'].map((criterion) => (
-                    <div key={criterion} className="flex flex-col items-center gap-2 p-3 rounded-2xl bg-dash-soft-pink border border-dash-border-gray/50 hover:bg-dash-border-gray transition-all duration-200 cursor-default">
-                      <Volume2 size={18} className="text-dash-primary-purple" />
-                      <span className="text-[10px] font-bold text-dash-dark-purple text-center tracking-tight">{criterion}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* RIGHT: Question List + Progress */}
-            <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-6 shadow-[0_4px_20px_rgba(87,82,170,0.02)] flex flex-col gap-5">
-              <div className="flex items-center justify-between border-b border-dash-border-gray/25 pb-4">
-                <h3 className="font-plus-jakarta font-extrabold text-base text-dash-dark-purple tracking-tight">Questions</h3>
-              </div>
-
-              <div className="flex flex-col gap-3">
-                {[
-                  { num: 1, text: 'Can you briefly introduce yourself and walk me through your background?', active: true, done: false },
-                  { num: 2, text: 'You mentioned a Machine Learning project on your resume — can you explain what problem it solved?', active: false, done: false },
-                  { num: 3, text: 'What challenges did you face during your internship and how did you overcome them?', active: false, done: false },
-                  { num: 4, text: 'Why did you choose Python as your primary programming language for most of your projects?', active: false, done: false },
-                  { num: 5, text: 'Where do you see yourself in the next 3 years in your career?', active: false, done: false }
-                ].map((q) => (
-                  <div
-                    key={q.num}
-                    className={`flex items-start gap-3 p-3.5 rounded-2xl border transition-all duration-200 cursor-pointer ${q.active
-                      ? 'bg-dash-primary-purple/20 border-dash-primary-purple/40'
-                      : 'bg-dash-soft-pink border border-dash-border-gray/50 hover:bg-dash-border-gray'
-                      }`}
-                  >
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-extrabold shrink-0 mt-0.5 ${q.active ? 'bg-dash-primary-purple text-dash-white-card' : 'bg-dash-border-gray/40 text-dash-light-purple'
-                      }`}>
-                      {q.num}
-                    </span>
-                    <p className={`text-xs font-semibold leading-relaxed ${q.active ? 'text-dash-dark-purple' : 'text-dash-light-purple'
-                      }`}>
-                      {q.text}
-                    </p>
+            {englishInterview && (englishInterview.status === 'NOT_STARTED' || !englishInterview.status) && (
+              <div className="w-full flex justify-center items-center py-6">
+                <div className="w-full max-w-2xl bg-dash-white-card border border-dash-border-gray/50 rounded-[28px] p-8 sm:p-10 shadow-[0_4px_25px_rgba(87,82,170,0.02)] text-center flex flex-col items-center gap-6">
+                  <div className="w-16 h-16 rounded-2xl bg-dash-primary-purple/10 flex items-center justify-center text-dash-primary-purple">
+                    <Volume2 size={32} />
                   </div>
-                ))}
-              </div>
+                  <div>
+                    <h3 className="font-plus-jakarta font-extrabold text-2xl text-dash-dark-purple tracking-tight">
+                      English Speaking Assessment
+                    </h3>
+                    <p className="text-xs font-bold text-dash-light-purple mt-1 uppercase tracking-wider">AI HR Interviewer</p>
+                  </div>
 
-              {/* Progress Footer */}
-              <div className="border-t border-dash-border-gray/25 pt-4 flex items-center justify-between">
-                <span className="text-xs font-bold text-dash-light-purple uppercase tracking-wider">Completed</span>
-                <span className="text-xs font-extrabold text-dash-dark-purple">0 / 5</span>
+                  <div className="bg-dash-soft-pink/40 border border-dash-border-gray/40 rounded-2xl p-6 text-left w-full space-y-4 text-xs font-medium text-dash-dark-purple leading-relaxed">
+                    <p className="font-bold text-sm border-b border-dash-border-gray/25 pb-2 text-dash-primary-purple">Welcome to the English Assessment.</p>
+                    <p>Hello! I am your AI HR Interviewer today.</p>
+                    <p>I will evaluate your English communication skills through a realistic, conversational HR interview tailored to your uploaded resume background.</p>
+                    <p>• The interview will take approximately <strong>15 minutes</strong>.</p>
+                    <p>• You can type your answers or speak using your microphone (Speech-to-Text).</p>
+                    <p>Please answer naturally and professionally. Good luck!</p>
+                  </div>
+
+                  {englishInterview.is_eligible === false ? (
+                    <div className="w-full p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 font-bold text-xs">
+                      ⚠️ You must successfully complete the Technical Assessment first before starting the English Assessment.
+                    </div>
+                  ) : englishUploading ? (
+                    <div className="w-full p-6 border border-dash-border-gray/50 rounded-2xl bg-slate-50 flex flex-col items-center gap-3">
+                      <Loader2 className="animate-spin text-dash-primary-purple" size={32} />
+                      <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden mt-2">
+                        <div className="h-full bg-dash-primary-purple transition-all duration-350" style={{ width: `${englishUploadProgress}%` }} />
+                      </div>
+                      <span className="text-xs font-bold text-dash-primary-purple">Uploading & Analyzing Resume... {englishUploadProgress}%</span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-4 w-full">
+                      {/* Drag & Drop Zone */}
+                      <div
+                        onDragOver={(e) => { e.preventDefault(); setEnglishDragOver(true); }}
+                        onDragLeave={() => setEnglishDragOver(false)}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          setEnglishDragOver(false);
+                          const files = e.dataTransfer.files;
+                          if (files && files.length > 0) {
+                            uploadEnglishResume(files[0]);
+                          }
+                        }}
+                        onClick={() => englishFileInputRef.current && englishFileInputRef.current.click()}
+                        className={`w-full py-8 border-2 border-dashed rounded-[20px] transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${
+                          englishDragOver
+                            ? 'border-dash-primary-purple bg-dash-primary-purple/5 scale-[0.99]'
+                            : 'border-dash-border-gray hover:border-dash-primary-purple hover:bg-dash-light-blue-bg/40'
+                        }`}
+                      >
+                        <input
+                          type="file"
+                          ref={englishFileInputRef}
+                          onChange={(e) => {
+                            const files = e.target.files;
+                            if (files && files.length > 0) {
+                              uploadEnglishResume(files[0]);
+                            }
+                          }}
+                          accept=".pdf"
+                          className="hidden"
+                        />
+                        <UploadCloud size={24} className="text-dash-light-purple animate-pulse" />
+                        <span className="text-xs font-extrabold text-dash-dark-purple">Upload Resume to Start HR Interview</span>
+                        <span className="text-[10px] text-slate-400 font-bold">Drag & Drop Resume PDF or click to browse (max 5MB)</span>
+                      </div>
+
+                      {englishUploadError && (
+                        <p className="text-[10px] font-bold text-red-500">{englishUploadError}</p>
+                      )}
+
+                      {/* If candidate already has a resume on file, let them start directly */}
+                      {candidate && candidate.resume && candidate.resume > 0 && (
+                        <div className="flex flex-col items-center gap-2 mt-2">
+                          <span className="text-[10px] text-slate-400 font-bold">— OR —</span>
+                          <button
+                            type="button"
+                            onClick={handleStartEnglish}
+                            className="px-8 py-3.5 rounded-xl bg-dash-primary-purple text-white font-bold text-xs hover:bg-dash-dark-purple transition-all duration-200 shadow-md cursor-pointer border-0 flex items-center gap-2 justify-center w-full"
+                          >
+                            <Play size={13} />
+                            <span>Start Interview with Previously Uploaded Resume</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
+
+            {englishInterview && englishInterview.status === 'IN_PROGRESS' && (() => {
+              const conversations = englishInterview.conversations || [];
+              const currentQ = englishInterview.current_question || {};
+              const currentQNum = conversations.length;
+              const activeQuestionText = currentQ.ai_question || englishInterview.ai_question || "Please introduce yourself.";
+
+              return (
+                <div className="flex flex-col gap-6 w-full flex-1 animate-fade-in select-text">
+                  <style>{`
+                    @keyframes ripple {
+                      0% { transform: scale(0.95); opacity: 0.8; }
+                      50% { transform: scale(1.15); opacity: 0.4; }
+                      100% { transform: scale(1.35); opacity: 0; }
+                    }
+                    .animate-ripple-fast {
+                      animation: ripple 1.2s infinite ease-out;
+                    }
+                    .animate-ripple-medium {
+                      animation: ripple 2s infinite ease-out;
+                    }
+                    .animate-ripple-slow {
+                      animation: ripple 3.5s infinite ease-out;
+                    }
+                  `}</style>
+
+                  {/* Header / Mode Switcher bar */}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-dash-white-card border border-dash-border-gray/50 rounded-[20px] p-4 shadow-sm w-full">
+                    <div className="flex items-center gap-3">
+                      <div className="w-2.5 h-2.5 rounded-full bg-[#22c55e] animate-pulse" />
+                      <span className="text-xs font-bold text-dash-dark-purple">Sophia - RecruitAI AI HR Manager</span>
+                    </div>
+
+                    <div className="flex items-center bg-slate-100 rounded-xl p-1 border border-slate-200/50">
+                      <button
+                        type="button"
+                        onClick={() => setVoiceMode(true)}
+                        className={`px-4 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer border-none ${voiceMode
+                          ? 'bg-dash-primary-purple text-white shadow-sm'
+                          : 'text-slate-500 hover:text-slate-800'
+                          }`}
+                      >
+                        🎙️ Calling Mode
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setVoiceMode(false)}
+                        className={`px-4 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer border-none ${!voiceMode
+                          ? 'bg-dash-primary-purple text-white shadow-sm'
+                          : 'text-slate-500 hover:text-slate-800'
+                          }`}
+                      >
+                        💬 Chat Mode
+                      </button>
+                    </div>
+                  </div>
+
+                  {voiceMode ? (
+                    /* VOICE CALL MODE CONTAINER */
+                    <div className="w-full flex flex-col items-center justify-between bg-gradient-to-b from-[#1c133a] to-[#0a0614] border border-[#2d1b54]/40 rounded-[32px] p-6 sm:p-10 shadow-[0_10px_35px_rgba(45,27,84,0.3)] min-h-[500px] text-center gap-8 relative overflow-hidden select-none">
+                      
+                      {/* Interactive Waveform / Avatar center */}
+                      <div className="flex flex-col items-center gap-5 my-auto relative z-10 w-full">
+                        <div className="relative w-44 h-44 flex items-center justify-center rounded-full bg-white/5 border border-white/10 shadow-[0_0_50px_rgba(139,92,246,0.15)]">
+                          
+                          {/* Pulse wave rings based on state */}
+                          {isRecording && (
+                            <>
+                              <div className="absolute inset-0 rounded-full border border-emerald-500/30 animate-ripple-fast" style={{ animationDelay: '0s' }} />
+                              <div className="absolute inset-0 rounded-full border border-emerald-500/20 animate-ripple-fast" style={{ animationDelay: '0.4s' }} />
+                              <div className="absolute inset-0 rounded-full border border-emerald-500/10 animate-ripple-fast" style={{ animationDelay: '0.8s' }} />
+                            </>
+                          )}
+
+                          {aiIsSpeaking && (
+                            <>
+                              <div className="absolute inset-0 rounded-full border border-violet-500/30 animate-ripple-medium" style={{ animationDelay: '0s' }} />
+                              <div className="absolute inset-0 rounded-full border border-violet-500/20 animate-ripple-medium" style={{ animationDelay: '0.6s' }} />
+                              <div className="absolute inset-0 rounded-full border border-violet-500/10 animate-ripple-medium" style={{ animationDelay: '1.2s' }} />
+                            </>
+                          )}
+
+                          {(aiTyping || englishLoading) && (
+                            <>
+                              <div className="absolute inset-0 rounded-full border border-slate-400/20 animate-ripple-slow" style={{ animationDelay: '0s' }} />
+                              <div className="absolute inset-0 rounded-full border border-slate-400/10 animate-ripple-slow" style={{ animationDelay: '1.5s' }} />
+                            </>
+                          )}
+
+                          {/* Inner Avatar Box */}
+                          <div className={`w-28 h-28 rounded-full flex items-center justify-center text-white shadow-2xl relative z-10 transition-all duration-500 ${
+                            isRecording 
+                              ? 'bg-emerald-600 shadow-emerald-500/30 border-2 border-emerald-400/40' 
+                              : aiIsSpeaking 
+                                ? 'bg-violet-600 shadow-violet-500/30 border-2 border-violet-400/40' 
+                                : 'bg-[#231b42] border border-[#40356c]'
+                          }`}>
+                            <Volume2 size={40} className={isRecording ? "animate-pulse" : aiIsSpeaking ? "animate-bounce" : ""} />
+                          </div>
+                        </div>
+
+                        {/* Speech status label */}
+                        <div className="bg-white/5 border border-white/10 rounded-full px-5 py-1.5 text-xs font-bold text-white shadow-sm flex items-center gap-2">
+                          <span className={`w-2 h-2 rounded-full ${
+                            isRecording 
+                              ? 'bg-emerald-500 animate-ping' 
+                              : aiIsSpeaking 
+                                ? 'bg-violet-500 animate-pulse' 
+                                : 'bg-slate-400'
+                          }`} />
+                          <span>
+                            {isRecording 
+                              ? 'Listening... Please speak' 
+                              : aiIsSpeaking 
+                                ? 'Sophia is speaking...' 
+                                : aiTyping || englishLoading 
+                                  ? 'Thinking...' 
+                                  : 'Sophia is ready'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Question Text Box */}
+                      <div className="w-full max-w-2xl bg-white/5 border border-white/10 rounded-2xl p-5 shadow-inner text-center z-10">
+                        <p className="text-white font-plus-jakarta font-extrabold text-base leading-relaxed">
+                          "{activeQuestionText}"
+                        </p>
+                      </div>
+
+                      {/* Candidate response bubble transcript */}
+                      <div className="w-full max-w-2xl z-10">
+                        {englishText ? (
+                          <div className="bg-emerald-950/40 border border-emerald-500/30 rounded-2xl p-4 text-left shadow-sm flex flex-col gap-1.5">
+                            <span className="text-[10px] font-extrabold text-emerald-400 uppercase tracking-widest">Captured Response (Transcript)</span>
+                            <p className="text-xs font-bold text-emerald-100 leading-relaxed font-sans">{englishText}</p>
+                          </div>
+                        ) : isRecording ? (
+                          <p className="text-xs text-slate-400 font-bold italic animate-pulse">Start speaking now... your answer transcript will appear here in real time.</p>
+                        ) : (
+                          <p className="text-xs text-slate-400 font-bold italic">Click the microphone to record your response.</p>
+                        )}
+                      </div>
+
+                      {/* Audio room control bar */}
+                      <div className="w-full max-w-2xl flex items-center justify-between border-t border-white/10 pt-6 z-10 gap-4 mt-auto">
+                        {/* Remaining Time */}
+                        <div className="flex flex-col text-left">
+                          <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">Remaining Time</span>
+                          <span className="font-mono text-sm font-extrabold text-red-400">{formatTime(englishTimeLeft)}</span>
+                        </div>
+
+                        {/* Main Call controls */}
+                        <div className="flex items-center gap-3">
+                          {/* Mute button */}
+                          <button
+                            type="button"
+                            onClick={toggleMute}
+                            className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-200 cursor-pointer shadow-md ${
+                              isMuted 
+                                ? 'bg-amber-600 border-amber-600 text-white hover:bg-amber-700' 
+                                : 'bg-white/10 border-white/10 text-white hover:bg-white/20'
+                            }`}
+                            title={isMuted ? "Unmute Sophia's Voice" : "Mute Sophia's Voice"}
+                          >
+                            {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+                          </button>
+
+                          {/* Record toggle */}
+                          <button
+                            type="button"
+                            onClick={toggleRecording}
+                            disabled={englishLoading || aiTyping || aiIsSpeaking}
+                            className={`w-14 h-14 rounded-full flex items-center justify-center border transition-all duration-200 cursor-pointer shadow-lg disabled:opacity-40 disabled:cursor-not-allowed ${
+                              isRecording 
+                                ? 'bg-red-600 border-red-600 text-white hover:bg-red-700 animate-pulse' 
+                                : 'bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700'
+                            }`}
+                            title={isRecording ? "Stop Recording" : "Start Speaking"}
+                          >
+                            <Mic size={24} className={isRecording ? "animate-pulse" : ""} />
+                          </button>
+
+                          {/* Done Speaking (Send) */}
+                          <button
+                            type="button"
+                            onClick={handleRespondEnglish}
+                            disabled={!englishText.trim() || englishLoading || aiTyping}
+                            className="px-5 h-12 rounded-full bg-[#10b981] hover:bg-[#059669] text-white flex items-center justify-center font-bold text-xs transition-all duration-200 cursor-pointer shadow-md border-none disabled:opacity-40 disabled:cursor-not-allowed"
+                            title="Send response to Sophia"
+                          >
+                            Done Speaking (Send)
+                          </button>
+
+                          {/* Conclude Interview */}
+                          <button
+                            type="button"
+                            onClick={handleCompleteEnglish}
+                            disabled={englishLoading || aiTyping || conversations.length < 3}
+                            className="px-5 h-12 rounded-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center font-bold text-xs transition-all duration-200 cursor-pointer shadow-md border-none disabled:opacity-40 disabled:cursor-not-allowed"
+                            title="Finish conversation and generate report"
+                          >
+                            Conclude Interview
+                          </button>
+                        </div>
+
+                        {/* Conversation Turns info */}
+                        <div className="flex flex-col text-right">
+                          <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">Conversation</span>
+                          <span className="text-sm font-extrabold text-white">{currentQNum} turns</span>
+                        </div>
+                      </div>
+
+                    </div>
+                  ) : (
+                    /* CHAT TEXT MODE CONTAINER */
+                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-stretch w-full flex-1 min-h-[550px]">
+                      
+                      {/* LEFT PANEL: AI HR Avatar & Status */}
+                      <div className="xl:col-span-1 bg-dash-white-card border border-dash-border-gray/50 rounded-[28px] p-6 shadow-[0_4px_20px_rgba(87,82,170,0.02)] flex flex-col justify-between items-center text-center gap-6">
+                        
+                        <div className="flex flex-col items-center gap-4 w-full">
+                          {/* Visual Pulse Avatar */}
+                          <div className="relative w-36 h-36 flex items-center justify-center rounded-full bg-dash-primary-purple/10 border-4 border-dash-primary-purple/20 shadow-[0_0_30px_rgba(87,82,170,0.1)] overflow-hidden">
+                            <div className={`absolute inset-0 rounded-full border border-dash-primary-purple/20 animate-ping opacity-60 ${isRecording ? 'duration-1000' : ''}`} style={{ animationDuration: isRecording ? '1.5s' : '3s' }} />
+                            <div className="w-20 h-20 rounded-full bg-dash-primary-purple flex items-center justify-center text-white shadow-lg relative z-10">
+                              <Volume2 size={32} className={isRecording ? "animate-bounce" : aiTyping ? "animate-pulse" : ""} />
+                            </div>
+                          </div>
+
+                          <div>
+                            <h4 className="font-plus-jakarta font-extrabold text-base text-dash-dark-purple leading-tight">AI HR Interviewer</h4>
+                            <span className="text-[10px] text-dash-light-purple font-bold uppercase tracking-wider mt-1 block">Active Evaluation</span>
+                          </div>
+                        </div>
+
+                        {/* Meta stats grid */}
+                        <div className="grid grid-cols-2 gap-4 w-full bg-dash-light-blue-bg/40 border border-dash-border-gray/30 rounded-2xl p-4 text-xs font-semibold text-dash-dark-purple">
+                          <div className="flex flex-col gap-0.5 border-r border-dash-border-gray/20 pr-2">
+                            <span className="text-[9px] font-bold text-dash-light-purple uppercase tracking-wider">Interview Time</span>
+                            <span className="font-mono text-sm font-extrabold text-red-500">{formatTime(englishTimeLeft)}</span>
+                          </div>
+                          <div className="flex flex-col gap-0.5 pl-2">
+                            <span className="text-[9px] font-bold text-dash-light-purple uppercase tracking-wider">Turns</span>
+                            <span className="font-extrabold text-sm">{currentQNum} spoken</span>
+                          </div>
+                          <div className="flex flex-col gap-0.5 col-span-2 border-t border-dash-border-gray/25 pt-2 mt-1 items-center">
+                            <span className="text-[9px] font-bold text-dash-light-purple uppercase tracking-wider">Connection Status</span>
+                            <span className="flex items-center gap-1.5 mt-1 text-[11px] font-bold">
+                              <span className={`w-2 h-2 rounded-full ${englishLoading ? 'bg-amber-400 animate-pulse' : 'bg-[#22c55e]'}`} />
+                              {englishLoading ? 'Processing...' : 'Online & Connected'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Mute and Guidelines footer */}
+                        <div className="flex flex-col gap-3 w-full border-t border-dash-border-gray/25 pt-4">
+                          <button
+                            onClick={toggleMute}
+                            className={`w-full py-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${isMuted
+                              ? 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100'
+                              : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                              }`}
+                          >
+                            {isMuted ? 'Unmute AI HR Voice' : 'Mute AI HR Voice'}
+                          </button>
+                          <p className="text-[10px] text-dash-light-purple font-medium leading-normal px-2">
+                            Speak clearly into the microphone. You can edit the transcribed text before clicking Send.
+                          </p>
+                        </div>
+
+                      </div>
+
+                      {/* RIGHT PANEL: Chat History & Input */}
+                      <div className="xl:col-span-2 bg-dash-white-card border border-dash-border-gray/50 rounded-[28px] p-6 shadow-[0_4px_20px_rgba(87,82,170,0.02)] flex flex-col justify-between gap-4">
+                        
+                        {/* Chat Messages Log */}
+                        <div className="flex-1 min-h-[300px] max-h-[380px] overflow-y-auto pr-1 flex flex-col gap-4 border-b border-dash-border-gray/20 pb-4">
+                          {conversations.map((msg, index) => {
+                            const isLastItem = index === conversations.length - 1;
+                            return (
+                              <div key={index} className="flex flex-col gap-3">
+                                {/* AI Question */}
+                                <div className="flex items-start gap-2.5 max-w-[85%] self-start animate-fade-in">
+                                  <div className="w-7 h-7 rounded-lg bg-dash-primary-purple/10 flex items-center justify-center text-dash-primary-purple shrink-0 mt-0.5 text-xs font-bold">HR</div>
+                                  <div className="bg-slate-50 border border-slate-200/60 rounded-2xl rounded-tl-none p-3.5 text-xs font-medium text-slate-800 leading-relaxed shadow-xs">
+                                    {msg.ai_question}
+                                  </div>
+                                </div>
+                                
+                                {/* Candidate Answer */}
+                                {msg.candidate_answer && (
+                                  <div className="flex items-start gap-2.5 max-w-[85%] self-end justify-end animate-fade-in">
+                                    <div className="bg-dash-primary-purple text-white rounded-2xl rounded-tr-none p-3.5 text-xs font-medium leading-relaxed shadow-sm">
+                                      {msg.candidate_answer}
+                                    </div>
+                                    <div className="w-7 h-7 rounded-full bg-dash-primary-purple flex items-center justify-center text-white shrink-0 mt-0.5 text-[10px] font-bold">ME</div>
+                                  </div>
+                                )}
+
+                                {/* Typing Indicator inside active item */}
+                                {isLastItem && aiTyping && !msg.candidate_answer && (
+                                  <div className="flex items-center gap-2 text-xs font-semibold text-dash-light-purple ml-9 mt-1 italic animate-pulse">
+                                    <Loader2 size={12} className="animate-spin" />
+                                    <span>AI HR is evaluating and generating next question...</span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+
+                          {conversations.length === 0 && (
+                            <div className="h-full flex items-center justify-center text-center text-xs text-dash-light-purple italic">
+                              Click Start to begin. The AI HR interviewer will speak and present questions here.
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Mode Switcher Action Buttons */}
+                        <div className="flex items-center justify-between border-t border-dash-border-gray/20 pt-2 mt-1">
+                          <span className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider">
+                            {conversations.length} turns recorded
+                          </span>
+                          <button
+                            type="button"
+                            onClick={handleCompleteEnglish}
+                            disabled={englishLoading || aiTyping || conversations.length < 3}
+                            className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition-all cursor-pointer border-0 disabled:opacity-40 disabled:cursor-not-allowed shadow-md"
+                          >
+                            Conclude Interview
+                          </button>
+                        </div>
+
+                        {/* Response Input Control Panel */}
+                        <div className="flex flex-col gap-3">
+                          {/* Spoken indicator banner */}
+                          {isRecording && (
+                            <div className="bg-red-50 border border-red-200 text-red-600 rounded-xl p-2.5 text-xs font-bold flex items-center gap-2 animate-pulse">
+                              <span className="w-2.5 h-2.5 rounded-full bg-red-600 shrink-0 animate-ping" />
+                              <span>Listening... Speak naturally. Click Microphone button to stop.</span>
+                            </div>
+                          )}
+
+                          <div className="flex items-end gap-2.5">
+                            <textarea
+                              value={englishText}
+                              onChange={(e) => setEnglishText(e.target.value)}
+                              placeholder="Type your response here or click the microphone to speak..."
+                              rows={3}
+                              disabled={englishLoading || aiTyping}
+                              className="flex-1 p-3 text-xs font-semibold bg-[#fafafa] border border-dash-border-gray/50 rounded-2xl focus:outline-none focus:ring-2 focus:ring-dash-primary-purple/40 focus:border-dash-primary-purple transition-all resize-none shadow-inner"
+                            />
+
+                            <div className="flex flex-col gap-2 shrink-0">
+                              {/* Microphone Button */}
+                              <button
+                                type="button"
+                                onClick={toggleRecording}
+                                disabled={englishLoading || aiTyping}
+                                className={`w-11 h-11 rounded-xl flex items-center justify-center border transition-all duration-200 cursor-pointer shadow-md ${isRecording
+                                  ? 'bg-red-600 text-white border-red-600 animate-pulse hover:bg-red-700'
+                                  : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
+                                  }`}
+                                title="Speak Response"
+                              >
+                                <Mic size={16} />
+                              </button>
+
+                              {/* Send Button */}
+                              <button
+                                type="button"
+                                onClick={handleRespondEnglish}
+                                disabled={!englishText.trim() || englishLoading || aiTyping}
+                                className="w-11 h-11 rounded-xl bg-dash-primary-purple text-white flex items-center justify-center hover:bg-dash-dark-purple transition-all duration-200 cursor-pointer shadow-md border-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                                title="Send Message"
+                              >
+                                <Send size={16} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                      </div>
+
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {englishInterview && englishInterview.status === 'COMPLETED' && (
+              <div className="w-full flex justify-center items-center py-10 animate-fade-in">
+                <div className="w-full max-w-xl bg-dash-white-card border border-dash-border-gray/50 rounded-[28px] p-8 sm:p-10 shadow-[0_4px_25px_rgba(87,82,170,0.02)] text-center flex flex-col items-center gap-6">
+                  <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-[#10b981]">
+                    <CheckCircle2 size={32} />
+                  </div>
+                  <div>
+                    <h3 className="font-plus-jakarta font-extrabold text-2xl text-dash-dark-purple tracking-tight">
+                      Interview Completed!
+                    </h3>
+                    <p className="text-xs font-bold text-dash-light-purple mt-1 uppercase tracking-wider">English Speaking Assessment</p>
+                  </div>
+
+                  <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-6 text-center w-full space-y-3.5 text-xs font-medium text-slate-700 leading-relaxed shadow-sm">
+                    <p className="font-bold text-sm text-dash-primary-purple">Thank you for taking the assessment.</p>
+                    <p>Your conversational AI HR interview has been successfully completed and saved.</p>
+                    <p>All evaluation scores, summary analysis, strengths, weaknesses, and dialogue transcripts have been securely submitted to the recruiter for processing.</p>
+                    <p className="text-[10px] text-dash-light-purple italic mt-2">You can safely navigate away or wait for updates from your recruiter.</p>
+                  </div>
+
+                  <div className="flex w-full justify-center mt-2">
+                    <button
+                      onClick={handleRetryEnglish}
+                      disabled={englishLoading}
+                      className="px-6 py-3 rounded-xl bg-dash-primary-purple text-white font-bold text-xs hover:bg-dash-dark-purple transition-all duration-200 shadow-md cursor-pointer border-0 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      <RotateCcw size={14} />
+                      <span>Retry Assessment</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        {activeTab === 'results' && (
-          <CandidateResultsView showToast={showToast} />
-        )}
 
-        {activeTab !== 'dashboard' && activeTab !== 'resume' && activeTab !== 'technical' && activeTab !== 'english' && activeTab !== 'results' && (
+        {activeTab !== 'technical' && activeTab !== 'english' && (
           <section className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-8 shadow-sm flex flex-col items-center justify-center min-h-[350px] text-center">
             <div className="p-4 rounded-full bg-dash-light-blue-bg text-dash-primary-purple mb-4">
               <Clock size={36} className="animate-spin" style={{ animationDuration: '10s' }} />
@@ -3014,17 +3165,26 @@ const CandidateDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
               <div className="flex items-center gap-3 w-full">
                 <button
                   type="button"
+                  disabled={isSubmittingManual}
                   onClick={() => setIsSubmitModalOpen(false)}
-                  className="flex-1 py-3 px-4 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 transition-all cursor-pointer"
+                  className="flex-1 py-3 px-4 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
+                  disabled={isSubmittingManual}
                   onClick={() => handleSubmitExam()}
-                  className="flex-1 py-3 px-4 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 transition-all shadow-md cursor-pointer"
+                  className="flex-1 py-3 px-4 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 transition-all shadow-md cursor-pointer flex items-center justify-center gap-2 disabled:bg-indigo-400 disabled:cursor-not-allowed"
                 >
-                  Submit Assessment
+                  {isSubmittingManual ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      <span>Submitting...</span>
+                    </>
+                  ) : (
+                    <span>Submit Assessment</span>
+                  )}
                 </button>
               </div>
             </motion.div>

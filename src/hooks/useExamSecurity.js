@@ -325,6 +325,14 @@ export const useExamSecurity = ({
         const now = Date.now();
         if (now - lastTabSwitchTimeRef.current < 1000) return;
         lastTabSwitchTimeRef.current = now;
+
+        // Force exit fullscreen to trigger warning overlay immediately
+        if (document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        } else if (document.webkitExitFullscreen) {
+          document.webkitExitFullscreen().catch(() => {});
+        }
+
         triggerViolation('Tab Switch', 'Switched away from assessment tab.', 'High', 'TAB_SWITCH', true);
       } else if (document.visibilityState === 'visible') {
         sendActivityLogToBackend('WINDOW_FOCUS', exitCountRef.current, 'Returned to assessment tab.');
@@ -342,6 +350,14 @@ export const useExamSecurity = ({
         if (!document.hasFocus() && activeRef.current && !isExamLockedRef.current) {
           if (now - lastWindowBlurTimeRef.current < 1000) return;
           lastWindowBlurTimeRef.current = now;
+
+          // Force exit fullscreen to trigger warning overlay immediately
+          if (document.exitFullscreen) {
+            document.exitFullscreen().catch(() => {});
+          } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen().catch(() => {});
+          }
+
           triggerViolation('Window Blur', 'Browser lost focus.', 'Medium', 'WINDOW_BLUR', true);
         }
       }, 150);

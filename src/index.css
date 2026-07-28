@@ -2,41 +2,41 @@
 @import "tailwindcss";
 
 @theme {
-  --color-candidate-bg: #f9f8fc;
+  --color-candidate-bg: #f5f9fc;
   --color-candidate-card-bg: #ffffff;
-  --color-candidate-card-border: rgba(124, 58, 237, 0.08);
-  --color-candidate-primary: #7c3aed;
-  --color-candidate-primary-hover: #6d28d9;
-  --color-candidate-accent: #ec4899;
-  --color-candidate-text-main: #1e1b4b;
-  --color-candidate-text-sub: #4f46e5;
+  --color-candidate-card-border: rgba(43, 114, 181, 0.08);
+  --color-candidate-primary: #2b72b5;
+  --color-candidate-primary-hover: #205688;
+  --color-candidate-accent: #5893d4;
+  --color-candidate-text-main: #0f172a;
+  --color-candidate-text-sub: #5893d4;
   --color-candidate-text-muted: #94a3b8;
-  --color-candidate-button-shadow: rgba(124, 58, 237, 0.08);
+  --color-candidate-button-shadow: rgba(43, 114, 181, 0.08);
 
   --color-recruiter-bg: #f8fafc;
   --color-recruiter-card-bg: #ffffff;
-  --color-recruiter-card-border: rgba(79, 70, 229, 0.12);
-  --color-recruiter-primary: #4f46e5;
-  --color-recruiter-primary-hover: #4338ca;
-  --color-recruiter-accent: #2563eb;
+  --color-recruiter-card-border: rgba(43, 114, 181, 0.12);
+  --color-recruiter-primary: #2b72b5;
+  --color-recruiter-primary-hover: #205688;
+  --color-recruiter-accent: #5893d4;
   --color-recruiter-text-main: #0f172a;
   --color-recruiter-text-sub: #475569;
   --color-recruiter-text-muted: #94a3b8;
-  --color-recruiter-button-shadow: rgba(79, 70, 229, 0.15);
+  --color-recruiter-button-shadow: rgba(43, 114, 181, 0.15);
 
   --color-input-bg-light: #ffffff;
   --color-input-border-light: #e2e8f0;
 
-  --color-dash-primary-purple: #4F46E5;
+  --color-dash-primary-purple: #2b72b5;
   --color-dash-dark-purple: #0F172A;
-  --color-dash-light-purple: #6366F1;
-  --color-dash-soft-pink: #EEF2FF;
+  --color-dash-light-purple: #5893d4;
+  --color-dash-soft-pink: #d6f7f2;
   --color-dash-light-blue-bg: #F8FAFC;
   --color-dash-white-card: #FFFFFF;
   --color-dash-success-green: #10B981;
   --color-dash-light-green: #D1FAE5;
   --color-dash-border-gray: #E2E8F0;
-  --color-dash-accent-brown: #4338CA;
+  --color-dash-accent-brown: #2b72b5;
   --color-dash-sidebar-bg: #0F172A;
 
   --font-inter: 'Inter', sans-serif;

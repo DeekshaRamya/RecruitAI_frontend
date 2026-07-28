@@ -64,25 +64,48 @@ export const ExamSecurityMonitor = ({
   // Determine modal header and message based on full-screen exit count
   const getWarningContent = () => {
     switch (fullscreenExitCount) {
+      case 0:
+        return {
+          title: "Assessment Instructions & Safe Exam Rules",
+          titleColor: "text-indigo-400",
+          message: "To ensure a fair testing environment, this assessment runs in Safe Exam Mode. Please read the following rules carefully:\n\n" +
+                   "🚫 DO NOT press Alt+Tab or switch windows/tabs.\n" +
+                   "🚫 DO NOT exit full-screen mode (Escape key is disabled).\n" +
+                   "🚫 DO NOT open Developer Tools (F12 or inspect shortcuts).\n" +
+                   "🚫 DO NOT copy, cut, or paste content.\n" +
+                   "🚫 DO NOT right-click on the page.\n" +
+                   "🚫 DO NOT connect multiple monitors (dual screens).\n\n" +
+                   "You are allowed a maximum of 3 warnings. Exiting full-screen a 4th time will result in automatic submission. Please click below to enter full-screen and begin your assessment.",
+          buttonText: "Start Assessment in Fullscreen"
+        };
       case 1:
         return {
           title: "Warning (1 of 3)",
           titleColor: "text-amber-400",
-          message: "You have exited full-screen mode.\nPlease return to full-screen to continue your assessment.\nRepeated violations may result in automatic submission.",
+          message: "You have exited full-screen mode.\n\n" +
+                   "🚫 DO NOT switch windows/tabs (Alt+Tab).\n" +
+                   "🚫 DO NOT exit full-screen mode.\n\n" +
+                   "Please return to full-screen to continue your assessment. Repeated violations will result in automatic submission.",
           buttonText: "Return to Exam"
         };
       case 2:
         return {
           title: "Warning (2 of 3)",
           titleColor: "text-orange-400",
-          message: "This is your second warning.\nOne more violation will result in automatic submission.",
+          message: "This is your second warning.\n\n" +
+                   "🚫 DO NOT switch windows/tabs (Alt+Tab).\n" +
+                   "🚫 DO NOT exit full-screen mode.\n\n" +
+                   "Please return to full-screen immediately. One more violation will result in automatic submission.",
           buttonText: "Return to Exam"
         };
       case 3:
         return {
           title: "Final Warning (3 of 3)",
           titleColor: "text-rose-500",
-          message: "This is your final warning.\nIf you exit full-screen once again, your assessment will be submitted automatically.",
+          message: "This is your final warning.\n\n" +
+                   "🚫 DO NOT switch windows/tabs (Alt+Tab).\n" +
+                   "🚫 DO NOT exit full-screen mode.\n\n" +
+                   "If you exit full-screen once again, your assessment will be submitted automatically.",
           buttonText: "Return to Exam"
         };
       default:
@@ -161,7 +184,7 @@ export const ExamSecurityMonitor = ({
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.9, y: 20 }}
-              className="max-w-md w-full bg-[#121214] border border-zinc-800/80 rounded-[32px] p-8 text-center shadow-2xl relative overflow-hidden"
+              className="max-w-lg w-full bg-[#121214] border border-zinc-800/80 rounded-[32px] p-8 text-center shadow-2xl relative overflow-hidden"
             >
               {/* Background gradient orb */}
               <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-amber-500/10 rounded-full blur-[60px]" />
@@ -170,11 +193,11 @@ export const ExamSecurityMonitor = ({
                 <Maximize2 size={28} className="animate-pulse" />
               </div>
 
-              <h2 className={`font-plus-jakarta font-black text-xl mb-2 ${warningContent.titleColor}`}>
+              <h2 className={`font-plus-jakarta font-black text-xl mb-4 ${warningContent.titleColor}`}>
                 {warningContent.title}
               </h2>
               
-              <p className="text-zinc-300 text-sm leading-relaxed mb-6 font-medium">
+              <p className="text-zinc-300 text-xs leading-relaxed mb-6 font-medium whitespace-pre-line text-left bg-zinc-900/40 p-5 rounded-2xl border border-zinc-800/50">
                 {warningContent.message}
               </p>
 
