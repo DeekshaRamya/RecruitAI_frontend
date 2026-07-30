@@ -239,15 +239,9 @@ const LoginCard = ({ role, setRole, onLogin }) => {
         subtitle: 'Secure access to RecruitAI recruiter management and assessment dashboard.'
       };
     }
-    if (candidateMode === 'login') {
-      return {
-        title: 'Welcome Back',
-        subtitle: 'Enter your credentials to access your candidate dashboard.'
-      };
-    }
     return {
-      title: 'Join RecruitAI',
-      subtitle: 'Create your candidate profile to begin assessment journeys.'
+      title: 'Welcome Back',
+      subtitle: 'Enter your credentials to access your candidate dashboard.'
     };
   };
 
@@ -286,7 +280,7 @@ const LoginCard = ({ role, setRole, onLogin }) => {
       <div className="text-center mb-6">
         <AnimatePresence mode="wait">
           <motion.div
-            key={`${role}-${candidateMode}`}
+            key={role}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
@@ -337,7 +331,7 @@ const LoginCard = ({ role, setRole, onLogin }) => {
               Sign in securely using your organization’s Microsoft account.
             </div>
           </motion.div>
-        ) : candidateMode === 'login' ? (
+        ) : (
           <motion.div
             key="candidate-login"
             initial={{ opacity: 0, y: 15 }}
@@ -417,135 +411,6 @@ const LoginCard = ({ role, setRole, onLogin }) => {
                 Sign In
               </ActionButton>
             </form>
-
-            {/* Divider */}
-            <div className="flex items-center text-center my-5 text-recruiter-text-muted text-[0.8rem] tracking-[1px]">
-              <div className="flex-1 border-b border-[#e2e8f0] mr-3" />
-              <span>OR</span>
-              <div className="flex-1 border-b border-[#e2e8f0] ml-3" />
-            </div>
-
-            {/* Registration redirect */}
-            <div className="text-center text-[0.875rem] text-candidate-text-muted">
-              <span>Don't have an account?</span>
-              <span
-                className="font-semibold no-underline ml-1 transition-colors duration-200 cursor-pointer text-candidate-primary hover:text-candidate-primary-hover"
-                onClick={() => setCandidateMode('register')}
-              >
-                Register
-              </span>
-            </div>
-          </motion.div>
-        ) : (
-          <motion.div
-            key="candidate-register"
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -15 }}
-            transition={{ duration: 0.25 }}
-          >
-            {/* Candidate Registration Form */}
-            <form onSubmit={handleRegisterSubmit}>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-3 mb-4 max-h-[48vh] overflow-y-auto pr-1 custom-scrollbar max-sm:grid-cols-1">
-                {/* Full Name */}
-                <InputField
-                  label="Full Name"
-                  type="text"
-                  id="reg-name"
-                  name="fullName"
-                  placeholder="John Doe"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  icon={User}
-                  role={role}
-                />
-
-                {/* Phone Number */}
-                <InputField
-                  label="Phone Number"
-                  type="tel"
-                  id="reg-phone"
-                  name="phone"
-                  placeholder="+1 (555) 000-0000"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  icon={Phone}
-                  role={role}
-                />
-
-                {/* Email Address */}
-                <InputField
-                  label="Email Address"
-                  type="email"
-                  id="reg-email"
-                  name="email"
-                  placeholder="name@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  icon={Mail}
-                  role={role}
-                />
-
-                {/* Password */}
-                <InputField
-                  label="Password"
-                  type="password"
-                  id="reg-password"
-                  name="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  icon={Lock}
-                  role={role}
-                />
-              </div>
-
-              {/* Terms Checkbox */}
-              <div className="flex justify-between items-center mb-4 text-[0.85rem] mt-2">
-                <label className="flex items-center gap-2 cursor-pointer select-none text-candidate-text-sub text-[0.8rem]">
-                  <input
-                    type="checkbox"
-                    className="absolute opacity-0 w-0 h-0"
-                    checked={agreeTerms}
-                    onChange={(e) => setAgreeTerms(e.target.checked)}
-                  />
-                  <div
-                    className={`relative w-4 h-4 rounded flex items-center justify-center transition-all duration-200 ${agreeTerms
-                        ? 'bg-candidate-primary border-transparent'
-                        : 'bg-input-bg-light border border-input-border-light'
-                      }`}
-                  >
-                    <Check
-                      className={`text-white transition-all duration-200 ${agreeTerms ? 'opacity-100 scale-100' : 'opacity-0 scale-[0.6]'}`}
-                      size={12}
-                      strokeWidth={3}
-                    />
-                  </div>
-                  <span>I agree to the Terms & Conditions</span>
-                </label>
-              </div>
-
-              {/* Create Account Action */}
-              <ActionButton
-                type="submit"
-                isLoading={loading}
-                loadingText="Creating Account..."
-                className="w-full font-inter text-[0.95rem] font-semibold text-white bg-candidate-primary rounded-xl p-3 shadow-[0_4px_14px_rgba(124,58,237,0.08)] hover:bg-candidate-primary-hover hover:shadow-[0_6px_18px_rgba(124,58,237,0.18)]"
-              >
-                Create Account
-              </ActionButton>
-            </form>
-
-            {/* Login redirect link */}
-            <div className="text-center text-[0.875rem] text-candidate-text-muted mt-4">
-              <span>Already have an account?</span>
-              <span
-                className="font-semibold no-underline ml-1 transition-colors duration-200 cursor-pointer text-candidate-primary hover:text-candidate-primary-hover"
-                onClick={() => setCandidateMode('login')}
-              >
-                Sign In
-              </span>
-            </div>
           </motion.div>
         )}
       </AnimatePresence>
