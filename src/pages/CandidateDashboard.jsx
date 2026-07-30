@@ -37,7 +37,6 @@ import {
   Key,
   Send,
   Mic,
-  MicOff,
   VolumeX,
   ShieldAlert,
   Lock,
@@ -352,7 +351,7 @@ const ExpectedOutputTable = React.memo(({ rawOutput }) => {
 
   const lines = rawOutput.split('\n').map(l => l.trim()).filter(Boolean);
   const tableLines = lines.filter(l => l.startsWith('|') || (l.includes('|') && !l.toLowerCase().includes('showing')));
-
+  
   let recordCountText = "";
   const countLine = lines.find(l => l.toLowerCase().includes('showing') || l.toLowerCase().includes('records returned') || l.toLowerCase().includes('top'));
   if (countLine) {
@@ -380,7 +379,7 @@ const ExpectedOutputTable = React.memo(({ rawOutput }) => {
 
     if (headerCells.length > 0) {
       const displayFooterText = recordCountText || `Showing ${dataRows.length} of ${dataRows.length} returned records`;
-
+      
       return (
         <div className="mt-3 flex flex-col bg-[#111111] border border-zinc-800 rounded-xl overflow-hidden shadow-inner text-white select-text font-mono text-xs">
           <div className="bg-[#171717] px-3.5 py-2 border-b border-zinc-800 flex items-center justify-between shrink-0">
@@ -654,7 +653,7 @@ const SqlStudioEditor = React.memo(({ isSql, currentIdx, answerValue, onAnswerCh
 
 const QueryResultGrid = React.memo(({ isSql, consoleTab, setConsoleTab, sqlQueryResult, consoleOutput, syntaxError, runtimeError, isExecuting, executionStatus, executionTime, customInput, setCustomInput, expectedOutputText, resultGridRef }) => {
   return (
-    <div
+    <div 
       ref={resultGridRef}
       tabIndex={-1}
       className="flex flex-col h-[260px] min-h-[240px] max-h-[280px] shrink-0 w-full bg-[#111111] border border-zinc-800 rounded-xl overflow-hidden shadow-xl focus:outline-none focus:ring-1 focus:ring-dash-primary-purple/50 select-text"
@@ -698,12 +697,13 @@ const QueryResultGrid = React.memo(({ isSql, consoleTab, setConsoleTab, sqlQuery
               <span className="text-zinc-400 font-sans font-semibold">Rows: <strong className="text-emerald-400 font-mono">{sqlQueryResult.rowCount ?? sqlQueryResult.rows?.length ?? 0}</strong></span>
             )}
             <span className="text-zinc-400 font-sans font-semibold">Time: <strong className="text-zinc-200 font-mono">{Math.round(executionTime)}ms</strong></span>
-            <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider ${executionStatus === 'Success'
+            <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider ${
+              executionStatus === 'Success'
                 ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/60'
                 : executionStatus === 'Syntax Error'
                   ? 'bg-amber-950 text-amber-400 border border-amber-800/60'
                   : 'bg-red-950 text-red-400 border border-red-800/60'
-              }`}>
+            }`}>
               {executionStatus}
             </span>
           </div>
@@ -1002,6 +1002,8 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
   const currentTextRef = useRef('');
   const isSubmittingRef = useRef(false);
   const isRecordingRef = useRef(false);
+  const finalTranscriptHistoryRef = useRef('');
+  const currentSessionFinalRef = useRef('');
   const [isStartingTechnical, setIsStartingTechnical] = useState(false);
   const startingTechRef = useRef(false);
   const startingEnglishRef = useRef(false);
@@ -1180,9 +1182,24 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     }
   };
 
-  // Reset and retake the English Interview (Disabled - One Attempt Only)
+  // Reset and retake the English Interview
   const handleRetryEnglish = async () => {
-    showToast("You have already completed this assessment. Multiple attempts are not allowed.");
+    const confirmRetry = window.confirm("Are you sure you want to retry this assessment? This will permanently delete your previous interview and scores.");
+    if (!confirmRetry) return;
+
+    try {
+      setEnglishLoading(true);
+      const res = await api.post('/api/english-assessment/retry');
+      setEnglishInterview(res.data || null);
+      showToast("English interview has been reset. You can now start a new attempt.");
+      await fetchEnglishStatus();
+    } catch (err) {
+      console.error("Failed to retry English Assessment:", err);
+      const errMsg = err.response?.data?.detail || "Failed to reset English assessment. Please try again.";
+      showToast(errMsg);
+    } finally {
+      setEnglishLoading(false);
+    }
   };
 
   // Upload and parse resume specifically for English Assessment
@@ -1258,10 +1275,6 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
       const cleanText = text.replace(/Welcome to the English Assessment.*?Click "Start Interview" to begin\./gi, '');
       const utterance = new SpeechSynthesisUtterance(cleanText);
-      
-      // Store utterance globally to prevent garbage collection in Chrome/Safari
-      window.activeUtterance = utterance;
-
       utterance.lang = 'en-US';
 
       const voices = window.speechSynthesis.getVoices();
@@ -1301,7 +1314,6 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       };
 
       utterance.onend = () => {
-        window.activeUtterance = null;
         setAiIsSpeaking(false);
         // Automatically activate microphone when AI finishes speaking!
         if (SpeechRecognition) {
@@ -1311,9 +1323,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
         }
       };
 
-      utterance.onerror = (e) => {
-        console.error("[TTS Error]:", e);
-        window.activeUtterance = null;
+      utterance.onerror = () => {
         setAiIsSpeaking(false);
         if (SpeechRecognition) {
           setTimeout(() => {
@@ -1358,16 +1368,17 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     if (isRecording) {
       stopRecording();
     } else {
-      if (typeof window !== 'undefined' && window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-      }
-      setAiIsSpeaking(false);
-      startRecording(SpeechRecognition, true);
+      startRecording(SpeechRecognition);
     }
   };
 
-  const startRecording = (SpeechRecognition, force = false) => {
-    if (isSubmittingRef.current || (aiIsSpeaking && !force)) return;
+  const startRecording = (SpeechRecognition, isAutoRestart = false) => {
+    if (isSubmittingRef.current || aiIsSpeaking) return;
+
+    if (!isAutoRestart) {
+      finalTranscriptHistoryRef.current = '';
+      currentSessionFinalRef.current = '';
+    }
 
     if (recognitionRef.current) {
       try { recognitionRef.current.abort(); } catch (e) { }
@@ -1381,7 +1392,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       rec.lang = 'en-US';
 
       rec.onstart = () => {
-        console.log("[STT] Speech Recognition active");
+        console.log("[STT] Speech Recognition active, autoRestart:", isAutoRestart);
         setIsRecording(true);
         isRecordingRef.current = true;
         setVoiceUsed(true);
@@ -1397,7 +1408,14 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
             interimTranscript += event.results[i][0].transcript;
           }
         }
-        const text = (localFinalTranscript + interimTranscript).trim();
+        currentSessionFinalRef.current = localFinalTranscript;
+
+        const currentSessionText = (localFinalTranscript + interimTranscript).trim();
+        const history = finalTranscriptHistoryRef.current;
+        const text = history 
+          ? (history + " " + currentSessionText).trim() 
+          : currentSessionText;
+
         console.log("[STT Live Text]:", text);
         setEnglishText(text);
         currentTextRef.current = text;
@@ -1431,13 +1449,21 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
       rec.onend = () => {
         console.log("[STT End]");
-        // Auto-restart with fresh SpeechRecognition instance and small timeout to prevent browser crash/InvalidStateError
+        // Save the current session's final transcript to the history
+        if (currentSessionFinalRef.current) {
+          finalTranscriptHistoryRef.current = (finalTranscriptHistoryRef.current + " " + currentSessionFinalRef.current).trim();
+          currentSessionFinalRef.current = '';
+        }
+
+        // Auto-restart if candidate is still in recording mode and AI is not speaking
         if (isRecordingRef.current && !isSubmittingRef.current && !aiIsSpeaking) {
-          setTimeout(() => {
-            if (isRecordingRef.current && !isSubmittingRef.current && !aiIsSpeaking) {
-              startRecording(SpeechRecognition);
-            }
-          }, 300);
+          try {
+            startRecording(SpeechRecognition, true);
+          } catch (err) {
+            console.warn("STT auto-restart error:", err);
+            setIsRecording(false);
+            isRecordingRef.current = false;
+          }
         } else {
           setIsRecording(false);
           isRecordingRef.current = false;
@@ -1610,7 +1636,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     setTimeout(() => {
       if (resultGridRef.current) {
         resultGridRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        try { resultGridRef.current.focus({ preventScroll: false }); } catch (e) { }
+        try { resultGridRef.current.focus({ preventScroll: false }); } catch (e) {}
       }
     }, 150);
   };
@@ -1636,7 +1662,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
   const handleEditorDidMount = (editor, monaco) => {
     if (sqlCompletionProviderRef.current) {
-      try { sqlCompletionProviderRef.current.dispose(); } catch (_e) { }
+      try { sqlCompletionProviderRef.current.dispose(); } catch (_e) {}
     }
 
     sqlCompletionProviderRef.current = monaco.languages.registerCompletionItemProvider('sql', {
@@ -1662,7 +1688,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
         // Check if user is typing after a dot: e.g. "HumanResources." or "HumanResources.Employee." or "Employee."
         const match = textUntilPosition.match(/([a-zA-Z0-9_]+)\.(?:([a-zA-Z0-9_]+)\.)?$/);
-
+        
         if (match) {
           const part1 = match[1]; // e.g. "HumanResources" or "Employee"
           const part2 = match[2]; // e.g. "Employee" if typing "HumanResources.Employee."
@@ -1718,7 +1744,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
           // Case 1: Typing freely -> suggest available schemas (HumanResources, Person, Sales, Production, Purchasing, dbo, etc.), tables, and SQL keywords
           const schemasSet = new Set(Object.values(schemaMap).map(t => t.schema));
           ['HumanResources', 'Person', 'Sales', 'Production', 'Purchasing', 'dbo'].forEach(s => schemasSet.add(s));
-
+          
           schemasSet.forEach(s => {
             suggestions.push({
               label: s,
@@ -2049,7 +2075,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
         if (!match || match.status === 'COMPLETED') {
           try {
             localStorage.removeItem(`recruitai_active_exam_${activeAssignment.id}`);
-          } catch (e) { }
+          } catch (e) {}
           setActiveAssignment(null);
           setExamState(null);
           setActiveTab('dashboard');
@@ -2058,7 +2084,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       } else {
         try {
           localStorage.removeItem(`recruitai_active_exam_${activeAssignment.id}`);
-        } catch (e) { }
+        } catch (e) {}
         setActiveAssignment(null);
         setExamState(null);
         setActiveTab('dashboard');
@@ -2067,30 +2093,6 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     }
   }, [assignments, activeAssignment, loadingAssignments]);
 
-
-  const handleRetryExam = async (assignment) => {
-    const confirmRetry = window.confirm("Are you sure you want to retry this assessment? This will overwrite your previous answers.");
-    if (!confirmRetry) return;
-
-    try {
-      await api.patch(`/api/assignments/${assignment.id}/status`, { status: 'ASSIGNED' });
-      showToast("Resetting assessment status...");
-    } catch (e) {
-      console.warn("Could not patch status to ASSIGNED, trying IN_PROGRESS:", e);
-      try {
-        await api.patch(`/api/assignments/${assignment.id}/status`, { status: 'IN_PROGRESS' });
-      } catch (err) {
-        console.error("Failed to reset assignment status in backend:", err);
-      }
-    }
-
-    try {
-      localStorage.removeItem(`recruitai_active_exam_${assignment.id}`);
-    } catch (e) {}
-
-    const updatedAssignment = { ...assignment, status: 'ASSIGNED' };
-    handleStartExam(updatedAssignment);
-  };
 
   const handleStartExam = async (assignment) => {
     if (startingTechRef.current || isStartingTechnical) return;
@@ -3212,19 +3214,9 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
                       {/* Action Button */}
                       {isCompleted ? (
-                        <div className="flex flex-col gap-2 w-full">
-                          <div className="w-full py-3 rounded-xl bg-dash-success-green/10 text-dash-success-green text-center font-bold text-sm border border-dash-success-green/20 flex items-center justify-center gap-2">
-                            <CheckCircle2 size={16} />
-                            <span>Completed</span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => handleRetryExam(assignment)}
-                            className="w-full py-2.5 rounded-xl bg-dash-primary-purple text-dash-white-card hover:bg-dash-dark-purple text-center font-bold text-xs shadow-xs transition-all cursor-pointer border-none flex items-center justify-center gap-1.5"
-                          >
-                            <RotateCcw size={13} />
-                            <span>Retry Assessment</span>
-                          </button>
+                        <div className="w-full py-3 rounded-xl bg-dash-success-green/10 text-dash-success-green text-center font-bold text-sm border border-dash-success-green/20 flex items-center justify-center gap-2">
+                          <CheckCircle2 size={16} />
+                          <span>Completed</span>
                         </div>
                       ) : (() => {
                         const startTimeVal = assignment.startTime || assignment.start_time;
@@ -3351,7 +3343,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
               {/* TOP HEADER BAR: Assessment Title, Topic, Timer, Progress & Top-Right Submit Button */}
               <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-2xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
-
+                
                 {/* Title & Phase/Topic */}
                 <div className="flex items-center gap-3">
                   <span className="px-3 py-1 rounded-xl text-[11px] font-black uppercase tracking-wider bg-dash-primary-purple text-white shadow-xs">
@@ -3742,13 +3734,15 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                       <button
                         type="button"
                         onClick={() => setAiVoiceGender('female')}
-                        className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer flex items-center gap-3.5 ${aiVoiceGender === 'female'
+                        className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer flex items-center gap-3.5 ${
+                          aiVoiceGender === 'female'
                             ? 'border-dash-primary-purple bg-dash-primary-purple/10 shadow-sm ring-2 ring-dash-primary-purple/20'
                             : 'border-dash-border-gray/50 bg-slate-50/50 hover:border-dash-primary-purple/50'
-                          }`}
+                        }`}
                       >
-                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-xl shrink-0 ${aiVoiceGender === 'female' ? 'bg-dash-primary-purple text-white' : 'bg-slate-200 text-slate-700'
-                          }`}>
+                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-xl shrink-0 ${
+                          aiVoiceGender === 'female' ? 'bg-dash-primary-purple text-white' : 'bg-slate-200 text-slate-700'
+                        }`}>
                           👩‍💼
                         </div>
                         <div className="flex-1 min-w-0">
@@ -3763,13 +3757,15 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                       <button
                         type="button"
                         onClick={() => setAiVoiceGender('male')}
-                        className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer flex items-center gap-3.5 ${aiVoiceGender === 'male'
+                        className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer flex items-center gap-3.5 ${
+                          aiVoiceGender === 'male'
                             ? 'border-dash-primary-purple bg-dash-primary-purple/10 shadow-sm ring-2 ring-dash-primary-purple/20'
                             : 'border-dash-border-gray/50 bg-slate-50/50 hover:border-dash-primary-purple/50'
-                          }`}
+                        }`}
                       >
-                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-xl shrink-0 ${aiVoiceGender === 'male' ? 'bg-dash-primary-purple text-white' : 'bg-slate-200 text-slate-700'
-                          }`}>
+                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-xl shrink-0 ${
+                          aiVoiceGender === 'male' ? 'bg-dash-primary-purple text-white' : 'bg-slate-200 text-slate-700'
+                        }`}>
                           👨‍💼
                         </div>
                         <div className="flex-1 min-w-0">
@@ -3816,8 +3812,8 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                         }}
                         onClick={() => englishFileInputRef.current && englishFileInputRef.current.click()}
                         className={`w-full py-7 border-2 border-dashed rounded-[20px] transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${englishDragOver
-                          ? 'border-dash-primary-purple bg-dash-primary-purple/5 scale-[0.99]'
-                          : 'border-dash-border-gray hover:border-dash-primary-purple hover:bg-dash-light-blue-bg/40'
+                            ? 'border-dash-primary-purple bg-dash-primary-purple/5 scale-[0.99]'
+                            : 'border-dash-border-gray hover:border-dash-primary-purple hover:bg-dash-light-blue-bg/40'
                           }`}
                       >
                         <input
@@ -3908,9 +3904,9 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                     {/* Progress Bar & Warning Counter */}
                     <div className="flex items-center gap-4 flex-1 max-w-md mx-4">
                       <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-dash-primary-purple transition-all duration-500"
-                          style={{ width: `${Math.min(100, Math.round(((currentQNum + 1) / 8) * 100))}%` }}
+                        <div 
+                          className="h-full bg-dash-primary-purple transition-all duration-500" 
+                          style={{ width: `${Math.min(100, Math.round(((currentQNum + 1) / 8) * 100))}%` }} 
                         />
                       </div>
                       <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 shrink-0">
@@ -3964,12 +3960,12 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
                         {/* Inner Avatar Box */}
                         <div className={`w-28 h-28 rounded-full flex items-center justify-center text-white shadow-2xl relative z-10 transition-all duration-500 ${isRecording
-                          ? 'bg-emerald-600 shadow-emerald-500/30 border-2 border-emerald-400/40'
-                          : aiIsSpeaking
-                            ? 'bg-violet-600 shadow-violet-500/30 border-2 border-violet-400/40'
-                            : autoSubmitting || aiTyping || englishLoading
-                              ? 'bg-amber-600 shadow-amber-500/30 border-2 border-amber-400/40'
-                              : 'bg-[#231b42] border border-[#40356c]'
+                            ? 'bg-emerald-600 shadow-emerald-500/30 border-2 border-emerald-400/40'
+                            : aiIsSpeaking
+                              ? 'bg-violet-600 shadow-violet-500/30 border-2 border-violet-400/40'
+                              : autoSubmitting || aiTyping || englishLoading
+                                ? 'bg-amber-600 shadow-amber-500/30 border-2 border-amber-400/40'
+                                : 'bg-[#231b42] border border-[#40356c]'
                           }`}>
                           <Volume2 size={40} className={isRecording ? "animate-pulse" : aiIsSpeaking ? "animate-bounce" : ""} />
                         </div>
@@ -3978,12 +3974,12 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                       {/* Speech status label */}
                       <div className="bg-white/5 border border-white/10 rounded-full px-5 py-1.5 text-xs font-bold text-white shadow-sm flex items-center gap-2">
                         <span className={`w-2 h-2 rounded-full ${isRecording
-                          ? 'bg-emerald-500 animate-ping'
-                          : aiIsSpeaking
-                            ? 'bg-violet-500 animate-pulse'
-                            : autoSubmitting || aiTyping || englishLoading
-                              ? 'bg-amber-400 animate-ping'
-                              : 'bg-slate-400'
+                            ? 'bg-emerald-500 animate-ping'
+                            : aiIsSpeaking
+                              ? 'bg-violet-500 animate-pulse'
+                              : autoSubmitting || aiTyping || englishLoading
+                                ? 'bg-amber-400 animate-ping'
+                                : 'bg-slate-400'
                           }`} />
                         <span>
                           {isRecording
@@ -4035,7 +4031,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                           className="w-full bg-black/40 text-white font-sans text-xs font-semibold p-3 rounded-xl border border-white/10 focus:outline-none resize-none shadow-inner leading-relaxed placeholder:text-slate-400 placeholder:italic select-none cursor-default"
                         />
 
-                        <div className="flex items-center justify-between mt-2 pt-1 text-[10px] text-slate-300 font-medium gap-4">
+                        <div className="flex items-center justify-between mt-2 pt-1 text-[10px] text-slate-300 font-medium">
                           <span>
                             {isRecording && englishText
                               ? '✨ Speech is transcribed live word by word. 5 seconds of silence will automatically submit your response.'
@@ -4045,16 +4041,6 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                                   ? '⏳ 5s silence detected — Auto-submitting response...'
                                   : '🤖 Voice-driven interview — Typing is disabled.'}
                           </span>
-                          {englishText && englishText.trim().length > 0 && !isSubmittingRef.current && (
-                            <button
-                              type="button"
-                              onClick={() => handleRespondEnglish(englishText)}
-                              className="px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-[10px] shadow-sm flex items-center gap-1.5 transition-all cursor-pointer border-none shrink-0 animate-fade-in"
-                            >
-                              <Send size={10} />
-                              Submit Answer
-                            </button>
-                          )}
                         </div>
                       </div>
                     </div>
@@ -4069,26 +4055,13 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
                       {/* Main Call controls */}
                       <div className="flex items-center gap-3">
-                        {/* Microphone button */}
-                        <button
-                          type="button"
-                          onClick={toggleRecording}
-                          className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-200 cursor-pointer shadow-md ${isRecording
-                            ? 'bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700 animate-pulse'
-                            : 'bg-white/10 border-white/10 text-white hover:bg-white/20'
-                            }`}
-                          title={isRecording ? "Stop Microphone" : "Start Microphone"}
-                        >
-                          {isRecording ? <Mic size={18} /> : <MicOff size={18} className="opacity-50" />}
-                        </button>
-
                         {/* Mute button */}
                         <button
                           type="button"
                           onClick={toggleMute}
                           className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-200 cursor-pointer shadow-md ${isMuted
-                            ? 'bg-amber-600 border-amber-600 text-white hover:bg-amber-700'
-                            : 'bg-white/10 border-white/10 text-white hover:bg-white/20'
+                              ? 'bg-amber-600 border-amber-600 text-white hover:bg-amber-700'
+                              : 'bg-white/10 border-white/10 text-white hover:bg-white/20'
                             }`}
                           title={isMuted ? `Unmute ${interviewerName}'s Voice` : `Mute ${interviewerName}'s Voice`}
                         >
@@ -4140,13 +4113,17 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                     <p className="text-[10px] text-dash-light-purple italic mt-2">You can safely navigate away or wait for updates from your recruiter.</p>
                   </div>
 
-                  {/* One-attempt lock notice — no retry button */}
-                  <div className="flex w-full items-center justify-center gap-2.5 bg-amber-50 border border-amber-200/70 rounded-xl px-5 py-3 mt-2">
-                    <ShieldAlert size={15} className="text-amber-600 shrink-0" />
-                    <p className="text-xs font-bold text-amber-700">
-                      This assessment has been permanently submitted. Multiple attempts are not permitted.
-                    </p>
-                  </div>
+                  {/* Retry English Assessment Button */}
+                  <ActionButton
+                    onClick={handleRetryEnglish}
+                    isLoading={englishLoading}
+                    loadingText="Resetting Assessment..."
+                    icon={RotateCcw}
+                    iconSize={14}
+                    className="px-8 py-3.5 rounded-xl bg-dash-primary-purple text-white font-bold text-xs hover:bg-dash-dark-purple shadow-md justify-center w-full"
+                  >
+                    Retry English Assessment
+                  </ActionButton>
                 </div>
               </div>
             )}
