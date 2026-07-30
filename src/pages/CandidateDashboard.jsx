@@ -41,7 +41,9 @@ import {
   VolumeX,
   ShieldAlert,
   Lock,
-  ListOrdered
+  ListOrdered,
+  Flag,
+  HelpCircle
 } from 'lucide-react';
 
 const MAX_QUESTIONS = 8;
@@ -282,9 +284,9 @@ const DatabaseSchemaVisualizer = ({ schemaLines, dataLines, liveSchemaMap }) => 
           )}
 
           {viewMode === 'schema' ? (
-            <div className="overflow-x-auto rounded-xl border border-slate-200/60">
+            <div className="overflow-x-auto overflow-y-auto max-h-[260px] rounded-xl border border-slate-200/60 dashboard-scrollbar">
               <table className="min-w-full divide-y divide-slate-200/60 text-left text-xs text-slate-700">
-                <thead className="bg-slate-50 font-bold uppercase tracking-wider text-[9px] text-slate-400">
+                <thead className="bg-slate-50 font-bold uppercase tracking-wider text-[9px] text-slate-400 sticky top-0 z-10 shadow-xs">
                   <tr>
                     <th className="px-4 py-2">Column</th>
                     <th className="px-4 py-2">Type</th>
@@ -454,110 +456,188 @@ const ExpectedOutputTable = React.memo(({ rawOutput }) => {
   );
 });
 
-const QuestionCard = React.memo(({ question, isSql, isCoding, liveSchemaMap }) => {
+const QuestionCard = React.memo(({ 
+  question, 
+  isSql, 
+  isCoding, 
+  liveSchemaMap, 
+  hasPrev, 
+  hasNext, 
+  goToQuestion, 
+  currentIdx, 
+  totalQuestions, 
+  toggleFlag, 
+  isFlagged,
+  onOpenSubmitModal 
+}) => {
   if (!question) return null;
 
   return (
-    <div className="flex flex-col gap-3 bg-white border border-slate-200/90 rounded-2xl p-3.5 select-text overflow-y-auto max-h-[660px] h-[660px] custom-scrollbar shadow-xs">
-      {isSql ? (
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
+    <div className="flex flex-col justify-between gap-3 bg-white border border-slate-200/90 rounded-2xl p-4 select-text max-h-[660px] h-[660px] shadow-xs">
+      <div className="flex flex-col gap-3 overflow-y-auto pr-1 dashboard-scrollbar flex-1">
+        {/* Header with Q Index & Flag toggle */}
+        <div className="flex items-center justify-between border-b border-slate-200/80 pb-2.5 shrink-0">
+          <div className="flex items-center gap-2">
             <span className="text-xs font-black uppercase tracking-wider text-dash-dark-purple flex items-center gap-2">
-              <Database size={16} className="text-dash-primary-purple" />
-              <span>SQL Assessment Question</span>
+              {isSql ? <Database size={16} className="text-dash-primary-purple" /> : <Code size={16} className="text-indigo-600" />}
+              <span>{isSql ? 'SQL Assessment Question' : 'Coding Challenge'}</span>
             </span>
-            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-purple-100 text-purple-700 uppercase shadow-2xs">
-              T-SQL / SQL Server
-            </span>
-          </div>
-
-          {question.scenario && (
-            <div>
-              <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Scenario Context</h4>
-              <p className="text-xs font-semibold text-slate-700 leading-relaxed whitespace-pre-line bg-slate-50 border border-slate-200/60 rounded-xl p-3 shadow-2xs">
-                {question.scenario}
-              </p>
-            </div>
-          )}
-
-          <div>
-            <h4 className="text-xs font-extrabold text-dash-primary-purple uppercase tracking-wider mb-1.5">Problem Statement & Task</h4>
-            <p className="text-sm font-extrabold text-slate-900 leading-relaxed whitespace-pre-wrap bg-indigo-50/40 border border-purple-100 rounded-xl p-3.5 shadow-2xs">
-              {question.question || question.problemStatement}
-            </p>
-          </div>
-
-          {question.constraints && question.constraints.length > 0 && (
-            <div className="bg-amber-50/60 border border-amber-200/70 rounded-xl p-3">
-              <h4 className="text-[10px] font-extrabold text-amber-800 uppercase tracking-wider mb-1">Constraints & Requirements</h4>
-              <ul className="list-disc pl-4 text-xs font-semibold text-amber-900 space-y-1">
-                {question.constraints.map((c, i) => <li key={i}>{c}</li>)}
-              </ul>
-            </div>
-          )}
-
-          <DatabaseSchemaVisualizer
-            schemaLines={question.databaseSchema}
-            dataLines={question.sampleData}
-            liveSchemaMap={liveSchemaMap}
-          />
-
-          <ExpectedOutputTable rawOutput={question.expectedOutput || question.exampleOutput} />
-        </div>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {question.scenario && (
-            <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-3 shadow-2xs">
-              <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Scenario Context</h4>
-              <p className="text-xs font-semibold text-slate-700 leading-relaxed whitespace-pre-line">
-                {question.scenario}
-              </p>
-            </div>
-          )}
-          <div>
-            <h4 className="text-xs font-extrabold text-dash-primary-purple uppercase tracking-wider mb-1.5">Problem Description</h4>
-            <p className="text-sm font-extrabold text-slate-900 leading-relaxed whitespace-pre-wrap bg-indigo-50/40 border border-purple-100 rounded-xl p-3.5 shadow-2xs">
-              {question.question || question.problemStatement || question.title}
-            </p>
-          </div>
-          {(question.function_name || question.functionName) && (
-            <div className="bg-purple-50/70 border border-purple-200/50 rounded-xl p-2.5 flex items-center gap-2">
-              <Code size={14} className="text-dash-primary-purple shrink-0" />
-              <span className="text-xs font-bold text-dash-dark-purple">
-                Expected Function: <code className="font-mono text-purple-700 font-extrabold bg-white px-2 py-0.5 rounded border border-purple-200/50">{question.function_name || question.functionName}(...)</code>
+            {totalQuestions && (
+              <span className="text-[10px] font-mono font-extrabold px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 uppercase shadow-2xs">
+                Q{currentIdx + 1} of {totalQuestions}
               </span>
-            </div>
+            )}
+          </div>
+
+          {toggleFlag && (
+            <button
+              type="button"
+              onClick={toggleFlag}
+              className={`px-2.5 py-1 rounded-xl border text-[11px] font-extrabold flex items-center gap-1.5 cursor-pointer transition-all ${
+                isFlagged
+                  ? 'bg-amber-500/15 border-amber-500/40 text-amber-700 shadow-2xs'
+                  : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              <Flag size={12} className={isFlagged ? "fill-amber-500 text-amber-500" : ""} />
+              <span>{isFlagged ? 'Flagged' : 'Flag Question'}</span>
+            </button>
           )}
-          {question.inputFormat && (
+        </div>
+
+        {isSql ? (
+          <div className="flex flex-col gap-3">
+            {question.scenario && (
+              <div>
+                <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Scenario Context</h4>
+                <p className="text-xs font-semibold text-slate-700 leading-relaxed whitespace-pre-line bg-slate-50 border border-slate-200/60 rounded-xl p-3 shadow-2xs">
+                  {question.scenario}
+                </p>
+              </div>
+            )}
+
             <div>
-              <h4 className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">Input Format</h4>
-              <p className="text-xs font-medium text-slate-600 leading-normal">{question.inputFormat}</p>
+              <h4 className="text-xs font-extrabold text-dash-primary-purple uppercase tracking-wider mb-1.5">Problem Statement & Task</h4>
+              <p className="text-sm font-extrabold text-slate-900 leading-relaxed whitespace-pre-wrap bg-indigo-50/40 border border-purple-100 rounded-xl p-3.5 shadow-2xs">
+                {question.question || question.problemStatement}
+              </p>
             </div>
-          )}
-          {question.outputFormat && (
+
+            {question.constraints && question.constraints.length > 0 && (
+              <div className="bg-amber-50/60 border border-amber-200/70 rounded-xl p-3">
+                <h4 className="text-[10px] font-extrabold text-amber-800 uppercase tracking-wider mb-1">Constraints & Requirements</h4>
+                <ul className="list-disc pl-4 text-xs font-semibold text-amber-900 space-y-1">
+                  {question.constraints.map((c, i) => <li key={i}>{c}</li>)}
+                </ul>
+              </div>
+            )}
+
+            <DatabaseSchemaVisualizer
+              schemaLines={question.databaseSchema}
+              dataLines={question.sampleData}
+              liveSchemaMap={liveSchemaMap}
+            />
+
+            <ExpectedOutputTable rawOutput={question.expectedOutput || question.exampleOutput} />
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {question.scenario && (
+              <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-3 shadow-2xs">
+                <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Scenario Context</h4>
+                <p className="text-xs font-semibold text-slate-700 leading-relaxed whitespace-pre-line">
+                  {question.scenario}
+                </p>
+              </div>
+            )}
             <div>
-              <h4 className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">Output Format</h4>
-              <p className="text-xs font-medium text-slate-600 leading-normal">{question.outputFormat}</p>
+              <h4 className="text-xs font-extrabold text-dash-primary-purple uppercase tracking-wider mb-1.5">Problem Description</h4>
+              <p className="text-sm font-extrabold text-slate-900 leading-relaxed whitespace-pre-wrap bg-indigo-50/40 border border-purple-100 rounded-xl p-3.5 shadow-2xs">
+                {question.question || question.problemStatement || question.title}
+              </p>
             </div>
-          )}
-          {question.constraints && question.constraints.length > 0 && (
-            <div>
-              <h4 className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">Constraints</h4>
-              <ul className="list-disc pl-4 text-xs font-medium text-slate-600 space-y-1">
-                {question.constraints.map((c, i) => <li key={i}>{c}</li>)}
-              </ul>
-            </div>
-          )}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-1">
-            <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-2.5 shadow-2xs">
-              <span className="block font-bold text-slate-400 uppercase tracking-wider text-[9px] mb-1">Sample Input:</span>
-              <pre className="text-xs font-mono font-semibold text-slate-700 bg-white p-2 rounded border border-slate-200/60 overflow-x-auto whitespace-pre-wrap">{question.sampleInput || question.exampleInput || "No input."}</pre>
-            </div>
-            <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-2.5 shadow-2xs">
-              <span className="block font-bold text-slate-400 uppercase tracking-wider text-[9px] mb-1">Sample Output:</span>
-              <pre className="text-xs font-mono font-semibold text-slate-700 bg-white p-2 rounded border border-slate-200/60 overflow-x-auto whitespace-pre-wrap">{question.sampleOutput || question.exampleOutput || "No output."}</pre>
+            {(question.function_name || question.functionName) && (
+              <div className="bg-purple-50/70 border border-purple-200/50 rounded-xl p-2.5 flex items-center gap-2">
+                <Code size={14} className="text-dash-primary-purple shrink-0" />
+                <span className="text-xs font-bold text-dash-dark-purple">
+                  Expected Function: <code className="font-mono text-purple-700 font-extrabold bg-white px-2 py-0.5 rounded border border-purple-200/50">{question.function_name || question.functionName}(...)</code>
+                </span>
+              </div>
+            )}
+            {question.inputFormat && (
+              <div>
+                <h4 className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">Input Format</h4>
+                <p className="text-xs font-medium text-slate-600 leading-normal">{question.inputFormat}</p>
+              </div>
+            )}
+            {question.outputFormat && (
+              <div>
+                <h4 className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">Output Format</h4>
+                <p className="text-xs font-medium text-slate-600 leading-normal">{question.outputFormat}</p>
+              </div>
+            )}
+            {question.constraints && question.constraints.length > 0 && (
+              <div>
+                <h4 className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">Constraints</h4>
+                <ul className="list-disc pl-4 text-xs font-medium text-slate-600 space-y-1">
+                  {question.constraints.map((c, i) => <li key={i}>{c}</li>)}
+                </ul>
+              </div>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-1">
+              <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-2.5 shadow-2xs">
+                <span className="block font-bold text-slate-400 uppercase tracking-wider text-[9px] mb-1">Sample Input:</span>
+                <pre className="text-xs font-mono font-semibold text-slate-700 bg-white p-2 rounded border border-slate-200/60 overflow-x-auto whitespace-pre-wrap">{question.sampleInput || question.exampleInput || "No input."}</pre>
+              </div>
+              <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-2.5 shadow-2xs">
+                <span className="block font-bold text-slate-400 uppercase tracking-wider text-[9px] mb-1">Sample Output:</span>
+                <pre className="text-xs font-mono font-semibold text-slate-700 bg-white p-2 rounded border border-slate-200/60 overflow-x-auto whitespace-pre-wrap">{question.sampleOutput || question.exampleOutput || "No output."}</pre>
+              </div>
             </div>
           </div>
+        )}
+      </div>
+
+      {/* QUESTION CONTAINER NAVIGATION FOOTER */}
+      {goToQuestion && (
+        <div className="pt-3 border-t border-slate-200/80 flex items-center justify-between gap-3 shrink-0">
+          <button
+            type="button"
+            onClick={() => goToQuestion(currentIdx - 1)}
+            disabled={!hasPrev}
+            className={`px-4 py-2 rounded-xl border font-extrabold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
+              hasPrev
+                ? 'bg-slate-100 text-slate-800 border-slate-300 hover:bg-slate-200 hover:scale-[1.01]'
+                : 'opacity-40 cursor-not-allowed text-slate-400 border-slate-200 bg-slate-50'
+            }`}
+          >
+            <ChevronLeft size={16} />
+            <span>Previous</span>
+          </button>
+
+          <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">
+            {currentIdx + 1} of {totalQuestions}
+          </span>
+
+          {hasNext ? (
+            <button
+              type="button"
+              onClick={() => goToQuestion(currentIdx + 1)}
+              className="px-4 py-2 rounded-xl bg-dash-primary-purple hover:bg-dash-dark-purple text-white font-extrabold text-xs transition-all flex items-center gap-1.5 cursor-pointer border-0 shadow-xs hover:scale-[1.01]"
+            >
+              <span>Next</span>
+              <ChevronRight size={16} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onOpenSubmitModal && onOpenSubmitModal()}
+              className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs transition-all flex items-center gap-1.5 cursor-pointer border-0 shadow-xs hover:scale-[1.01]"
+            >
+              <CheckCircle2 size={15} />
+              <span>Finish</span>
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -657,7 +737,7 @@ const QueryResultGrid = React.memo(({ isSql, consoleTab, setConsoleTab, sqlQuery
     <div
       ref={resultGridRef}
       tabIndex={-1}
-      className="flex flex-col h-[260px] min-h-[240px] max-h-[280px] shrink-0 w-full bg-[#111111] border border-zinc-800 rounded-xl overflow-hidden shadow-xl focus:outline-none focus:ring-1 focus:ring-dash-primary-purple/50 select-text"
+      className="flex flex-col flex-1 min-h-[220px] w-full bg-[#111111] border border-zinc-800 rounded-xl overflow-hidden shadow-xl focus:outline-none focus:ring-1 focus:ring-dash-primary-purple/50 select-text"
     >
       <div className="flex flex-wrap items-center justify-between bg-[#171717] px-3.5 py-2 border-b border-zinc-800 gap-2 shrink-0">
         <div className="flex items-center gap-5">
@@ -943,6 +1023,31 @@ const isQuestionAnswered = (q, idx, answers, executionOutputs = {}) => {
   const starter = q.starterCode || q.starter_code || q.codeTemplate || q.exampleCode || '';
   if (starter && trimmedAns === String(starter).trim()) return false;
   if (trimmedAns === 'def solution():\n    pass\n\nif __name__ == "__main__":\n    solution()') return false;
+
+  return trimmedAns.length > 0;
+};
+
+const isAnswerFilled = (q, ans) => {
+  if (!q || ans === undefined || ans === null) return false;
+  const trimmedAns = String(ans).trim();
+  if (!trimmedAns) return false;
+
+  const isMcq = (q.type || q.question_type || '').toUpperCase() === 'MCQ' || (Array.isArray(q.options) && q.options.length > 0);
+  if (isMcq) {
+    return trimmedAns.length > 0;
+  }
+
+  const starter = q.starterCode || q.starter_code || q.codeTemplate || q.exampleCode || '';
+  if (starter && trimmedAns === String(starter).trim()) return false;
+  if (trimmedAns === 'def solution():\n    pass\n\nif __name__ == "__main__":\n    solution()') return false;
+
+  const defaultSqlStarter = getSqlDefaultStarter(q).trim();
+  if (trimmedAns === '-- Write your SQL query here' || trimmedAns === defaultSqlStarter || (trimmedAns.includes('Write your T-SQL query here') && trimmedAns.startsWith('-- Write your T-SQL query here'))) {
+    const lines = trimmedAns.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('--'));
+    if (lines.length === 0 || (lines.length === 1 && lines[0].toUpperCase().startsWith('SELECT * FROM'))) {
+      return false;
+    }
+  }
 
   return trimmedAns.length > 0;
 };
@@ -1937,19 +2042,26 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     const questions = asm.questions || [];
     const question = questions[currentIdx];
     if (question && (examState.answers[currentIdx] === undefined || examState.answers[currentIdx] === null)) {
-      const isSql = (question.type === 'SCENARIO' || question.type === 'SCENARIO_CODING' || question.type === 'CODING') &&
-        (question.subject || question.language || '').toLowerCase().includes('sql');
-      const isCoding = question.type === 'CODING' || question.type === 'PYTHON_CODING' ||
-        (question.subject || '').toLowerCase().includes('python');
+      const typeUpper = (question.type || question.question_type || '').toUpperCase();
+      const qHasOpts = question && Array.isArray(question.options) && question.options.length > 0;
+      const isMcq = typeUpper === 'MCQ' || qHasOpts;
 
-      let starter = question.starterCode || question.starter_code || question.codeTemplate || question.exampleCode || null;
-      if (!starter) {
-        if (isSql) {
-          starter = getSqlDefaultStarter(question);
-        } else if (isCoding) {
-          starter = `def solution():\n    pass\n\nif __name__ == "__main__":\n    solution()`;
-        } else {
-          starter = '';
+      let starter = '';
+      if (!isMcq) {
+        const isSql = (question.type === 'SCENARIO' || question.type === 'SCENARIO_CODING' || question.type === 'CODING') &&
+          (question.subject || question.language || '').toLowerCase().includes('sql');
+        const isCoding = question.type === 'CODING' || question.type === 'PYTHON_CODING' ||
+          (question.subject || '').toLowerCase().includes('python');
+
+        starter = question.starterCode || question.starter_code || question.codeTemplate || question.exampleCode || null;
+        if (!starter) {
+          if (isSql) {
+            starter = getSqlDefaultStarter(question);
+          } else if (isCoding) {
+            starter = `def solution():\n    pass\n\nif __name__ == "__main__":\n    solution()`;
+          } else {
+            starter = '';
+          }
         }
       }
 
@@ -2220,18 +2332,26 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
       const initialAnswers = {};
       sortedQuestions.forEach((q, idx) => {
-        const isCoding = q.type === 'CODING' || q.type === 'PYTHON_CODING' || (q.subject || '').toLowerCase().includes('python');
-        const isSql = (q.type === 'SCENARIO' || q.type === 'SCENARIO_CODING' || q.type === 'CODING') && (q.subject || q.language || '').toLowerCase().includes('sql');
-        const starter = q.starterCode || q.starter_code || q.codeTemplate || q.exampleCode;
+        const typeUpper = (q.type || q.question_type || '').toUpperCase();
+        const qHasOpts = q && Array.isArray(q.options) && q.options.length > 0;
+        const isMcq = typeUpper === 'MCQ' || qHasOpts;
 
-        if (starter) {
-          initialAnswers[idx] = starter;
-        } else if (isSql) {
-          initialAnswers[idx] = getSqlDefaultStarter(q);
-        } else if (isCoding) {
-          initialAnswers[idx] = `def solution():\n    pass\n\nif __name__ == "__main__":\n    solution()`;
-        } else {
+        if (isMcq) {
           initialAnswers[idx] = '';
+        } else {
+          const isCoding = q.type === 'CODING' || q.type === 'PYTHON_CODING' || (q.subject || '').toLowerCase().includes('python');
+          const isSql = (q.type === 'SCENARIO' || q.type === 'SCENARIO_CODING' || q.type === 'CODING') && (q.subject || q.language || '').toLowerCase().includes('sql');
+          const starter = q.starterCode || q.starter_code || q.codeTemplate || q.exampleCode;
+
+          if (starter) {
+            initialAnswers[idx] = starter;
+          } else if (isSql) {
+            initialAnswers[idx] = getSqlDefaultStarter(q);
+          } else if (isCoding) {
+            initialAnswers[idx] = `def solution():\n    pass\n\nif __name__ == "__main__":\n    solution()`;
+          } else {
+            initialAnswers[idx] = '';
+          }
         }
       });
 
@@ -3402,25 +3522,34 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
             );
           }
 
-          const mcqQuestions = questions.filter(q => (q.type || q.question_type || '').toUpperCase() === 'MCQ');
-          const scenarioQuestions = questions.filter(q => (q.type || q.question_type || '').toUpperCase() !== 'MCQ');
+          const mcqNavItems = questions
+            .map((q, idx) => ({ q, idx }))
+            .filter(item => {
+              const typeUpper = (item.q.type || item.q.question_type || '').toUpperCase();
+              const qHasOpts = item.q && Array.isArray(item.q.options) && item.q.options.length > 0;
+              return typeUpper === 'MCQ' || qHasOpts;
+            });
 
-          const totalMcqs = mcqQuestions.length;
-          const totalScenarios = scenarioQuestions.length;
+          const codingNavItems = questions
+            .map((q, idx) => ({ q, idx }))
+            .filter(item => {
+              const typeUpper = (item.q.type || item.q.question_type || '').toUpperCase();
+              const qHasOpts = item.q && Array.isArray(item.q.options) && item.q.options.length > 0;
+              return typeUpper !== 'MCQ' && !qHasOpts;
+            });
+
+          const totalMcqs = mcqNavItems.length;
+          const totalScenarios = codingNavItems.length;
 
           const isMcqPhase = totalMcqs > 0 && currentIdx < totalMcqs;
           const currentPhaseLabel = isMcqPhase
             ? `Phase 1 of ${totalScenarios > 0 ? 2 : 1} — MCQ Questions`
-            : `Phase ${totalMcqs > 0 ? 2 : 1} of ${totalMcqs > 0 ? 2 : 1} — Scenario Questions`;
+            : `Phase ${totalMcqs > 0 ? 2 : 1} of ${totalMcqs > 0 ? 2 : 1} — Scenario & Coding Studio`;
 
-          const phaseQuestionNum = isMcqPhase
-            ? currentIdx + 1
-            : (totalMcqs > 0 ? currentIdx - totalMcqs + 1 : currentIdx + 1);
-
-          const phaseTotalQuestions = isMcqPhase ? totalMcqs : totalScenarios;
           const currentTopic = question.topic || question.subject || "General";
           const visitedCount = questions.filter((q, idx) => Boolean(examState.visitedQuestions?.[idx])).length;
-          const overallProgressPercent = questions.length > 0 ? Math.round((visitedCount / questions.length) * 100) : 0;
+          const answeredCount = questions.filter((q, idx) => isAnswerFilled(q, examState.answers[idx])).length;
+          const overallProgressPercent = questions.length > 0 ? Math.round((answeredCount / questions.length) * 100) : 0;
 
           const hasOptions = question && Array.isArray(question.options) && question.options.length > 0;
           const isSql = !hasOptions && question ? (((question.type === 'SCENARIO' || question.type === 'SCENARIO_CODING' || question.type === 'CODING') && (question.subject || question.language || '').toLowerCase() === 'sql') || (question.question || '').toUpperCase().includes('SELECT')) : false;
@@ -3434,16 +3563,41 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
           const hasPrev = currentIdx > 0;
           const hasNext = currentIdx < questions.length - 1;
+          const isFlagged = Boolean(examState.flaggedQuestions?.[currentIdx]);
+
+          const flaggedCount = Object.keys(examState.flaggedQuestions || {}).filter(k => Boolean(examState.flaggedQuestions[k])).length;
+          const unansweredCount = questions.length - answeredCount;
+
+          const goToQuestion = (targetIdx) => {
+            setExamState(prev => ({
+              ...prev,
+              currentQuestionIndex: targetIdx,
+              visitedQuestions: {
+                ...prev.visitedQuestions,
+                [targetIdx]: true
+              }
+            }));
+          };
+
+          const toggleFlag = () => {
+            setExamState(prev => ({
+              ...prev,
+              flaggedQuestions: {
+                ...prev.flaggedQuestions,
+                [currentIdx]: !prev.flaggedQuestions?.[currentIdx]
+              }
+            }));
+          };
 
           return (
             <div className="flex flex-col gap-4 animate-fade-in w-full select-none">
 
-              {/* TOP HEADER BAR: Assessment Title, Topic, Timer, Progress & Top-Right Submit Button */}
+              {/* TOP HEADER BAR: Title, Topic, Timer, Progress & Submit */}
               <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-2xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
 
                 {/* Title & Phase/Topic */}
                 <div className="flex items-center gap-3">
-                  <span className="px-3 py-1 rounded-xl text-[11px] font-black uppercase tracking-wider bg-dash-primary-purple text-white shadow-xs">
+                  <span className={`px-3 py-1 rounded-xl text-[11px] font-black uppercase tracking-wider text-white shadow-xs ${isCoding ? 'bg-indigo-600' : 'bg-dash-primary-purple'}`}>
                     {currentPhaseLabel}
                   </span>
                   <div className="flex flex-col">
@@ -3457,8 +3611,8 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                   </div>
                 </div>
 
-                {/* Timer & Overall Progress */}
-                <div className="flex items-center gap-5 flex-wrap">
+                {/* Timer, Progress & Submit */}
+                <div className="flex items-center gap-4 flex-wrap">
                   {/* Timer Box */}
                   <div className="flex items-center gap-2 bg-dash-soft-pink border border-dash-border-gray/50 rounded-xl px-3.5 py-1.5 shadow-2xs">
                     <span className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider">Time Remaining:</span>
@@ -3471,14 +3625,14 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                   <div className="hidden md:flex items-center gap-3 border-l border-slate-200/80 pl-4">
                     <div className="flex flex-col items-end">
                       <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">Overall Progress</span>
-                      <span className="text-xs font-extrabold text-dash-primary-purple">{overallProgressPercent}% ({visitedCount}/{questions.length})</span>
+                      <span className="text-xs font-extrabold text-dash-primary-purple">{overallProgressPercent}% ({answeredCount}/{questions.length})</span>
                     </div>
                     <div className="w-20 h-2.5 rounded-full bg-slate-200 overflow-hidden shrink-0">
                       <div className="h-full bg-dash-primary-purple rounded-full transition-all duration-300" style={{ width: `${overallProgressPercent}%` }} />
                     </div>
                   </div>
 
-                  {/* TOP-RIGHT CORNER: Submit Assessment Button */}
+                  {/* Submit Assessment Button */}
                   <button
                     onClick={() => setIsSubmitModalOpen(true)}
                     className="py-2 px-4 rounded-xl border border-red-200 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs shadow-sm transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.02]"
@@ -3489,7 +3643,11 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                 </div>
               </div>
 
+<<<<<<< HEAD
+              {/* CODING LAYOUT: Top Horizontal Navigator */}
+=======
               {/* HORIZONTAL QUESTION NUMBER NAVIGATION BAR (Clean Single Line Alignment) */}
+>>>>>>> c631e3334eaecd7caa6f657d2c1a456c5cc54222
               {isCoding && (
                 <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-2xl px-4 py-2.5 shadow-2xs flex flex-wrap lg:flex-nowrap items-center justify-between gap-3 overflow-x-auto dashboard-scrollbar">
                   <div className="flex items-center gap-3 overflow-x-auto py-0.5 dashboard-scrollbar flex-1">
@@ -3498,6 +3656,44 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                       <span>Navigator:</span>
                     </span>
 
+<<<<<<< HEAD
+                    {mcqNavItems.length > 0 && (
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-[9px] font-black text-purple-700 bg-purple-100 px-2 py-1 rounded-md uppercase tracking-wider shrink-0">MCQ Questions ({mcqNavItems.length})</span>
+                        <div className="flex items-center gap-1.5">
+                          {mcqNavItems.map(({ q, idx }) => {
+                            const isCurrent = idx === currentIdx;
+                            const qAns = examState.answers[idx];
+                            const isAns = isAnswerFilled(q, qAns);
+                            const isCompleted = isAns && !isCurrent;
+                            const qFlagged = Boolean(examState.flaggedQuestions?.[idx]);
+
+                            return (
+                              <button
+                                key={idx}
+                                onClick={() => goToQuestion(idx)}
+                                title={`Question ${idx + 1}: MCQ (${isCurrent ? 'Active' : qFlagged ? 'Flagged' : isCompleted ? 'Answered' : 'Unanswered'})`}
+                                className={`w-8 h-8 rounded-lg font-extrabold text-xs flex items-center justify-center cursor-pointer border transition-all duration-200 shrink-0 relative ${
+                                  isCurrent
+                                    ? 'bg-dash-primary-purple text-white border-dash-primary-purple shadow-sm scale-105 ring-2 ring-dash-primary-purple/40 font-black'
+                                    : qFlagged
+                                      ? 'bg-amber-500/15 text-amber-700 border-amber-500/50 hover:bg-amber-500/25'
+                                      : isCompleted
+                                        ? 'bg-emerald-500/15 text-emerald-700 border-emerald-500/40 hover:bg-emerald-500/25'
+                                        : 'bg-slate-100 border-slate-200/80 text-slate-600 hover:bg-slate-200/70'
+                                }`}
+                              >
+                                {idx + 1}
+                                {qFlagged ? (
+                                  <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-amber-500 text-white rounded-full flex items-center justify-center text-[7px] font-black shadow-xs">
+                                    <Flag size={7} className="fill-white" />
+                                  </span>
+                                ) : isCompleted ? (
+                                  <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-500 text-white rounded-full flex items-center justify-center text-[7px] font-black shadow-xs">
+                                    <Check size={8} strokeWidth={3} />
+                                  </span>
+                                ) : null}
+=======
                     {totalMcqs > 0 && (
                       <div className="flex items-center gap-2 shrink-0">
                         <span className="text-[9px] font-black text-purple-700 bg-purple-100 px-2 py-1 rounded-md uppercase tracking-wider shrink-0">Phase 1 (MCQ)</span>
@@ -3517,6 +3713,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                                   }`}
                               >
                                 {idx + 1}
+>>>>>>> c631e3334eaecd7caa6f657d2c1a456c5cc54222
                               </button>
                             );
                           })}
@@ -3524,6 +3721,48 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                       </div>
                     )}
 
+<<<<<<< HEAD
+                    {mcqNavItems.length > 0 && codingNavItems.length > 0 && (
+                      <div className="h-4 w-px bg-slate-200 shrink-0 mx-1" />
+                    )}
+
+                    {codingNavItems.length > 0 && (
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-[9px] font-black text-indigo-700 bg-indigo-100 px-2 py-1 rounded-md uppercase tracking-wider shrink-0">Scenario & Coding ({codingNavItems.length})</span>
+                        <div className="flex items-center gap-1.5">
+                          {codingNavItems.map(({ q, idx }) => {
+                            const isCurrent = idx === currentIdx;
+                            const qAns = examState.answers[idx];
+                            const isAns = isAnswerFilled(q, qAns);
+                            const isCompleted = isAns && !isCurrent;
+                            const qFlagged = Boolean(examState.flaggedQuestions?.[idx]);
+
+                            return (
+                              <button
+                                key={idx}
+                                onClick={() => goToQuestion(idx)}
+                                title={`Question ${idx + 1}: Coding (${isCurrent ? 'Active' : qFlagged ? 'Flagged' : isCompleted ? 'Answered' : 'Unanswered'})`}
+                                className={`w-8 h-8 rounded-lg font-extrabold text-xs flex items-center justify-center cursor-pointer border transition-all duration-200 shrink-0 relative ${
+                                  isCurrent
+                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm scale-105 ring-2 ring-indigo-500/40 font-black'
+                                    : qFlagged
+                                      ? 'bg-amber-500/15 text-amber-700 border-amber-500/50 hover:bg-amber-500/25'
+                                      : isCompleted
+                                        ? 'bg-emerald-500/15 text-emerald-700 border-emerald-500/40 hover:bg-emerald-500/25'
+                                        : 'bg-slate-100 border-slate-200/80 text-slate-600 hover:bg-slate-200/70'
+                                }`}
+                              >
+                                {idx + 1}
+                                {qFlagged ? (
+                                  <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-amber-500 text-white rounded-full flex items-center justify-center text-[7px] font-black shadow-xs">
+                                    <Flag size={7} className="fill-white" />
+                                  </span>
+                                ) : isCompleted ? (
+                                  <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-500 text-white rounded-full flex items-center justify-center text-[7px] font-black shadow-xs">
+                                    <Check size={8} strokeWidth={3} />
+                                  </span>
+                                ) : null}
+=======
                     {totalMcqs > 0 && totalScenarios > 0 && (
                       <div className="h-4 w-px bg-slate-200 shrink-0 mx-1" />
                     )}
@@ -3548,6 +3787,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                                   }`}
                               >
                                 {realIdx + 1}
+>>>>>>> c631e3334eaecd7caa6f657d2c1a456c5cc54222
                               </button>
                             );
                           })}
@@ -3556,22 +3796,41 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                     )}
                   </div>
 
+<<<<<<< HEAD
+                  <span className="text-[10px] font-extrabold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg border border-indigo-200/60 shrink-0 uppercase tracking-wider ml-auto flex items-center gap-1.5">
+                    <Code size={12} />
+                    <span>{isSql ? 'SQL QUERY STUDIO' : 'PYTHON COMPILER STUDIO'}</span>
+=======
                   <span className="text-[10px] font-extrabold text-dash-primary-purple bg-purple-50 px-2.5 py-1 rounded-lg border border-purple-200/50 shrink-0 uppercase tracking-wider ml-auto">
                     {isSql ? 'SQL QUERY' : (isCoding ? 'PYTHON CODING' : 'MCQ')}
+>>>>>>> c631e3334eaecd7caa6f657d2c1a456c5cc54222
                   </span>
                 </div>
               )}
 
+<<<<<<< HEAD
+              {/* MAIN CONTENT AREA: Dynamic switching between MCQ and Coding */}
+=======
               {/* TWO-COLUMN MAIN CONTENT LAYOUT */}
+>>>>>>> c631e3334eaecd7caa6f657d2c1a456c5cc54222
               {isCoding ? (
+                /* CODING / COMPILER LAYOUT: Majority Width Editor + Left Question Card */
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start w-full">
-                  {/* Left Column (5/12 width): Question Card */}
+                  {/* Left Column (5/12 width): Question Card with Integrated Navigation */}
                   <div className="lg:col-span-5 w-full flex flex-col gap-3">
                     <QuestionCard
                       question={question}
                       isSql={isSql}
                       isCoding={isCoding}
                       liveSchemaMap={liveSchemaMap}
+                      hasPrev={hasPrev}
+                      hasNext={hasNext}
+                      goToQuestion={goToQuestion}
+                      currentIdx={currentIdx}
+                      totalQuestions={questions.length}
+                      toggleFlag={toggleFlag}
+                      isFlagged={isFlagged}
+                      onOpenSubmitModal={() => setIsSubmitModalOpen(true)}
                     />
                   </div>
 
@@ -3611,6 +3870,358 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                   </div>
                 </div>
               ) : (
+<<<<<<< HEAD
+                /* MCQ LAYOUT: Fixed Sticky Left Vertical Sidebar Navigator (22% Width) + Single Large Main Assessment Card (78% Width) */
+                <div className="flex flex-col lg:flex-row gap-5 items-start w-full">
+
+                  {/* FIXED STICKY VERTICAL SIDEBAR QUESTION NAVIGATOR (Left Side 20-22%) */}
+                  <div className="w-full lg:w-72 xl:w-80 shrink-0 sticky top-4 bg-dash-white-card border border-dash-border-gray/50 rounded-2xl p-4.5 shadow-sm flex flex-col gap-4">
+                    
+                    {/* Sidebar Title & Total Count */}
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                      <div className="flex items-center gap-2">
+                        <ListOrdered size={16} className="text-dash-primary-purple" />
+                        <h4 className="font-plus-jakarta font-extrabold text-sm text-dash-dark-purple">
+                          Question Navigator
+                        </h4>
+                      </div>
+                      <span className="text-[10px] font-black bg-dash-primary-purple/10 text-dash-primary-purple px-2.5 py-0.5 rounded-full border border-dash-primary-purple/20">
+                        {questions.length} Total
+                      </span>
+                    </div>
+
+                    {/* Visual Status Legend */}
+                    <div className="grid grid-cols-3 gap-1.5 bg-slate-50 border border-slate-100 p-2 rounded-xl text-[10px] font-extrabold">
+                      <div className="flex flex-col items-center justify-center p-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-700">
+                        <div className="flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          <span>{answeredCount}</span>
+                        </div>
+                        <span className="text-[9px] font-semibold text-emerald-600/80">Answered</span>
+                      </div>
+
+                      <div className="flex flex-col items-center justify-center p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700">
+                        <div className="flex items-center gap-1">
+                          <Flag size={9} className="fill-amber-500 text-amber-500" />
+                          <span>{flaggedCount}</span>
+                        </div>
+                        <span className="text-[9px] font-semibold text-amber-600/80">Flagged</span>
+                      </div>
+
+                      <div className="flex flex-col items-center justify-center p-1.5 rounded-lg bg-slate-100 border border-slate-200 text-slate-600">
+                        <div className="flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                          <span>{unansweredCount}</span>
+                        </div>
+                        <span className="text-[9px] font-semibold text-slate-500">Pending</span>
+                      </div>
+                    </div>
+
+                    {/* SECTIONED QUESTION LIST */}
+                    <div className="flex flex-col gap-4 max-h-[420px] overflow-y-auto dashboard-scrollbar pr-1">
+                      
+                      {/* MCQ QUESTIONS SECTION */}
+                      {mcqNavItems.length > 0 && (
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-purple-700 bg-purple-100 px-2.5 py-1 rounded-md flex items-center gap-1.5">
+                              <CheckCircle2 size={11} />
+                              <span>MCQ Questions ({mcqNavItems.length})</span>
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-5 gap-2">
+                            {mcqNavItems.map(({ q, idx }) => {
+                              const isCurrent = idx === currentIdx;
+                              const qAns = examState.answers[idx];
+                              const isAns = isAnswerFilled(q, qAns);
+                              const isCompleted = isAns && !isCurrent;
+                              const qFlagged = Boolean(examState.flaggedQuestions?.[idx]);
+
+                              return (
+                                <button
+                                  key={idx}
+                                  onClick={() => goToQuestion(idx)}
+                                  title={`Question ${idx + 1}: MCQ (${isCurrent ? 'Active (Current)' : qFlagged ? 'Flagged' : isCompleted ? 'Answered' : 'Unanswered'})`}
+                                  className={`h-9 rounded-xl font-extrabold text-xs flex items-center justify-center cursor-pointer border transition-all duration-200 relative ${
+                                    isCurrent
+                                      ? 'bg-dash-primary-purple text-white border-dash-primary-purple shadow-sm scale-105 ring-2 ring-dash-primary-purple/40 font-black'
+                                      : qFlagged
+                                        ? 'bg-amber-500/15 text-amber-700 border-amber-500/50 hover:bg-amber-500/25'
+                                        : isCompleted
+                                          ? 'bg-emerald-500/15 text-emerald-700 border-emerald-500/40 hover:bg-emerald-500/25'
+                                          : 'bg-slate-100 border-slate-200/80 text-slate-600 hover:bg-slate-200/70'
+                                  }`}
+                                >
+                                  <span>{idx + 1}</span>
+                                  
+                                  {/* Mini Badges */}
+                                  {qFlagged ? (
+                                    <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-amber-500 text-white rounded-full flex items-center justify-center text-[7px] font-black shadow-xs">
+                                      <Flag size={7} className="fill-white" />
+                                    </span>
+                                  ) : isCompleted ? (
+                                    <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-500 text-white rounded-full flex items-center justify-center text-[7px] font-black shadow-xs">
+                                      <Check size={8} strokeWidth={3} />
+                                    </span>
+                                  ) : null}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* SCENARIO / CODING QUESTIONS SECTION */}
+                      {codingNavItems.length > 0 && (
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-indigo-700 bg-indigo-100 px-2.5 py-1 rounded-md flex items-center gap-1.5">
+                              <Code size={11} />
+                              <span>Scenario & Coding Questions ({codingNavItems.length})</span>
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-5 gap-2">
+                            {codingNavItems.map(({ q, idx }) => {
+                              const isCurrent = idx === currentIdx;
+                              const qAns = examState.answers[idx];
+                              const isAns = isAnswerFilled(q, qAns);
+                              const isCompleted = isAns && !isCurrent;
+                              const qFlagged = Boolean(examState.flaggedQuestions?.[idx]);
+
+                              return (
+                                <button
+                                  key={idx}
+                                  onClick={() => goToQuestion(idx)}
+                                  title={`Question ${idx + 1}: Coding (${isCurrent ? 'Active (Current)' : qFlagged ? 'Flagged' : isCompleted ? 'Answered' : 'Unanswered'})`}
+                                  className={`h-9 rounded-xl font-extrabold text-xs flex items-center justify-center cursor-pointer border transition-all duration-200 relative ${
+                                    isCurrent
+                                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm scale-105 ring-2 ring-indigo-500/40 font-black'
+                                      : qFlagged
+                                        ? 'bg-amber-500/15 text-amber-700 border-amber-500/50 hover:bg-amber-500/25'
+                                        : isCompleted
+                                          ? 'bg-emerald-500/15 text-emerald-700 border-emerald-500/40 hover:bg-emerald-500/25'
+                                          : 'bg-slate-100 border-slate-200/80 text-slate-600 hover:bg-slate-200/70'
+                                  }`}
+                                >
+                                  <span>{idx + 1}</span>
+                                  
+                                  {/* Mini Badges */}
+                                  {qFlagged ? (
+                                    <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-amber-500 text-white rounded-full flex items-center justify-center text-[7px] font-black shadow-xs">
+                                      <Flag size={7} className="fill-white" />
+                                    </span>
+                                  ) : isCompleted ? (
+                                    <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-500 text-white rounded-full flex items-center justify-center text-[7px] font-black shadow-xs">
+                                      <Check size={8} strokeWidth={3} />
+                                    </span>
+                                  ) : null}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                    </div>
+
+                    {/* Quick Helper Banner */}
+                    <div className="mt-auto pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-semibold">
+                      <span>Click any number to jump</span>
+                      <button
+                        onClick={toggleFlag}
+                        className={`px-2.5 py-1 rounded-lg border text-[10px] font-extrabold flex items-center gap-1 cursor-pointer transition-colors ${
+                          isFlagged
+                            ? 'bg-amber-50 border-amber-200 text-amber-600'
+                            : 'bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-700'
+                        }`}
+                      >
+                        <Flag size={10} className={isFlagged ? "fill-amber-500 text-amber-500" : ""} />
+                        <span>{isFlagged ? 'Flagged' : 'Flag'}</span>
+                      </button>
+                    </div>
+
+                  </div>
+
+                  {/* MAIN CONTENT AREA: Single Large Assessment Card (78% Width) */}
+                  <div className="flex-1 w-full bg-dash-white-card border border-dash-border-gray/50 rounded-2xl p-6 shadow-sm flex flex-col justify-between gap-6 min-h-[540px]">
+                    
+                    {/* CARD CONTENT BODY */}
+                    <div className="flex flex-col gap-5 w-full">
+                      
+                      {/* Question Header & Meta Bar */}
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-4 w-full">
+                        <div className="flex items-center gap-2.5">
+                          <span className="px-3 py-1 rounded-xl text-xs font-black uppercase tracking-wider bg-dash-primary-purple/10 text-dash-primary-purple border border-dash-primary-purple/20 shadow-2xs">
+                            Question {currentIdx + 1} of {questions.length}
+                          </span>
+                          <span className="text-xs font-extrabold text-slate-400">
+                            (1 Mark)
+                          </span>
+                        </div>
+
+                        {/* Flag Question Action (Top-Right Corner) */}
+                        <button
+                          type="button"
+                          onClick={toggleFlag}
+                          className={`px-3.5 py-1.5 rounded-xl border text-xs font-extrabold flex items-center gap-1.5 cursor-pointer transition-all duration-200 ${
+                            isFlagged
+                              ? 'bg-amber-500/15 border-amber-500/40 text-amber-700 shadow-2xs'
+                              : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-800'
+                          }`}
+                        >
+                          <Flag size={13} className={isFlagged ? "fill-amber-500 text-amber-500" : ""} />
+                          <span>{isFlagged ? 'Flagged for Review' : 'Flag Question'}</span>
+                        </button>
+                      </div>
+
+                      {/* Scenario Context Box (If Present) */}
+                      {question.scenario && (
+                        <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-2xl p-4.5 shadow-2xs w-full">
+                          <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                            <Sparkles size={12} className="text-dash-primary-purple" />
+                            <span>Scenario Context:</span>
+                          </h5>
+                          <p className="text-xs sm:text-sm font-semibold text-slate-800 leading-relaxed whitespace-pre-line">
+                            {question.scenario}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Question Text - Full Width for Maximum Readability */}
+                      <div className="w-full">
+                        <h3 className="font-plus-jakarta font-extrabold text-lg sm:text-xl text-dash-dark-purple leading-relaxed">
+                          {question.question}
+                        </h3>
+                      </div>
+
+                      {/* Options Header / Selection Clear Bar */}
+                      <div className="flex items-center justify-between border-t border-b border-slate-100/80 py-2.5 mt-1 w-full">
+                        <span className="text-xs font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                          <CheckCircle2 size={15} className="text-dash-primary-purple" />
+                          <span>Select your answer option:</span>
+                        </span>
+
+                        {examState.answers[currentIdx] && (
+                          <button
+                            type="button"
+                            onClick={() => setExamState(prev => ({
+                              ...prev,
+                              answers: { ...prev.answers, [currentIdx]: '' }
+                            }))}
+                            className="text-[11px] font-extrabold text-slate-400 hover:text-red-500 flex items-center gap-1 bg-transparent border-0 cursor-pointer transition-colors"
+                          >
+                            <RotateCcw size={12} />
+                            <span>Clear Selection</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Answer Options - Displayed Directly Beneath Question */}
+                      {question.options && question.options.length > 0 ? (
+                        <div className="grid grid-cols-1 gap-3.5 w-full">
+                          {question.options.map((option, optIdx) => {
+                            const optionLetter = String.fromCharCode(65 + optIdx);
+                            const isSelected = examState.answers[currentIdx] === option;
+
+                            return (
+                              <button
+                                key={optIdx}
+                                type="button"
+                                onClick={() => setExamState(prev => ({
+                                  ...prev,
+                                  answers: { ...prev.answers, [currentIdx]: option }
+                                }))}
+                                className={`w-full text-left p-4.5 rounded-2xl border font-semibold text-sm transition-all duration-200 cursor-pointer flex items-start gap-4 group shadow-2xs ${
+                                  isSelected
+                                    ? 'bg-dash-primary-purple/10 border-2 border-dash-primary-purple text-dash-dark-purple shadow-sm font-bold scale-[1.003]'
+                                    : 'bg-white border-dash-border-gray/60 text-slate-700 hover:border-dash-primary-purple/40 hover:bg-dash-soft-pink/30 hover:shadow-xs'
+                                }`}
+                              >
+                                {/* Option Letter Badge */}
+                                <div className={`w-7 h-7 rounded-xl font-extrabold text-xs flex items-center justify-center shrink-0 transition-all ${
+                                  isSelected
+                                    ? 'bg-dash-primary-purple text-white shadow-xs'
+                                    : 'bg-slate-100 text-slate-600 border border-slate-200 group-hover:bg-dash-primary-purple/20 group-hover:text-dash-primary-purple'
+                                }`}>
+                                  {optionLetter}
+                                </div>
+
+                                {/* Option Content */}
+                                <span className="flex-1 pt-0.5 leading-relaxed font-sans text-slate-800">{option}</span>
+
+                                {/* Selection Radio Circle */}
+                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all ${
+                                  isSelected
+                                    ? 'border-dash-primary-purple bg-dash-primary-purple text-white shadow-2xs'
+                                    : 'border-slate-300 group-hover:border-dash-primary-purple'
+                                }`}>
+                                  {isSelected && <Check size={12} strokeWidth={3} />}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="w-full">
+                          <textarea
+                            value={examState.answers[currentIdx] || ''}
+                            onChange={(e) => setExamState(prev => ({
+                              ...prev,
+                              answers: { ...prev.answers, [currentIdx]: e.target.value }
+                            }))}
+                            placeholder="Write your explanation or text answer here..."
+                            rows={6}
+                            className="w-full p-4 rounded-2xl border border-dash-border-gray/60 bg-[#fafafa] font-mono text-sm focus:outline-none focus:ring-2 focus:ring-dash-primary-purple/40 focus:border-dash-primary-purple transition-all resize-y"
+                          />
+                        </div>
+                      )}
+
+                    </div>
+
+                    {/* CARD BOTTOM NAVIGATION FOOTER (Inside Same Assessment Card) */}
+                    <div className="pt-5 border-t border-slate-100 flex items-center justify-between gap-4 w-full">
+                      {/* Previous Question Button */}
+                      <button
+                        type="button"
+                        onClick={() => goToQuestion(currentIdx - 1)}
+                        disabled={!hasPrev}
+                        className={`px-5 py-2.5 rounded-xl border font-extrabold text-xs flex items-center gap-2 transition-all cursor-pointer ${
+                          hasPrev
+                            ? 'bg-slate-100 text-slate-800 border-slate-300 hover:bg-slate-200 hover:scale-[1.01]'
+                            : 'opacity-40 cursor-not-allowed text-slate-400 border-slate-200 bg-slate-50'
+                        }`}
+                      >
+                        <ChevronLeft size={16} />
+                        <span>Previous Question</span>
+                      </button>
+
+                      {/* Next Question / Finish Assessment Button */}
+                      {hasNext ? (
+                        <button
+                          type="button"
+                          onClick={() => goToQuestion(currentIdx + 1)}
+                          className="px-6 py-2.5 rounded-xl bg-dash-primary-purple hover:bg-dash-dark-purple text-white font-extrabold text-xs transition-all flex items-center gap-2 cursor-pointer border-0 shadow-sm hover:scale-[1.01]"
+                        >
+                          <span>Next Question</span>
+                          <ChevronRight size={16} />
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setIsSubmitModalOpen(true)}
+                          className="px-6 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs transition-all flex items-center gap-2 cursor-pointer border-0 shadow-md hover:scale-[1.01]"
+                        >
+                          <CheckCircle2 size={16} />
+                          <span>Finish Assessment</span>
+                        </button>
+                      )}
+                    </div>
+
+                  </div>
+
+=======
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start w-full">
                   {/* Left Column (3/12 width): Question Number Panel */}
                   <div className="lg:col-span-3 w-full bg-dash-white-card border border-dash-border-gray/50 rounded-2xl p-5 shadow-sm flex flex-col gap-4">
@@ -3740,61 +4351,9 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                       </div>
                     )}
                   </div>
+>>>>>>> c631e3334eaecd7caa6f657d2c1a456c5cc54222
                 </div>
               )}
-
-              {/* NATURAL BOTTOM ACTION BAR (Left: Previous | Center: Run Query | Right: Next Question) */}
-              <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-2xl px-5 py-3.5 shadow-sm flex items-center justify-between gap-4 w-full">
-                <div className="flex-1 flex justify-start">
-                  <button
-                    onClick={() => setExamState(prev => ({ ...prev, currentQuestionIndex: currentIdx - 1 }))}
-                    disabled={!hasPrev}
-                    className={`px-5 py-2.5 rounded-xl border font-extrabold text-xs flex items-center gap-2 transition-all cursor-pointer ${hasPrev
-                      ? 'bg-slate-100 text-slate-800 border-slate-300 hover:bg-slate-200 hover:scale-[1.01]'
-                      : 'opacity-40 cursor-not-allowed text-slate-400 border-slate-200 bg-slate-50'
-                      }`}
-                  >
-                    <ChevronLeft size={16} />
-                    <span>Previous</span>
-                  </button>
-                </div>
-
-                <div className="flex-1 flex justify-center">
-                  {isCoding && (
-                    <ActionButton
-                      onClick={() => handleRunCode(examState.answers[currentIdx], question)}
-                      isLoading={isExecuting}
-                      loadingText="Executing Query..."
-                      disabled={isSubmittingCode}
-                      icon={Play}
-                      iconSize={15}
-                      className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl shadow-sm hover:scale-[1.02] border-none cursor-pointer flex items-center gap-2"
-                    >
-                      {isSql ? 'Run Query / Execute Query' : 'Run Code / Execute Script'}
-                    </ActionButton>
-                  )}
-                </div>
-
-                <div className="flex-1 flex justify-end">
-                  {hasNext ? (
-                    <button
-                      onClick={() => setExamState(prev => ({ ...prev, currentQuestionIndex: currentIdx + 1 }))}
-                      className="px-5 py-2.5 rounded-xl bg-dash-primary-purple hover:bg-dash-dark-purple text-white font-extrabold text-xs transition-all flex items-center gap-2 cursor-pointer border-0 shadow-sm hover:scale-[1.01]"
-                    >
-                      <span>Next Question</span>
-                      <ChevronRight size={16} />
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => setIsSubmitModalOpen(true)}
-                      className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs transition-all flex items-center gap-2 cursor-pointer border-0 shadow-md hover:scale-[1.01]"
-                    >
-                      <CheckCircle2 size={16} />
-                      <span>Finish Assessment</span>
-                    </button>
-                  )}
-                </div>
-              </div>
 
             </div>
           );
@@ -4400,53 +4959,114 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
       {/* Manual Submission Confirmation Modal */}
       <AnimatePresence>
-        {isSubmitModalOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[9999] bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4"
-          >
+        {isSubmitModalOpen && (() => {
+          const currentAsm = activeAssignment?.assessment || activeAssignment || {};
+          const modalQuestions = currentAsm.questions || [];
+          const totalModalQuestions = modalQuestions.length;
+          const completedModalQuestions = modalQuestions.filter((q, idx) => isAnswerFilled(q, examState.answers[idx])).length;
+          const unansweredModalQuestions = Math.max(0, totalModalQuestions - completedModalQuestions);
+
+          return (
             <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 10 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 10 }}
-              className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-100 flex flex-col items-center text-center"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[9999] bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4"
             >
-              <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 mb-4">
-                <CheckCircle2 size={30} />
-              </div>
-              <h3 className="font-outfit font-extrabold text-xl text-slate-900 mb-2">
-                Submit Assessment?
-              </h3>
-              <p className="text-xs sm:text-sm text-slate-600 font-medium leading-relaxed mb-6">
-                Are you sure you want to submit your assessment? After submission, you will not be able to modify your answers.
-              </p>
-              <div className="flex items-center gap-3 w-full">
-                <ActionButton
-                  onClick={() => setIsSubmitModalOpen(false)}
-                  disabled={isSubmittingManual}
-                  variant="secondary"
-                  className="flex-1 py-3 px-4 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Cancel
-                </ActionButton>
-                <ActionButton
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleSubmitExam(activeAssignment?.id);
-                  }}
-                  isLoading={isSubmittingManual}
-                  loadingText="Submitting..."
-                  className="flex-1 py-3 px-4 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 shadow-md"
-                >
-                  Submit Assessment
-                </ActionButton>
-              </div>
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0, y: 10 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.95, opacity: 0, y: 10 }}
+                className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-100 flex flex-col items-center text-center gap-5"
+              >
+                <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+                  <CheckCircle2 size={30} />
+                </div>
+                
+                <div>
+                  <h3 className="font-plus-jakarta font-extrabold text-xl text-slate-900">
+                    Submit Assessment?
+                  </h3>
+                  <p className="text-xs text-slate-500 font-semibold mt-1">
+                    Review your completion progress before final submission
+                  </p>
+                </div>
+
+                {/* Progress Confirmation Summary */}
+                <div className="w-full bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex flex-col gap-3">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 text-left">
+                    Progress Summary
+                  </span>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Completed Questions */}
+                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 flex flex-col items-center justify-center">
+                      <span className="text-[10px] font-extrabold text-emerald-700 uppercase tracking-wider">Completed</span>
+                      <span className="font-plus-jakarta font-black text-lg text-emerald-700 mt-0.5">
+                        {completedModalQuestions}/{totalModalQuestions}
+                      </span>
+                    </div>
+
+                    {/* Unanswered Questions */}
+                    <div className={`border rounded-xl p-3 flex flex-col items-center justify-center ${
+                      unansweredModalQuestions > 0
+                        ? 'bg-amber-500/10 border-amber-500/20 text-amber-700'
+                        : 'bg-slate-100 border-slate-200 text-slate-600'
+                    }`}>
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider">Unanswered</span>
+                      <span className="font-plus-jakarta font-black text-lg mt-0.5">
+                        {unansweredModalQuestions}/{totalModalQuestions}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Status Notice */}
+                  {unansweredModalQuestions > 0 ? (
+                    <div className="flex items-start gap-2 text-left bg-amber-50 border border-amber-200/70 p-2.5 rounded-xl text-amber-800 text-[11px] font-medium leading-relaxed">
+                      <ShieldAlert size={15} className="text-amber-600 shrink-0 mt-0.5" />
+                      <span>
+                        You have <strong className="font-extrabold text-amber-900">{unansweredModalQuestions} unanswered question{unansweredModalQuestions > 1 ? 's' : ''}</strong>. You can go back to complete them or submit now.
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center gap-1.5 bg-emerald-50 border border-emerald-200/70 p-2.5 rounded-xl text-emerald-800 text-[11px] font-bold">
+                      <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                      <span>All {totalModalQuestions} questions have been completed!</span>
+                    </div>
+                  )}
+                </div>
+
+                <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                  After submission, your responses will be locked and cannot be modified.
+                </p>
+
+                <div className="flex items-center gap-3 w-full pt-1">
+                  <ActionButton
+                    onClick={() => setIsSubmitModalOpen(false)}
+                    disabled={isSubmittingManual}
+                    variant="secondary"
+                    className="flex-1 py-3 px-4 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Go Back & Review
+                  </ActionButton>
+
+                  <ActionButton
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleSubmitExam(activeAssignment?.id);
+                    }}
+                    isLoading={isSubmittingManual}
+                    loadingText="Submitting..."
+                    className="flex-1 py-3 px-4 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 shadow-md"
+                  >
+                    Confirm & Submit
+                  </ActionButton>
+                </div>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
+          );
+        })()}
       </AnimatePresence>
 
     </div>

@@ -24,6 +24,7 @@ import {
   Phone,
   Calendar,
   Plus,
+  UserPlus,
   LogOut,
   FileText,
   Sparkles,
@@ -39,7 +40,6 @@ import {
   RefreshCw,
   RotateCcw,
   Eye,
-  UserPlus,
   Code,
   Database,
   Brain,
@@ -187,6 +187,25 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
   const [selectedAssessmentForView, setSelectedAssessmentForView] = useState(null);
   const [assignments, setAssignments] = useState([]);
 
+  // Create Candidate Modal State
+  const [showCreateCandidateModal, setShowCreateCandidateModal] = useState(false);
+  const [newCandidateName, setNewCandidateName] = useState('');
+  const [newCandidateEmail, setNewCandidateEmail] = useState('');
+  const [newCandidatePassword, setNewCandidatePassword] = useState('Candidate@123');
+  const [newCandidatePhone, setNewCandidatePhone] = useState('');
+  const [isCreatingCandidate, setIsCreatingCandidate] = useState(false);
+
+  const fetchCandidates = async () => {
+    try {
+      const response = await api.get('/api/candidates');
+      if (response.data && Array.isArray(response.data)) {
+        setCandidates(response.data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch candidates from backend:", err);
+    }
+  };
+
   const fetchAssignments = async () => {
     try {
       const response = await api.get('/api/assignments?limit=500');
@@ -211,18 +230,6 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
       } catch (err) {
         console.error("Failed to fetch assessments from backend:", err);
         showToast("Error loading assessments from server.");
-      }
-    };
-
-    const fetchCandidates = async () => {
-      try {
-        const response = await api.get('/api/candidates');
-        if (response.data && Array.isArray(response.data)) {
-          setCandidates(response.data);
-        }
-      } catch (err) {
-        console.error("Failed to fetch candidates from backend:", err);
-        showToast("Error loading candidates from server.");
       }
     };
 
@@ -1447,8 +1454,22 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
                   )}
                 </div>
 
-                {/* Action Buttons for Selected Candidates */}
+                {/* Action Buttons for Candidate Management */}
                 <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewCandidateName('');
+                      setNewCandidateEmail('');
+                      setNewCandidatePassword('Candidate@123');
+                      setNewCandidatePhone('');
+                      setShowCreateCandidateModal(true);
+                    }}
+                    className="px-3.5 py-2 rounded-lg bg-dash-primary-purple text-white text-xs font-bold flex items-center gap-2 hover:bg-dash-dark-purple transition-all duration-200 cursor-pointer shadow-md border-none"
+                  >
+                    <UserPlus size={13} />
+                    <span>Create Candidate</span>
+                  </button>
                   {selectedCandidateIds.length > 0 && (
                     <div className="flex items-center gap-2">
                       <button
@@ -2418,6 +2439,160 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
             onClose={() => setSelectedAssessmentForView(null)}
             showToast={showToast}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Modal for Creating Candidate Account */}
+      <AnimatePresence>
+        {showCreateCandidateModal && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.4 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowCreateCandidateModal(false)}
+              className="fixed inset-0 bg-dash-dark-purple/40 z-50"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed inset-0 m-auto w-full max-w-md h-fit bg-dash-white-card border border-dash-border-gray rounded-[24px] shadow-2xl z-50 p-6 flex flex-col gap-5"
+            >
+              <div className="flex items-center justify-between border-b border-dash-border-gray/25 pb-3">
+                <div>
+                  <span className="text-[10px] text-dash-primary-purple font-extrabold tracking-widest uppercase">
+                    Candidate Account Provisioning
+                  </span>
+                  <h3 className="text-base font-bold text-dash-dark-purple font-outfit mt-0.5">
+                    Create Candidate Account
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateCandidateModal(false)}
+                  className="p-1.5 rounded-lg hover:bg-dash-soft-pink text-dash-light-purple hover:text-dash-dark-purple transition-all duration-200 cursor-pointer border-none bg-transparent"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!newCandidateName.trim() || !newCandidateEmail.trim() || !newCandidatePassword.trim()) {
+                    alert('Please fill in Name, Email, and Password.');
+                    return;
+                  }
+
+                  setIsCreatingCandidate(true);
+                  try {
+                    await api.post('/api/candidates', {
+                      name: newCandidateName.trim(),
+                      email: newCandidateEmail.trim(),
+                      password: newCandidatePassword.trim(),
+                      phone: newCandidatePhone.trim() || null
+                    });
+
+                    showToast(`Candidate account for "${newCandidateName.trim()}" created successfully!`);
+                    fetchCandidates();
+                    setShowCreateCandidateModal(false);
+                  } catch (err) {
+                    console.error("Failed to create candidate:", err);
+                    const detail = err.response?.data?.detail || err.message || "Failed to create candidate account.";
+                    alert(`Error: ${detail}`);
+                  } finally {
+                    setIsCreatingCandidate(false);
+                  }
+                }}
+                className="flex flex-col gap-4"
+              >
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider">
+                    Full Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Rahul Sharma"
+                    value={newCandidateName}
+                    onChange={(e) => setNewCandidateName(e.target.value)}
+                    className="w-full bg-[#f8fafc] border border-dash-border-gray rounded-xl py-2.5 px-4 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple transition-all"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider">
+                    Email Address *
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="e.g. candidate@example.com"
+                    value={newCandidateEmail}
+                    onChange={(e) => setNewCandidateEmail(e.target.value)}
+                    className="w-full bg-[#f8fafc] border border-dash-border-gray rounded-xl py-2.5 px-4 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple transition-all"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider">
+                      Initial Login Password *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const randomPass = 'Pass@' + Math.floor(100000 + Math.random() * 900000);
+                        setNewCandidatePassword(randomPass);
+                      }}
+                      className="text-[10px] font-bold text-dash-primary-purple hover:underline bg-transparent border-none cursor-pointer"
+                    >
+                      Auto-generate
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Minimum 6 characters"
+                    value={newCandidatePassword}
+                    onChange={(e) => setNewCandidatePassword(e.target.value)}
+                    className="w-full bg-[#f8fafc] border border-dash-border-gray rounded-xl py-2.5 px-4 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple transition-all font-mono"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider">
+                    Phone Number (Optional)
+                  </label>
+                  <input
+                    type="tel"
+                    placeholder="e.g. +91 98765 43210"
+                    value={newCandidatePhone}
+                    onChange={(e) => setNewCandidatePhone(e.target.value)}
+                    className="w-full bg-[#f8fafc] border border-dash-border-gray rounded-xl py-2.5 px-4 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple transition-all"
+                  />
+                </div>
+
+                <div className="flex gap-3 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateCandidateModal(false)}
+                    className="flex-1 py-3 rounded-xl border border-dash-border-gray hover:bg-dash-soft-pink text-dash-light-purple font-bold text-xs cursor-pointer transition-colors bg-transparent"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isCreatingCandidate}
+                    className="flex-1 py-3 rounded-xl bg-dash-primary-purple hover:bg-dash-dark-purple text-white font-bold text-xs cursor-pointer border-none shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {isCreatingCandidate ? 'Creating...' : 'Create Account'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
 
