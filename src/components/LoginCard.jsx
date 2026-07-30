@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Lock, LogIn, Check, User, Phone, Loader2 } from 'lucide-react';
 import RoleSwitcher from './RoleSwitcher';
 import InputField from './InputField';
+import ActionButton from './ActionButton';
 import logo from '../assets/systech.jpg';
 import api from '../api';
 
@@ -75,8 +76,8 @@ const LoginCard = ({ role, setRole, onLogin }) => {
         if (storedCandidates) {
           try {
             candidatesList = JSON.parse(storedCandidates);
-          } catch (err) {
-            console.error(err);
+          } catch {
+            // Ignore parse error
           }
         }
         
@@ -107,7 +108,6 @@ const LoginCard = ({ role, setRole, onLogin }) => {
         onLogin(userRole);
       }
     } catch (err) {
-      console.error("Login failed:", err);
       let detailMsg = 'An unexpected error occurred. Please try again later.';
       if (!err.response) {
         detailMsg = 'Unable to connect to the backend server. Please verify the server is running and the database is reachable.';
@@ -162,8 +162,8 @@ const LoginCard = ({ role, setRole, onLogin }) => {
       if (storedCandidates) {
         try {
           candidatesList = JSON.parse(storedCandidates);
-        } catch (err) {
-          console.error(err);
+        } catch {
+          // Ignore parse error
         }
       }
 
@@ -193,7 +193,6 @@ const LoginCard = ({ role, setRole, onLogin }) => {
         onLogin(userRole);
       }
     } catch (err) {
-      console.error("Registration failed:", err);
       let detailMsg = 'An unexpected error occurred. Please try again later.';
       if (!err.response) {
         detailMsg = 'Unable to connect to the backend server. Please verify the server is running and the database is reachable.';
@@ -408,16 +407,15 @@ const LoginCard = ({ role, setRole, onLogin }) => {
               </div>
 
               {/* Submit button with icon */}
-              <motion.button
+              <ActionButton
                 type="submit"
-                disabled={loading}
-                className={`w-full border-none font-inter text-[0.95rem] font-semibold text-white cursor-pointer flex items-center justify-center gap-2.5 transition-all duration-200 active:scale-[0.98] bg-candidate-primary rounded-xl p-3.5 shadow-[0_4px_14px_rgba(124,58,237,0.08)] hover:bg-candidate-primary-hover hover:shadow-[0_6px_18px_rgba(124,58,237,0.18)] ${loading ? 'opacity-75 cursor-not-allowed' : ''}`}
-                whileHover={{ scale: loading ? 1 : 1.02 }}
-                whileTap={{ scale: loading ? 1 : 0.98 }}
+                isLoading={loading}
+                loadingText="Signing In..."
+                icon={LogIn}
+                className="w-full font-inter text-[0.95rem] font-semibold text-white bg-candidate-primary rounded-xl p-3.5 shadow-[0_4px_14px_rgba(124,58,237,0.08)] hover:bg-candidate-primary-hover hover:shadow-[0_6px_18px_rgba(124,58,237,0.18)]"
               >
-                {loading ? <Loader2 className="animate-spin" size={18} /> : <LogIn size={18} />}
-                <span>{loading ? 'Signing In...' : 'Sign In'}</span>
-              </motion.button>
+                Sign In
+              </ActionButton>
             </form>
 
             {/* Divider */}
@@ -528,16 +526,14 @@ const LoginCard = ({ role, setRole, onLogin }) => {
               </div>
 
               {/* Create Account Action */}
-              <motion.button
+              <ActionButton
                 type="submit"
-                disabled={loading}
-                className={`w-full border-none font-inter text-[0.95rem] font-semibold text-white cursor-pointer flex items-center justify-center gap-2.5 transition-all duration-200 active:scale-[0.98] bg-candidate-primary rounded-xl p-3 shadow-[0_4px_14px_rgba(124,58,237,0.08)] hover:bg-candidate-primary-hover hover:shadow-[0_6px_18px_rgba(124,58,237,0.18)] ${loading ? 'opacity-75 cursor-not-allowed' : ''}`}
-                whileHover={{ scale: loading ? 1 : 1.02 }}
-                whileTap={{ scale: loading ? 1 : 0.98 }}
+                isLoading={loading}
+                loadingText="Creating Account..."
+                className="w-full font-inter text-[0.95rem] font-semibold text-white bg-candidate-primary rounded-xl p-3 shadow-[0_4px_14px_rgba(124,58,237,0.08)] hover:bg-candidate-primary-hover hover:shadow-[0_6px_18px_rgba(124,58,237,0.18)]"
               >
-                {loading ? <Loader2 className="animate-spin" size={18} /> : null}
-                <span>{loading ? 'Creating Account...' : 'Create Account'}</span>
-              </motion.button>
+                Create Account
+              </ActionButton>
             </form>
 
             {/* Login redirect link */}

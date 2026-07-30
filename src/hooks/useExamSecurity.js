@@ -95,8 +95,8 @@ export const useExamSecurity = ({
       } else if (element.msRequestFullscreen) {
         await element.msRequestFullscreen();
       }
-    } catch (err) {
-      console.warn('Fullscreen request failed:', err);
+    } catch {
+      // Ignore fullscreen failure
     }
   }, []);
 
@@ -113,8 +113,8 @@ export const useExamSecurity = ({
         browserInfo: navigator.userAgent,
         details: details || ''
       });
-    } catch (err) {
-      console.error("Failed to post real-time activity log:", err);
+    } catch {
+      // Handle silently
     }
   }, []);
 
@@ -299,11 +299,12 @@ export const useExamSecurity = ({
         return;
       }
 
-      // Clipboard shortcuts (Ctrl+C, Ctrl+V, Ctrl+X)
-      if ((e.ctrlKey || e.metaKey) && ['C', 'V', 'X'].includes(e.key.toUpperCase())) {
+      // Selection & Clipboard shortcuts (Ctrl+C, Ctrl+V, Ctrl+X, Ctrl+A)
+      if ((e.ctrlKey || e.metaKey) && ['C', 'V', 'X', 'A'].includes(e.key.toUpperCase())) {
         e.preventDefault();
-        const act = e.key.toUpperCase() === 'C' ? 'COPY_ATTEMPT' : (e.key.toUpperCase() === 'V' ? 'PASTE_ATTEMPT' : 'CUT_ATTEMPT');
-        triggerViolation('Clipboard Blocked', `Keyboard shortcut Ctrl+${e.key.toUpperCase()} blocked.`, 'Low', act);
+        const key = e.key.toUpperCase();
+        const act = key === 'C' ? 'COPY_ATTEMPT' : (key === 'V' ? 'PASTE_ATTEMPT' : (key === 'X' ? 'CUT_ATTEMPT' : 'SELECT_ALL_ATTEMPT'));
+        triggerViolation('Selection Blocked', `Keyboard shortcut Ctrl+${key} blocked.`, 'Low', act);
         return;
       }
 
@@ -508,8 +509,8 @@ export const useExamSecurity = ({
       if ('wakeLock' in navigator) {
         try {
           wakeLockSentinel = await navigator.wakeLock.request('screen');
-        } catch (err) {
-          console.warn('Wake Lock request failed:', err);
+        } catch {
+          // Ignore wake lock failure
         }
       }
     };
@@ -528,7 +529,7 @@ export const useExamSecurity = ({
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityForWakeLock);
       if (wakeLockSentinel) {
-        wakeLockSentinel.release().catch((e) => console.warn(e));
+        wakeLockSentinel.release().catch(() => {});
       }
     };
   }, [active, isExamLocked]);
@@ -545,8 +546,8 @@ export const useExamSecurity = ({
             triggerViolation('Dual Monitor', 'Multiple monitors detected. Please disconnect external screens.', 'High');
           }
         }
-      } catch (err) {
-        console.warn('Extended screen placement check not supported/permitted:', err);
+      } catch {
+        // Ignore screen check unsupported error
       }
     };
 
