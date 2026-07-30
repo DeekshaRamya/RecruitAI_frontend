@@ -2,17 +2,17 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import logo from '../assets/systech.jpg';
+import ActionButton from '../components/ActionButton';
 import {
   Briefcase,
   Users,
   Award,
-  TrendingUp,
   Search,
   X,
   Check,
-  Bell,
   Menu,
   ChevronRight,
+  ChevronDown,
   SlidersHorizontal,
   Mail,
   User,
@@ -37,16 +37,17 @@ import {
   Play,
   BookOpen,
   RefreshCw,
+  RotateCcw,
   Eye,
   UserPlus,
   Code,
   Database,
   Brain,
   PieChart,
-  Loader2,
   Volume2,
   BarChart2,
-  Activity
+  Loader2,
+  CheckCircle2
 } from 'lucide-react';
 import api from '../api';
 
@@ -162,6 +163,25 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
     localStorage.setItem('recruitai_candidates', JSON.stringify(candidates));
   }, [candidates]);
 
+  // Deduplicate assessments helper by ID or signature
+  const deduplicateAssessments = (list) => {
+    if (!Array.isArray(list)) return [];
+    const seenIds = new Set();
+    const seenNames = new Set();
+    return list.filter(asm => {
+      if (!asm) return false;
+      const idKey = asm.id || asm._id ? String(asm.id || asm._id) : null;
+      const nameKey = asm.name ? String(asm.name).trim().toLowerCase() : null;
+
+      if (idKey && seenIds.has(idKey)) return false;
+      if (nameKey && seenNames.has(nameKey)) return false;
+
+      if (idKey) seenIds.add(idKey);
+      if (nameKey) seenNames.add(nameKey);
+      return true;
+    });
+  };
+
   // Saved Assessments & Assignments State
   const [savedAssessments, setSavedAssessments] = useState([]);
   const [selectedAssessmentForView, setSelectedAssessmentForView] = useState(null);
@@ -186,7 +206,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
       try {
         const response = await api.get('/api/assessment');
         if (response.data && Array.isArray(response.data)) {
-          setSavedAssessments(response.data);
+          setSavedAssessments(deduplicateAssessments(response.data));
         }
       } catch (err) {
         console.error("Failed to fetch assessments from backend:", err);
@@ -226,11 +246,10 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
   // Sidebar navigation state
   const [activeTab, setActiveTab] = useState(initialTab);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isAssessmentOpen, setIsAssessmentOpen] = useState(true);
 
-  // Search, filter, and sort states
+  // Search and filter states
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState('All Statuses');
-  const [sortBy, setSortBy] = useState('newest');
 
   // Interactive UI Drawer states
   const [selectedCandidate, setSelectedCandidate] = useState(null);
@@ -262,6 +281,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
   const [selectedAssignCandidate, setSelectedAssignCandidate] = useState(null);
   const [showAssignDropdown, setShowAssignDropdown] = useState(false);
   const [assigningAssessment, setAssigningAssessment] = useState(null);
+  const [isSubmittingAssign, setIsSubmittingAssign] = useState(false);
 
   // Group states
   const [selectedCandidateIds, setSelectedCandidateIds] = useState([]);
@@ -327,7 +347,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
 
   useEffect(() => {
     setCandidatePage(1);
-  }, [searchQuery, selectedStatus, candidates.length]);
+  }, [searchQuery, candidates.length]);
 
   useEffect(() => {
     if (assigningAssessment) {
@@ -492,7 +512,6 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
   const [selectedSubjects, setSelectedSubjects] = useState(['Python', 'SQL']);
   const [assessmentTitle, setAssessmentTitle] = useState('Python & SQL Technical Assessment');
   const [durationInput, setDurationInput] = useState('60 minutes');
-  const [selectedPreviewAssessmentId, setSelectedPreviewAssessmentId] = useState(null);
 
   // Percentage distribution states
   const [questionDist, setQuestionDist] = useState({ mcq: 70, scenario: 30 });
@@ -566,6 +585,15 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
   const [_editingQuestionId, _setEditingQuestionId] = useState(null);
   const [_editingText, _setEditingText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState({
+    active: false,
+    topics: [],
+    currentTopicName: '',
+    statusMessage: '',
+    overallPercent: 0,
+    completedTopicsCount: 0,
+    totalTopicsCount: 0
+  });
 
   // Dynamic states for active assessments metric count
   const [activeAssessmentsCount, setActiveAssessmentsCount] = useState(0);
@@ -573,17 +601,16 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
   // AI-generated questions list (starts empty, updated on AI assessment creation)
   const [generatedQuestions, setGeneratedQuestions] = useState([]);
 
-  // Dropdown open states
-  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
 
   // Dynamic valid active assessments filter
   const validActiveAssessments = useMemo(() => {
     if (!Array.isArray(savedAssessments)) return [];
-    return savedAssessments.filter(asm => {
+    const filtered = savedAssessments.filter(asm => {
       if (!asm || !asm.id || !asm.name) return false;
       const st = (asm.status || 'Active').toUpperCase();
       return st === 'ACTIVE' || st === 'CREATED';
     });
+    return deduplicateAssessments(filtered);
   }, [savedAssessments]);
 
   // Dynamic completed assessments count
@@ -633,8 +660,6 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
     },
   ];
 
-  // List of roles and statuses for filters
-  const statuses = ['All Statuses', 'Completed', 'In Progress', 'Under Review', 'Failed'];
 
   // Handle Search filtering
   const filteredCandidates = (Array.isArray(candidates) ? candidates : []).filter(candidate => {
@@ -673,92 +698,226 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
       return;
     }
 
-    const payload = {
-      title: assessmentTitle || `${selectedSubjects.join(' & ')} Technical Assessment`,
-      subjects: selectedSubjects,
-      questionDistribution: {
-        mcq: questionDist.mcq,
-        scenario: questionDist.scenario
-      },
-      difficultyDistribution: {
-        easy: difficultyDist.easy,
-        medium: difficultyDist.medium,
-        hard: difficultyDist.hard
-      },
-      duration: durationInput
-    };
+    const topicsList = [...selectedSubjects];
+    if (topicsList.length === 0) {
+      showToast("Please select at least one topic.");
+      return;
+    }
 
-    showToast("Generating assessment with AI... Please wait.");
     setIsGenerating(true);
 
-    try {
-      const response = await api.post('/api/assessment/generate', payload);
+    // ==========================================
+    // SINGLE TOPIC FLOW (Normal Generation)
+    // ==========================================
+    if (topicsList.length === 1) {
+      const singleTopic = topicsList[0];
+      const payload = {
+        title: assessmentTitle || `${singleTopic} Technical Assessment`,
+        subjects: [singleTopic],
+        totalQuestions: 15,
+        questionDistribution: {
+          mcq: questionDist.mcq,
+          scenario: questionDist.scenario
+        },
+        difficultyDistribution: {
+          easy: difficultyDist.easy,
+          medium: difficultyDist.medium,
+          hard: difficultyDist.hard
+        },
+        duration: durationInput
+      };
 
-      if (response.data && response.data.questions) {
-        const data = response.data;
-        const formatted = data.questions.map((q, idx) => ({
-          id: idx + 1,
-          subject: q.subject,
-          topic: q.topic || 'General',
-          type: q.type,
-          difficulty: q.difficulty,
-          scenario: q.scenario || q.problemStatement || '',
-          question: q.question,
-          q: q.question,
-          options: q.options,
-          correctAnswer: q.correctAnswer,
-          explanation: q.explanation || '',
-          problemStatement: q.problemStatement || q.scenario || '',
-          candidateTask: q.candidateTask || '',
-          expectedAnswer: q.expectedAnswer || q.correctAnswer || '',
-          evaluationCriteria: q.evaluationCriteria || '',
-          exampleInput: q.exampleInput || '',
-          exampleOutput: q.exampleOutput || '',
-          databaseSchema: q.databaseSchema || null,
-          sampleData: q.sampleData || null
-        }));
+      showToast("Generating assessment with AI... Please wait.");
+      setGenerationProgress({ active: false, topics: [], currentTopicName: '', statusMessage: '', overallPercent: 0, completedTopicsCount: 0, totalTopicsCount: 0 });
 
-        setGeneratedQuestions(formatted);
-        setActiveAssessmentsCount(prev => prev + 1);
+      try {
+        const response = await api.post('/api/assessment/generate', payload);
 
-        // Automatically save assessment in database to generate assessment ID
-        const savePayload = {
-          name: assessmentTitle || `${selectedSubjects.join(' & ')} Technical Assessment`,
-          subjects: selectedSubjects,
-          difficulty: 'Medium',
-          duration: durationInput || '60 minutes',
-          questionsCount: formatted.length,
-          createdDate: new Date().toISOString().split('T')[0],
-          status: 'Active',
-          candidatesAssigned: 0,
-          questions: formatted
-        };
+        if (response.data && response.data.questions) {
+          const data = response.data;
+          const formatted = data.questions.map((q, idx) => ({
+            id: idx + 1,
+            subject: q.subject || singleTopic,
+            topic: q.topic || 'General',
+            type: q.type,
+            difficulty: q.difficulty,
+            scenario: q.scenario || q.problemStatement || '',
+            question: q.question,
+            q: q.question,
+            options: q.options,
+            correctAnswer: q.correctAnswer,
+            explanation: q.explanation || '',
+            problemStatement: q.problemStatement || q.scenario || '',
+            candidateTask: q.candidateTask || '',
+            expectedAnswer: q.expectedAnswer || q.correctAnswer || '',
+            evaluationCriteria: q.evaluationCriteria || '',
+            exampleInput: q.exampleInput || '',
+            exampleOutput: q.exampleOutput || '',
+            databaseSchema: q.databaseSchema || null,
+            sampleData: q.sampleData || null
+          }));
 
-        try {
-          const saveRes = await api.post('/api/assessment', savePayload);
-          if (saveRes.data && saveRes.data.id) {
-            const savedAsm = saveRes.data;
-            setSavedAssessments(prev => [savedAsm, ...prev]);
-            setSelectedPreviewAssessmentId(savedAsm.id);
-            showToast(`Assessment created & saved successfully! Redirecting to preview...`);
-          }
-        } catch (saveErr) {
-          console.warn("Auto-save of generated assessment failed:", saveErr);
-          showToast(`Generated ${formatted.length} questions. Redirecting to preview...`);
+          setGeneratedQuestions(formatted);
+          showToast(`Generated ${formatted.length} questions! Click 'Save Assessment' or 'Save & Assign' to save.`);
+          setActiveTab('preview-questions');
+        } else {
+          throw new Error('Invalid questions format returned from backend');
         }
-
-        // Automatically redirect recruiter to Assessment Preview page
-        setActiveTab('preview-questions');
-      } else {
-        throw new Error('Invalid questions format returned from backend');
+      } catch (err) {
+        console.error("AI assessment generation failed:", err);
+        const errMsg = err.response?.data?.detail || err.message || err;
+        showToast(`Error: ${errMsg}`);
+      } finally {
+        setIsGenerating(false);
       }
-    } catch (err) {
-      console.error("AI assessment generation failed:", err);
-      const errMsg = err.response?.data?.detail || err.message || err;
-      showToast(`Error: ${errMsg}`);
-    } finally {
-      setIsGenerating(false);
+      return;
     }
+
+    // ==========================================
+    // MULTI-TOPIC FLOW (Progressive Batching)
+    // ==========================================
+    setGeneratedQuestions([]); // Reset questions array for progressive stream
+
+    const initialTopics = topicsList.map(t => ({
+      name: t,
+      status: 'pending',
+      count: 0,
+      error: null
+    }));
+
+    setGenerationProgress({
+      active: true,
+      topics: initialTopics,
+      currentTopicName: topicsList[0],
+      statusMessage: `Starting AI Generation for ${topicsList.join(', ')}...`,
+      overallPercent: 0,
+      completedTopicsCount: 0,
+      totalTopicsCount: topicsList.length
+    });
+
+    setActiveTab('preview-questions');
+
+    let allQuestions = [];
+    let completedCount = 0;
+
+    const totalTargetQs = (topicsList.length === 2 ? 20 : 25);
+    const perTopicTarget = Math.max(1, Math.round(totalTargetQs / topicsList.length));
+
+    for (let i = 0; i < topicsList.length; i++) {
+      const currentTopic = topicsList[i];
+
+      setGenerationProgress(prev => {
+        const updatedTopics = prev.topics.map((t, idx) => 
+          idx === i ? { ...t, status: 'generating' } : t
+        );
+        const percent = Math.round((i / topicsList.length) * 100);
+        return {
+          ...prev,
+          topics: updatedTopics,
+          currentTopicName: currentTopic,
+          statusMessage: i === 0 
+            ? `Generating ${currentTopic} Questions...` 
+            : `${topicsList[i-1]} Completed. Generating ${currentTopic}...`,
+          overallPercent: percent
+        };
+      });
+
+      const topicPayload = {
+        title: assessmentTitle || `${currentTopic} Technical Assessment`,
+        subjects: [currentTopic],
+        totalQuestions: perTopicTarget,
+        questionDistribution: {
+          mcq: questionDist.mcq,
+          scenario: questionDist.scenario
+        },
+        difficultyDistribution: {
+          easy: difficultyDist.easy,
+          medium: difficultyDist.medium,
+          hard: difficultyDist.hard
+        },
+        duration: durationInput
+      };
+
+      try {
+        const response = await api.post('/api/assessment/generate', topicPayload);
+        if (response.data && response.data.questions) {
+          const topicQs = response.data.questions.map((q) => ({
+            subject: q.subject || currentTopic,
+            topic: q.topic || 'General',
+            type: q.type,
+            difficulty: q.difficulty,
+            scenario: q.scenario || q.problemStatement || '',
+            question: q.question,
+            q: q.question,
+            options: q.options,
+            correctAnswer: q.correctAnswer,
+            explanation: q.explanation || '',
+            problemStatement: q.problemStatement || q.scenario || '',
+            candidateTask: q.candidateTask || '',
+            expectedAnswer: q.expectedAnswer || q.correctAnswer || '',
+            evaluationCriteria: q.evaluationCriteria || '',
+            exampleInput: q.exampleInput || '',
+            exampleOutput: q.exampleOutput || '',
+            databaseSchema: q.databaseSchema || null,
+            sampleData: q.sampleData || null
+          }));
+
+          allQuestions = [...allQuestions, ...topicQs];
+          const indexedQuestions = allQuestions.map((q, idx) => ({ ...q, id: idx + 1 }));
+          
+          setGeneratedQuestions(indexedQuestions);
+          completedCount++;
+
+          setGenerationProgress(prev => {
+            const updatedTopics = prev.topics.map((t, idx) => 
+              idx === i ? { ...t, status: 'completed', count: topicQs.length } : t
+            );
+            const nextTopic = topicsList[i + 1];
+            const percent = Math.round(((i + 1) / topicsList.length) * 100);
+            return {
+              ...prev,
+              topics: updatedTopics,
+              completedTopicsCount: completedCount,
+              overallPercent: percent,
+              statusMessage: nextTopic 
+                ? `${currentTopic} Completed (${topicQs.length} Qs). Generating ${nextTopic}...` 
+                : `${currentTopic} Completed (${topicQs.length} Qs). Generation complete.`
+            };
+          });
+
+          showToast(`Generated ${topicQs.length} questions for ${currentTopic}!`);
+        }
+      } catch (err) {
+        console.error(`Failed to generate ${currentTopic} questions:`, err);
+        const errMsg = err.response?.data?.detail || err.message || 'Generation failed';
+        showToast(`Warning: Failed to generate questions for ${currentTopic}. Continuing remaining topics...`);
+
+        setGenerationProgress(prev => {
+          const updatedTopics = prev.topics.map((t, idx) => 
+            idx === i ? { ...t, status: 'failed', error: errMsg } : t
+          );
+          const percent = Math.round(((i + 1) / topicsList.length) * 100);
+          return {
+            ...prev,
+            topics: updatedTopics,
+            overallPercent: percent
+          };
+        });
+      }
+    }
+
+    setGenerationProgress(prev => ({
+      ...prev,
+      statusMessage: "Generation Complete! Click 'Save Assessment' or 'Save & Assign' to save.",
+      overallPercent: 100
+    }));
+
+    showToast(`All topics generated successfully! Click 'Save Assessment' or 'Save & Assign' to save.`);
+
+    setTimeout(() => {
+      setIsGenerating(false);
+      setGenerationProgress(prev => ({ ...prev, active: false }));
+    }, 1500);
   };
 
   const handleSaveAssessment = async (andAssign = false) => {
@@ -782,8 +941,8 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
       const response = await api.post('/api/assessment', payload);
       if (response.data) {
         const savedAsm = response.data;
-        setSavedAssessments(prev => [savedAsm, ...prev]);
-        setSelectedPreviewAssessmentId(savedAsm.id);
+        setSavedAssessments(prev => deduplicateAssessments([savedAsm, ...prev]));
+        setSelectedAssessmentForView(savedAsm);
         showToast('Assessment saved successfully!');
         setActiveAssessmentsCount(prev => prev + 1);
 
@@ -828,7 +987,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
           // Refresh saved assessments & assignments
           const assessmentsRes = await api.get('/api/assessment');
           if (assessmentsRes.data) {
-            setSavedAssessments(assessmentsRes.data);
+            setSavedAssessments(deduplicateAssessments(assessmentsRes.data));
           }
           await fetchAssignments();
         }
@@ -855,34 +1014,6 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
     }, 4000);
   };
 
-  const getHeaderContent = () => {
-    switch (activeTab) {
-      case 'dashboard':
-        return {
-          title: 'Dashboard',
-          tag: 'v1.2',
-          subtitle: 'Analyze candidate assessments and coordinate evaluation flows.'
-        };
-      case 'preview-questions':
-        return {
-          title: 'Assessment Preview',
-          tag: 'QA Mode',
-          subtitle: 'Review AI-generated questions before saving and assigning to candidates.'
-        };
-      case 'assessments':
-        return {
-          title: 'Saved Assessments',
-          tag: 'Pool',
-          subtitle: 'Manage, view, and assign generated assessments for candidate evaluation.'
-        };
-      default:
-        return {
-          title: 'Dashboard',
-          tag: 'v1.2',
-          subtitle: 'Coordinate evaluation flows.'
-        };
-    }
-  };
 
   return (
     <div className="bg-dash-light-blue-bg text-dash-dark-purple min-h-screen relative overflow-hidden font-inter flex w-full">
@@ -901,13 +1032,14 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
         )}
       </AnimatePresence>
 
-      {/* 1. SIDEBAR (Full-Height Solid Layout with Independent Scroll) */}
-      <aside className="hidden lg:flex flex-col w-[260px] h-screen max-h-screen shrink-0 bg-dash-sidebar-bg p-6 overflow-y-auto dashboard-scrollbar relative z-30 text-dash-white-card shadow-[4px_0_24px_rgba(0,0,0,0.03)]">
-        <div className="flex flex-col min-h-full justify-between gap-6">
-          <div className="flex flex-col gap-6">
+      {/* 1. SIDEBAR (Fixed Non-Scrolling Grouped Layout) */}
+      <aside className="hidden lg:flex flex-col w-[260px] h-screen max-h-screen shrink-0 bg-dash-sidebar-bg p-5 overflow-hidden relative z-30 text-dash-white-card shadow-[4px_0_24px_rgba(0,0,0,0.03)]">
+        <div className="flex flex-col h-full justify-between gap-3 overflow-hidden">
+          {/* Scrollable Top Area (Branding + Nav) */}
+          <div className="flex flex-col gap-4 min-h-0 flex-1 overflow-y-auto custom-scrollbar pr-1">
             {/* Branding */}
-            <div className="flex items-center gap-3 px-2 py-2">
-              <img src={logo} alt="RecruitAI Logo" className="w-12 h-12 rounded-2xl object-cover shadow-md shrink-0" />
+            <div className="flex items-center gap-3 px-2 py-1 shrink-0">
+              <img src={logo} alt="RecruitAI Logo" className="w-10 h-10 rounded-2xl object-cover shadow-md shrink-0" />
               <div>
                 <h1 className="font-outfit font-bold text-base tracking-tight text-dash-white-card leading-none">RecruitAI</h1>
                 <span className="text-[10px] text-dash-light-purple font-medium tracking-widest uppercase">Recruiter Portal</span>
@@ -915,66 +1047,122 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
             </div>
 
             {/* Navigation Menu */}
-            <nav className="space-y-1.5">
-              {[
-                { id: 'dashboard', label: 'Dashboard', icon: Briefcase },
-                { id: 'create-assessment', label: 'Create Assessment', icon: Plus },
-                { id: 'preview-questions', label: 'Preview Questions', icon: Eye },
-                { id: 'assessments', label: 'Active Assessments', icon: Save },
-                { id: 'results', label: 'Technical Assessment Result', icon: Award },
-                { id: 'english-results', label: 'English Assessment Result', icon: Volume2 },
-                { id: 'overall-results', label: 'Overall Result', icon: BarChart2 }
-              ].map((item) => {
-                const Icon = item.icon;
-                const isActive = activeTab === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => setActiveTab(item.id)}
-                    className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-l-[24px] rounded-r-none text-sm font-bold transition-all duration-300 relative group cursor-pointer border-none text-left ${isActive
-                      ? 'sidebar-active-tab shadow-sm'
-                      : 'text-dash-light-purple hover:text-dash-white-card hover:bg-dash-primary-purple/20'
-                      }`}
-                  >
-                    <Icon size={18} className="relative z-10 shrink-0" />
-                    <span className="relative z-10">{item.label}</span>
-                  </button>
-                );
-              })}
-            </nav>
+            <nav className="space-y-4">
+              {/* Primary Pages */}
+              <div className="space-y-1">
+                {[
+                  { id: 'dashboard', label: 'Dashboard', icon: Briefcase },
+                  { id: 'create-assessment', label: 'Create Assessment', icon: Plus },
+                  { id: 'preview-questions', label: 'Preview Questions', icon: Eye },
+                  { id: 'assessments', label: 'Active Assessments', icon: Save },
+                  { id: 'groups', label: 'Candidate Groups', icon: Users }
+                ].map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeTab === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveTab(item.id)}
+                      className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer border-none text-left ${isActive
+                        ? 'sidebar-active-tab shadow-sm text-dash-white-card'
+                        : 'text-dash-light-purple hover:text-dash-white-card hover:bg-dash-primary-purple/20'
+                        }`}
+                    >
+                      <Icon size={16} className="shrink-0" />
+                      <span>{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
 
-            {/* Recruiter Sidebar Animation */}
-            <div className="flex items-center justify-center py-2 px-2">
-              <div className="w-48 h-48 flex items-center justify-center overflow-hidden">
+              {/* Grouped Section: Assessment (Collapsible Dropdown) */}
+              <div className="pt-2 border-t border-dash-border-gray/20">
+                <button
+                  type="button"
+                  onClick={() => setIsAssessmentOpen(prev => !prev)}
+                  className="w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-[11px] font-extrabold uppercase tracking-wider text-dash-primary-purple hover:bg-dash-primary-purple/10 transition-colors cursor-pointer border-none bg-transparent"
+                >
+                  <div className="flex items-center gap-2">
+                    <Award size={14} className="shrink-0" />
+                    <span>Assessment</span>
+                  </div>
+                  {isAssessmentOpen ? (
+                    <ChevronDown size={14} className="shrink-0 text-dash-primary-purple transition-transform duration-200" />
+                  ) : (
+                    <ChevronRight size={14} className="shrink-0 text-dash-primary-purple transition-transform duration-200" />
+                  )}
+                </button>
+
+                <AnimatePresence>
+                  {isAssessmentOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="space-y-1 mt-1 pl-2 overflow-hidden"
+                    >
+                      {[
+                        { id: 'results', label: 'Technical Assessment Results', icon: Award },
+                        { id: 'english-results', label: 'English Assessment Results', icon: Volume2 },
+                        { id: 'overall-results', label: 'Overall Results', icon: BarChart2 }
+                      ].map((item) => {
+                        const Icon = item.icon;
+                        const isActive = activeTab === item.id;
+                        return (
+                          <button
+                            key={item.id}
+                            onClick={() => setActiveTab(item.id)}
+                            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[11px] font-bold transition-all duration-200 cursor-pointer border-none text-left ${isActive
+                              ? 'bg-dash-primary-purple text-dash-white-card shadow-sm font-extrabold'
+                              : 'text-dash-light-purple hover:text-dash-white-card hover:bg-dash-primary-purple/20'
+                              }`}
+                          >
+                            <Icon size={14} className="shrink-0" />
+                            <span className="truncate">{item.label}</span>
+                          </button>
+                        );
+                      })}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </nav>
+          </div>
+
+          {/* Pinned Bottom Container (Large Prominent Animation + Profile + Logout) */}
+          <div className="shrink-0 flex flex-col gap-1.5 pt-1">
+            <div className="flex items-center justify-center py-0.5">
+              <div className="w-40 h-40 flex items-center justify-center overflow-hidden">
                 <DotLottieReact
                   src="https://lottie.host/5521a48e-619e-490f-a9b2-f4fb0386526e/5IWtyksCcc.lottie"
                   loop
                   autoplay
-                  style={{ width: '100%', height: '100%', transform: 'scale(1.2)', transformOrigin: 'center center' }}
+                  style={{ width: '100%', height: '100%', transform: 'scale(1.25)', transformOrigin: 'center center' }}
                 />
               </div>
             </div>
-          </div>
 
-          {/* User Profile & Logout Section (Fixed at bottom of sidebar scroll container) */}
-          <div className="border-t border-dash-border-gray/25 pt-4 space-y-3 mt-auto">
-            <div className="flex items-center gap-3 px-2">
-              <div className="w-9 h-9 rounded-full bg-dash-primary-purple flex items-center justify-center font-semibold text-dash-white-card shrink-0">
-                RA
+            {/* User Profile & Logout Section */}
+            <div className="space-y-1">
+              <div className="flex items-center gap-3 px-2">
+                <div className="w-8 h-8 rounded-full bg-dash-primary-purple flex items-center justify-center font-semibold text-xs text-dash-white-card shrink-0">
+                  RA
+                </div>
+                <div className="overflow-hidden min-w-0">
+                  <h4 className="text-xs font-semibold text-dash-white-card truncate">Recruiter Admin</h4>
+                  <span className="text-[10px] text-dash-light-purple truncate block">recruiter@recruitai.com</span>
+                </div>
               </div>
-              <div className="overflow-hidden min-w-0">
-                <h4 className="text-xs font-semibold text-dash-white-card truncate">Recruiter Admin</h4>
-                <span className="text-[10px] text-dash-light-purple truncate block">recruiter@recruitai.com</span>
-              </div>
+
+              <button
+                onClick={onLogout}
+                className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-rose-400 hover:bg-rose-500/20 transition-all duration-200 cursor-pointer border border-rose-500/20 bg-rose-500/10"
+              >
+                <LogOut size={15} className="shrink-0 text-rose-400" />
+                <span className="font-bold text-rose-300 hover:text-white">Log Out</span>
+              </button>
             </div>
-
-            <button
-              onClick={onLogout}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-dash-light-purple hover:bg-dash-primary-purple/20 transition-all duration-200 cursor-pointer border-none bg-transparent"
-            >
-              <LogOut size={16} className="shrink-0" />
-              <span>Log Out</span>
-            </button>
           </div>
         </div>
       </aside>
@@ -1000,75 +1188,145 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}
             transition={{ type: 'spring', bounce: 0.1, duration: 0.4 }}
-            className="fixed top-0 bottom-0 left-0 w-[270px] p-6 z-50 lg:hidden flex flex-col bg-dash-sidebar-bg text-dash-white-card border-r border-dash-border-gray/25 overflow-y-auto dashboard-scrollbar"
+            className="fixed top-0 bottom-0 left-0 w-[270px] p-6 z-50 lg:hidden flex flex-col bg-dash-sidebar-bg text-dash-white-card border-r border-dash-border-gray/25 overflow-hidden"
           >
-            <div className="flex flex-col min-h-full justify-between gap-6">
-              <div className="flex flex-col gap-6">
-                <div className="flex items-center justify-between mb-2">
+            <div className="flex flex-col h-full justify-between gap-4">
+              <div className="flex flex-col gap-5">
+                <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-3">
-                    <img src={logo} alt="RecruitAI Logo" className="w-10 h-10 rounded-xl object-cover shadow-sm shrink-0" />
+                    <img src={logo} alt="RecruitAI Logo" className="w-9 h-9 rounded-xl object-cover shadow-sm shrink-0" />
                     <h1 className="font-outfit font-bold text-base text-dash-white-card">RecruitAI</h1>
                   </div>
                   <button
                     onClick={() => setSidebarOpen(false)}
                     className="p-1 rounded-lg hover:bg-dash-primary-purple/20 text-dash-light-purple hover:text-dash-white-card border-none bg-transparent cursor-pointer"
                   >
-                    <X size={20} />
+                    <X size={18} />
                   </button>
                 </div>
 
-                <nav className="space-y-1.5">
-                  {[
-                    { id: 'dashboard', label: 'Dashboard', icon: Briefcase },
-                    { id: 'create-assessment', label: 'Create Assessment', icon: Plus },
-                    { id: 'preview-questions', label: 'Preview Questions', icon: Eye },
-                    { id: 'assessments', label: 'Active Assessments', icon: Save },
-                    { id: 'results', label: 'Technical Assessment Result', icon: Award },
-                    { id: 'english-results', label: 'English Assessment Result', icon: Volume2 },
-                    { id: 'overall-results', label: 'Overall Result', icon: BarChart2 }
-                  ].map((item) => {
-                    const Icon = item.icon;
-                    const isActive = activeTab === item.id;
-                    return (
-                      <button
-                        key={item.id}
-                        onClick={() => {
-                          setActiveTab(item.id);
-                          setSidebarOpen(false);
-                        }}
-                        className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-l-[24px] rounded-r-none text-sm font-bold transition-all duration-200 cursor-pointer border-none text-left ${isActive
-                          ? 'sidebar-active-tab shadow-sm'
-                          : 'text-dash-light-purple hover:text-dash-white-card hover:bg-dash-primary-purple/20'
-                          }`}
-                      >
-                        <Icon size={18} className="shrink-0" />
-                        <span>{item.label}</span>
-                      </button>
-                    );
-                  })}
+                <nav className="space-y-4">
+                  <div className="space-y-1">
+                    {[
+                      { id: 'dashboard', label: 'Dashboard', icon: Briefcase },
+                      { id: 'create-assessment', label: 'Create Assessment', icon: Plus },
+                      { id: 'preview-questions', label: 'Preview Questions', icon: Eye },
+                      { id: 'assessments', label: 'Active Assessments', icon: Save },
+                      { id: 'groups', label: 'Candidate Groups', icon: Users }
+                    ].map((item) => {
+                      const Icon = item.icon;
+                      const isActive = activeTab === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => {
+                            setActiveTab(item.id);
+                            setSidebarOpen(false);
+                          }}
+                          className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer border-none text-left ${isActive
+                            ? 'sidebar-active-tab shadow-sm text-dash-white-card'
+                            : 'text-dash-light-purple hover:text-dash-white-card hover:bg-dash-primary-purple/20'
+                            }`}
+                        >
+                          <Icon size={16} className="shrink-0" />
+                          <span>{item.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Mobile Grouped Section: Assessment (Collapsible Dropdown) */}
+                  <div className="pt-2 border-t border-dash-border-gray/20">
+                    <button
+                      type="button"
+                      onClick={() => setIsAssessmentOpen(prev => !prev)}
+                      className="w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-[11px] font-extrabold uppercase tracking-wider text-dash-primary-purple hover:bg-dash-primary-purple/10 transition-colors cursor-pointer border-none bg-transparent"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Award size={14} className="shrink-0" />
+                        <span>Assessment</span>
+                      </div>
+                      {isAssessmentOpen ? (
+                        <ChevronDown size={14} className="shrink-0 text-dash-primary-purple transition-transform duration-200" />
+                      ) : (
+                        <ChevronRight size={14} className="shrink-0 text-dash-primary-purple transition-transform duration-200" />
+                      )}
+                    </button>
+
+                    <AnimatePresence>
+                      {isAssessmentOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="space-y-1 mt-1 pl-2 overflow-hidden"
+                        >
+                          {[
+                            { id: 'results', label: 'Technical Assessment Results', icon: Award },
+                            { id: 'english-results', label: 'English Assessment Results', icon: Volume2 },
+                            { id: 'overall-results', label: 'Overall Results', icon: BarChart2 }
+                          ].map((item) => {
+                            const Icon = item.icon;
+                            const isActive = activeTab === item.id;
+                            return (
+                              <button
+                                key={item.id}
+                                onClick={() => {
+                                  setActiveTab(item.id);
+                                  setSidebarOpen(false);
+                                }}
+                                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[11px] font-bold transition-all duration-200 cursor-pointer border-none text-left ${isActive
+                                  ? 'bg-dash-primary-purple text-dash-white-card shadow-sm font-extrabold'
+                                  : 'text-dash-light-purple hover:text-dash-white-card hover:bg-dash-primary-purple/20'
+                                  }`}
+                              >
+                                <Icon size={14} className="shrink-0" />
+                                <span className="truncate">{item.label}</span>
+                              </button>
+                            );
+                          })}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 </nav>
               </div>
 
-              <div className="border-t border-dash-border-gray/25 pt-4 space-y-3 mt-auto">
-                <div className="flex items-center gap-3 px-2">
-                  <div className="w-9 h-9 rounded-full bg-dash-primary-purple flex items-center justify-center font-semibold text-dash-white-card shrink-0">
-                    RA
-                  </div>
-                  <div className="overflow-hidden min-w-0">
-                    <h4 className="text-xs font-semibold text-dash-white-card truncate">Recruiter Admin</h4>
-                    <span className="text-[10px] text-dash-light-purple truncate block">recruiter@recruitai.com</span>
+              {/* Mobile Lottie Animation (Large Prominent) */}
+              <div className="shrink-0 flex flex-col gap-1.5 pt-1">
+                <div className="flex items-center justify-center py-0.5">
+                  <div className="w-40 h-40 flex items-center justify-center overflow-hidden">
+                    <DotLottieReact
+                      src="https://lottie.host/5521a48e-619e-490f-a9b2-f4fb0386526e/5IWtyksCcc.lottie"
+                      loop
+                      autoplay
+                      style={{ width: '100%', height: '100%', transform: 'scale(1.25)', transformOrigin: 'center center' }}
+                    />
                   </div>
                 </div>
-                <button
-                  onClick={() => {
-                    setSidebarOpen(false);
-                    onLogout();
-                  }}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-dash-light-purple hover:bg-dash-primary-purple/20 transition-all duration-200 cursor-pointer border-none bg-transparent"
-                >
-                  <LogOut size={16} className="shrink-0" />
-                  <span>Log Out</span>
-                </button>
+
+                <div className="space-y-1">
+                  <div className="flex items-center gap-3 px-2">
+                    <div className="w-8 h-8 rounded-full bg-dash-primary-purple flex items-center justify-center font-semibold text-xs text-dash-white-card shrink-0">
+                      RA
+                    </div>
+                    <div className="overflow-hidden min-w-0">
+                      <h4 className="text-xs font-semibold text-dash-white-card truncate">Recruiter Admin</h4>
+                      <span className="text-[10px] text-dash-light-purple truncate block">recruiter@recruitai.com</span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSidebarOpen(false);
+                      onLogout();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-rose-400 hover:bg-rose-500/20 transition-all duration-200 cursor-pointer border border-rose-500/20 bg-rose-500/10"
+                  >
+                    <LogOut size={15} className="shrink-0 text-rose-400" />
+                    <span className="font-bold text-rose-300 hover:text-white">Log Out</span>
+                  </button>
+                </div>
               </div>
             </div>
           </motion.aside>
@@ -1728,6 +1986,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
           <QuestionPreviewHub
             generatedQuestions={generatedQuestions}
             setGeneratedQuestions={setGeneratedQuestions}
+            generationProgress={generationProgress}
             showToast={showToast}
             onSave={() => handleSaveAssessment(false)}
             onSaveAndAssign={() => handleSaveAssessment(true)}
@@ -1755,6 +2014,8 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
             assignments={assignments}
             fetchAssignments={fetchAssignments}
             showToast={showToast}
+            savedAssessments={savedAssessments}
+            onAssignClick={setAssigningAssessment}
           />
         )}
 
@@ -2329,57 +2590,65 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
               <form
                 onSubmit={async (e) => {
                   e.preventDefault();
-                  const dueDate = e.target.dueDate.value;
-                  const startTime = e.target.startTime.value;
+                  if (isSubmittingAssign) return;
+                  setIsSubmittingAssign(true);
+                  try {
+                    const dueDate = e.target.dueDate.value;
+                    const startTime = e.target.startTime.value;
 
-                  if (assignType === 'group') {
-                    if (!selectedAssignGroup) {
-                      alert('Please select a candidate group.');
-                      return;
-                    }
+                    if (assignType === 'group') {
+                      if (!selectedAssignGroup) {
+                        alert('Please select a candidate group.');
+                        return;
+                      }
 
-                    const groupMemberEmails = (Array.isArray(candidates) ? candidates : [])
-                      .filter(c => selectedAssignGroup.candidateIds.includes(c.id))
-                      .map(c => c.email);
+                      const groupMemberEmails = (Array.isArray(candidates) ? candidates : [])
+                        .filter(c => selectedAssignGroup.candidateIds.includes(c.id))
+                        .map(c => c.email);
 
-                    if (groupMemberEmails.length === 0) {
-                      alert('This group has no members.');
-                      return;
-                    }
+                      if (groupMemberEmails.length === 0) {
+                        alert('This group has no members.');
+                        return;
+                      }
 
-                    let successCount = 0;
-                    let failedCount = 0;
-                    for (const email of groupMemberEmails) {
+                      let successCount = 0;
+                      let failedCount = 0;
+                      for (const email of groupMemberEmails) {
+                        try {
+                          await handleConfirmAssign(email, dueDate, startTime, true);
+                          successCount++;
+                        } catch (err) {
+                          failedCount++;
+                          console.error(`Failed to assign to ${email}:`, err);
+                        }
+                      }
+
+                      showToast(`Successfully assigned to ${successCount} candidates. ${failedCount > 0 ? `Failed: ${failedCount}.` : ''}`);
+                      
+                      // Refresh saved assessments
                       try {
-                        await handleConfirmAssign(email, dueDate, startTime, true);
-                        successCount++;
+                        const assessmentsRes = await api.get('/api/assessment');
+                        if (assessmentsRes.data) {
+                          setSavedAssessments(deduplicateAssessments(assessmentsRes.data));
+                        }
                       } catch (err) {
-                        failedCount++;
-                        console.error(`Failed to assign to ${email}:`, err);
+                        console.error(err);
                       }
-                    }
-
-                    showToast(`Successfully assigned to ${successCount} candidates. ${failedCount > 0 ? `Failed: ${failedCount}.` : ''}`);
-                    
-                    // Refresh saved assessments
-                    try {
-                      const assessmentsRes = await api.get('/api/assessment');
-                      if (assessmentsRes.data) {
-                        setSavedAssessments(assessmentsRes.data);
+                      
+                      setAssigningAssessment(null);
+                      setAssigningGroup(null);
+                    } else {
+                      if (!selectedAssignCandidate) {
+                        alert('Please select a candidate from the dropdown.');
+                        return;
                       }
-                    } catch (err) {
-                      console.error(err);
+                      const email = selectedAssignCandidate.email;
+                      await handleConfirmAssign(email, dueDate, startTime);
                     }
-                    
-                    setAssigningAssessment(null);
-                    setAssigningGroup(null);
-                  } else {
-                    if (!selectedAssignCandidate) {
-                      alert('Please select a candidate from the dropdown.');
-                      return;
-                    }
-                    const email = selectedAssignCandidate.email;
-                    await handleConfirmAssign(email, dueDate, startTime);
+                  } catch (err) {
+                    console.error("Assign submit error:", err);
+                  } finally {
+                    setIsSubmittingAssign(false);
                   }
                 }}
                 className="flex flex-col gap-4"
@@ -2523,12 +2792,15 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
                   >
                     Cancel
                   </button>
-                  <button
+                  <ActionButton
                     type="submit"
-                    className="flex-1 py-3 rounded-xl bg-dash-primary-purple text-dash-white-card text-xs font-bold hover:bg-dash-dark-purple transition-colors cursor-pointer border-none shadow-md animate-pulse"
+                    isLoading={isSubmittingAssign}
+                    loadingText="Assigning..."
+                    disabled={isSubmittingAssign}
+                    className="flex-1 py-3 rounded-xl bg-dash-primary-purple text-dash-white-card text-xs font-bold hover:bg-dash-dark-purple transition-colors cursor-pointer border-none shadow-md"
                   >
                     Assign Assessment
-                  </button>
+                  </ActionButton>
                 </div>
               </form>
             </motion.div>
@@ -2602,11 +2874,84 @@ const SyntaxHighlighter = ({ code, language }) => {
   return <pre className="font-mono text-xs leading-relaxed overflow-x-auto whitespace-pre-wrap text-[#0f172a]">{code}</pre>;
 };
 
+const ProgressiveGenerationBanner = ({ generationProgress }) => {
+  if (!generationProgress || !generationProgress.active) return null;
+
+  const { topics, statusMessage, overallPercent, completedTopicsCount, totalTopicsCount } = generationProgress;
+
+  return (
+    <div className="w-full bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border border-indigo-500/30 rounded-[22px] p-5 shadow-lg text-white mb-6 animate-fade-in">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-3">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-purple-500/20 border border-purple-400/30 flex items-center justify-center text-purple-300 shrink-0">
+            <Sparkles size={18} className="animate-pulse" />
+          </div>
+          <div>
+            <h4 className="font-outfit font-extrabold text-sm text-white tracking-wide">
+              AI Progressive Assessment Generation
+            </h4>
+            <p className="text-[11px] font-semibold text-purple-200/80">
+              {statusMessage || "Generating questions topic by topic..."}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full border border-white/10 shrink-0">
+          <span className="text-xs font-black text-purple-300">{overallPercent}%</span>
+          <span className="text-[10px] font-bold text-slate-300">({completedTopicsCount}/{totalTopicsCount} Topics)</span>
+        </div>
+      </div>
+
+      {/* Progress Bar */}
+      <div className="w-full bg-slate-800/80 h-2.5 rounded-full overflow-hidden mb-4 border border-white/5">
+        <div 
+          className="h-full bg-gradient-to-r from-purple-500 via-indigo-400 to-emerald-400 rounded-full transition-all duration-500 shadow-[0_0_12px_rgba(168,85,247,0.5)]"
+          style={{ width: `${overallPercent}%` }}
+        />
+      </div>
+
+      {/* Topic Status Chips */}
+      <div className="flex flex-wrap items-center gap-2">
+        {topics && topics.map((t, idx) => {
+          const isDone = t.status === 'completed';
+          const isGenerating = t.status === 'generating';
+          const isFailed = t.status === 'failed';
+
+          return (
+            <div 
+              key={idx}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold transition-all ${
+                isDone 
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-sm'
+                  : isGenerating
+                    ? 'bg-purple-500/25 text-purple-200 border border-purple-400/50 animate-pulse shadow-md'
+                    : isFailed
+                      ? 'bg-red-500/20 text-red-300 border border-red-500/30'
+                      : 'bg-slate-800/60 text-slate-400 border border-slate-700/50'
+              }`}
+            >
+              {isDone && <CheckCircle size={13} className="text-emerald-400" />}
+              {isGenerating && <Loader2 size={13} className="animate-spin text-purple-300" />}
+              {isFailed && <AlertCircle size={13} className="text-red-400" />}
+              {!isDone && !isGenerating && !isFailed && <Clock size={13} className="text-slate-400" />}
+              
+              <span>{t.name}</span>
+              {isDone && <span className="text-[10px] opacity-85">✓ ({t.count} Qs)</span>}
+              {isGenerating && <span className="text-[10px] opacity-90">⏳ Generating...</span>}
+              {isFailed && <span className="text-[10px] opacity-90">❌</span>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 const QuestionPreviewHub = ({
   previewAssessmentId,
   savedAssessments,
   generatedQuestions,
   setGeneratedQuestions,
+  generationProgress,
   showToast,
   onSave,
   onSaveAndAssign,
@@ -2673,7 +3018,7 @@ const QuestionPreviewHub = ({
     } else if (generatedQuestions && generatedQuestions.length > 0 && !selectedId) {
       setSelectedId(generatedQuestions[0].id);
     }
-  }, [previewAssessmentId, fetchAssessmentData, savedAssessments]);
+  }, [previewAssessmentId, fetchAssessmentData, savedAssessments, generatedQuestions, selectedId]);
 
   // Edit form state
   const [editForm, setEditForm] = useState({
@@ -2763,7 +3108,7 @@ const QuestionPreviewHub = ({
     let parsedHiddenTestCases = [];
     try {
       parsedHiddenTestCases = JSON.parse(editForm.hiddenTestCases || '[]');
-    } catch (_err) {
+    } catch {
       showToast("Invalid JSON syntax in Hidden Test Cases.");
       return;
     }
@@ -2848,6 +3193,23 @@ const QuestionPreviewHub = ({
 
   // Empty state when no questions/assessments exist
   if (!generatedQuestions || generatedQuestions.length === 0) {
+    if (generationProgress && generationProgress.active) {
+      return (
+        <div className="flex flex-col gap-6 w-full animate-fade-in">
+          <ProgressiveGenerationBanner generationProgress={generationProgress} />
+          <div className="bg-dash-white-card border border-dash-border-gray rounded-[24px] p-12 shadow-[0_4px_20px_rgba(87,82,170,0.03)] flex flex-col items-center justify-center text-center my-auto min-h-[360px]">
+            <Loader2 size={40} className="animate-spin text-dash-primary-purple mb-4" />
+            <h3 className="font-outfit font-extrabold text-lg sm:text-xl text-dash-dark-purple mb-2">
+              Generating Initial Questions...
+            </h3>
+            <p className="text-xs sm:text-sm text-dash-light-purple font-semibold max-w-md leading-relaxed">
+              {generationProgress.statusMessage || "AI is generating the first topic's questions. Results will appear here instantly once ready..."}
+            </p>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="flex flex-col gap-6 w-full animate-fade-in">
         <div className="bg-dash-white-card border border-dash-border-gray rounded-[24px] p-12 shadow-[0_4px_20px_rgba(87,82,170,0.03)] flex flex-col items-center justify-center text-center my-auto min-h-[420px]">
@@ -2877,6 +3239,9 @@ const QuestionPreviewHub = ({
 
   return (
     <div className="flex flex-col gap-6 w-full animate-fade-in">
+      {generationProgress && generationProgress.active && (
+        <ProgressiveGenerationBanner generationProgress={generationProgress} />
+      )}
       {/* Assessment Question Pool Sub-Header */}
       <div className="bg-dash-white-card border border-dash-border-gray rounded-[24px] p-5 px-6 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -2922,23 +3287,31 @@ const QuestionPreviewHub = ({
 
         <div className="flex items-center gap-3 shrink-0">
           {onSave && (
-            <button
+            <ActionButton
               onClick={onSave}
-              className="px-4 py-2.5 rounded-xl border border-dash-border-gray bg-dash-white-card hover:bg-dash-soft-pink text-dash-dark-purple font-bold text-xs transition-all duration-200 flex items-center gap-2 cursor-pointer shadow-sm"
+              disabled={generationProgress?.active}
+              title={generationProgress?.active ? 'Please wait until all topics are generated' : 'Save assessment'}
+              icon={Save}
+              iconSize={15}
+              className="px-4 py-2.5 rounded-xl border border-dash-border-gray bg-dash-white-card hover:bg-dash-soft-pink text-dash-dark-purple font-bold text-xs shadow-sm"
             >
-              <Save size={15} className="text-dash-primary-purple" />
-              <span>Save Assessment</span>
-            </button>
+              Save Assessment
+            </ActionButton>
           )}
 
           {onSaveAndAssign && (
-            <button
+            <ActionButton
               onClick={onSaveAndAssign}
-              className="px-4 py-2.5 rounded-xl bg-dash-primary-purple text-dash-white-card font-bold text-xs transition-all duration-200 flex items-center gap-2 cursor-pointer shadow-md hover:bg-dash-dark-purple border-none"
+              disabled={generationProgress?.active || generatedQuestions.length === 0}
+              isLoading={generationProgress?.active}
+              loadingText={`Generating (${generationProgress?.completedTopicsCount || 0}/${generationProgress?.totalTopicsCount || 0})...`}
+              title={generationProgress?.active ? 'Please wait until all selected topics have been generated successfully' : 'Save and assign assessment to candidates'}
+              icon={UserPlus}
+              iconSize={15}
+              className="px-4 py-2.5 rounded-xl bg-dash-primary-purple text-dash-white-card font-bold text-xs shadow-md hover:bg-dash-dark-purple border-none"
             >
-              <UserPlus size={15} />
-              <span>Save & Assign</span>
-            </button>
+              Save & Assign
+            </ActionButton>
           )}
         </div>
       </div>
@@ -3703,7 +4076,10 @@ const CandidateDetailsModal = ({ item, onClose }) => {
 const AssignedCandidatesModal = ({
   assessment,
   assignments = [],
-  onClose
+  onClose,
+  fetchAssignments,
+  showToast,
+  onAssignClick
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -3900,12 +4276,33 @@ const AssignedCandidatesModal = ({
                           )}
                         </td>
                         <td className="py-3.5 px-4 text-right">
-                          <button
-                            onClick={() => setSelectedCandidateDetail(item)}
-                            className="px-3 py-1.5 rounded-xl bg-dash-primary-purple/10 border border-dash-primary-purple/30 text-dash-primary-purple font-bold text-xs hover:bg-dash-primary-purple hover:text-white transition-all cursor-pointer"
-                          >
-                            Details
-                          </button>
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => setSelectedCandidateDetail(item)}
+                              className="px-2.5 py-1.5 rounded-xl bg-dash-primary-purple/10 border border-dash-primary-purple/30 text-dash-primary-purple font-bold text-xs hover:bg-dash-primary-purple hover:text-white transition-all cursor-pointer"
+                            >
+                              Details
+                            </button>
+                            <ActionButton
+                              onClick={async () => {
+                                try {
+                                  await api.delete(`/api/assignments/${item.id}`);
+                                  if (showToast) showToast('Assignment deleted successfully.');
+                                  if (fetchAssignments) await fetchAssignments();
+                                } catch (err) {
+                                  console.error('Failed to delete assignment:', err);
+                                  if (showToast) showToast('Failed to delete assignment.');
+                                }
+                              }}
+                              loadingText="Deleting..."
+                              icon={Trash2}
+                              iconSize={12}
+                              className="px-2.5 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-600 font-bold text-xs hover:bg-rose-600 hover:text-white transition-all cursor-pointer"
+                              title="Delete Assignment"
+                            >
+                              Delete
+                            </ActionButton>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -3936,10 +4333,9 @@ const AssessmentsManager = ({
   setSavedAssessments,
   setGeneratedQuestions,
   assignments = [],
-  _fetchAssignments,
+  fetchAssignments,
   showToast,
   setActiveTab,
-  setSelectedAssessmentForView,
   onAssignClick
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -3967,11 +4363,24 @@ const AssessmentsManager = ({
     }
   };
 
-  const validActiveAssessments = (Array.isArray(savedAssessments) ? savedAssessments : []).filter(asm => {
-    if (!asm || !asm.id || !asm.name) return false;
-    const st = (asm.status || 'Active').toUpperCase();
-    return st === 'ACTIVE' || st === 'CREATED';
-  });
+  const validActiveAssessments = (() => {
+    const raw = (Array.isArray(savedAssessments) ? savedAssessments : []).filter(asm => {
+      if (!asm || !asm.id || !asm.name) return false;
+      const st = (asm.status || 'Active').toUpperCase();
+      return st === 'ACTIVE' || st === 'CREATED';
+    });
+    const seenIds = new Set();
+    const seenNames = new Set();
+    return raw.filter(asm => {
+      const idKey = asm.id ? String(asm.id) : null;
+      const nameKey = asm.name ? String(asm.name).trim().toLowerCase() : null;
+      if (idKey && seenIds.has(idKey)) return false;
+      if (nameKey && seenNames.has(nameKey)) return false;
+      if (idKey) seenIds.add(idKey);
+      if (nameKey) seenNames.add(nameKey);
+      return true;
+    });
+  })();
 
   const filteredAssessments = validActiveAssessments.filter(asm => {
     const query = searchQuery.toLowerCase();
@@ -4214,6 +4623,9 @@ const AssessmentsManager = ({
           assessment={viewingAssignedModalAssessment}
           assignments={assignments}
           onClose={() => setViewingAssignedModalAssessment(null)}
+          fetchAssignments={fetchAssignments}
+          showToast={showToast}
+          onAssignClick={onAssignClick}
         />
       )}
     </div>
@@ -4223,7 +4635,13 @@ const AssessmentsManager = ({
 // ==========================================
 // EXPIRED ASSESSMENTS MANAGER COMPONENT
 // ==========================================
-const ExpiredAssessmentsManager = ({ assignments = [], fetchAssignments, showToast }) => {
+const ExpiredAssessmentsManager = ({
+  assignments = [],
+  fetchAssignments,
+  showToast,
+  savedAssessments = [],
+  onAssignClick
+}) => {
   const [searchQuery, setSearchQuery] = useState('');
 
   const expiredAssignments = useMemo(() => {
@@ -4306,7 +4724,8 @@ const ExpiredAssessmentsManager = ({ assignments = [], fetchAssignments, showToa
                   <th className="pb-3.5">Assessment Name</th>
                   <th className="pb-3.5">Assigned Date</th>
                   <th className="pb-3.5">Expiration Date</th>
-                  <th className="pb-3.5 text-right pr-2">Status</th>
+                  <th className="pb-3.5">Status</th>
+                  <th className="pb-3.5 text-right pr-2">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-dash-border-gray/10 text-xs font-semibold">
@@ -4316,6 +4735,7 @@ const ExpiredAssessmentsManager = ({ assignments = [], fetchAssignments, showToa
                   const assessmentName = a.assessmentName || a.assessment?.name || 'Assessment';
                   const rawAssigned = a.assignedAt || a.assigned_at || a.created_at;
                   const rawExp = a.dueDate || a.due_date || a.endTime || a.end_time;
+                  const matchingAsm = savedAssessments.find(s => String(s.id) === String(a.assessmentId || a.assessment_id));
 
                   const assignedFormatted = rawAssigned ? new Date(rawAssigned).toLocaleString(undefined, {
                     year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
@@ -4344,11 +4764,34 @@ const ExpiredAssessmentsManager = ({ assignments = [], fetchAssignments, showToa
                       <td className="py-4 text-rose-600 font-bold">
                         {expFormatted}
                       </td>
-                      <td className="py-4 text-right pr-2">
+                      <td className="py-4">
                         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wide bg-rose-50 border border-rose-200 text-rose-700">
                           <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
                           Expired
                         </span>
+                      </td>
+                      <td className="py-4 text-right pr-2">
+                        <div className="flex items-center justify-end gap-2">
+                          <ActionButton
+                            onClick={async () => {
+                              try {
+                                await api.delete(`/api/assignments/${a.id}`);
+                                if (showToast) showToast('Expired assignment deleted successfully.');
+                                if (fetchAssignments) await fetchAssignments();
+                              } catch (err) {
+                                console.error('Failed to delete expired assignment:', err);
+                                if (showToast) showToast('Failed to delete assignment.');
+                              }
+                            }}
+                            loadingText="Deleting..."
+                            icon={Trash2}
+                            iconSize={12}
+                            className="px-2.5 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-600 font-bold text-xs hover:bg-rose-600 hover:text-white transition-all cursor-pointer"
+                            title="Delete Assignment"
+                          >
+                            Delete
+                          </ActionButton>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -4596,6 +5039,7 @@ const AssessmentDetailsDrawer = ({ assessment, onClose, showToast }) => {
 const ResultsManager = ({ showToast, candidateGroups = [], candidates = [] }) => {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingDetailId, setLoadingDetailId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [scoreFilter, setScoreFilter] = useState('All');
   const [sortBy, setSortBy] = useState('score-desc');
@@ -4652,11 +5096,7 @@ const ResultsManager = ({ showToast, candidateGroups = [], candidates = [] }) =>
     });
   }, [candidateGroups, candidateIdToEmailMap, results]);
 
-  useEffect(() => {
-    fetchResults();
-  }, []);
-
-  const fetchResults = async () => {
+  const fetchResults = React.useCallback(async () => {
     try {
       setLoading(true);
       const response = await api.get('/api/recruiter/results');
@@ -4667,25 +5107,44 @@ const ResultsManager = ({ showToast, candidateGroups = [], candidates = [] }) =>
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
-  const handleOpenDetail = async (assignmentId) => {
+  useEffect(() => {
+    fetchResults();
+  }, [fetchResults]);
+
+  const handleOpenDetail = async (targetId) => {
+    if (!targetId) {
+      showToast("Cannot open report: Assessment identifier is missing.");
+      return;
+    }
     try {
-      setDetailLoading(true);
-      const response = await api.get(`/api/results/${assignmentId}`);
-      setSelectedResult(response.data);
+      setLoadingDetailId(targetId);
+      console.info(`[Recruiter Dashboard] Requesting details for assessment ID: ${targetId}`);
+      const response = await api.get(`/api/results/${targetId}`);
+      console.info(`[Recruiter Dashboard] Successfully loaded assessment report for ${response.data?.candidateName || 'candidate'}:`, response.data);
+      setSelectedResult(response.data || {});
       const initialExpanded = {};
       if (response.data?.questionsAnalysis) {
-        response.data.questionsAnalysis.forEach(q => {
-          initialExpanded[q.questionId] = true;
+        response.data.questionsAnalysis.forEach((q, idx) => {
+          initialExpanded[q.questionId || idx] = true;
         });
       }
       setExpandedQuestions(initialExpanded);
     } catch (err) {
-      console.error("Failed to load result details:", err);
-      showToast("Error loading result details.");
+      console.error("[Recruiter Dashboard] Error fetching assessment results:", err, err.response?.data);
+      const serverDetail = err.response?.data?.detail;
+      if (err.response?.status === 404) {
+        showToast(serverDetail || "Assessment results not found. The assessment may still be in progress.");
+      } else if (err.response?.status === 403) {
+        showToast(serverDetail || "You do not have authorization to view these assessment details.");
+      } else if (err.response?.status === 400) {
+        showToast(serverDetail || "Invalid assessment ID format provided.");
+      } else {
+        showToast(serverDetail || "Unable to load assessment details from server. Please try again later.");
+      }
     } finally {
-      setDetailLoading(false);
+      setLoadingDetailId(null);
     }
   };
 
@@ -5425,11 +5884,21 @@ const ResultsManager = ({ showToast, candidateGroups = [], candidates = [] }) =>
 
                           <td className="px-6 py-4 text-right">
                             <button
-                              onClick={() => handleOpenDetail(res.assignmentId)}
-                              className="px-3 py-1.5 rounded-lg bg-dash-white-card border border-dash-border-gray hover:border-dash-primary-purple text-dash-primary-purple text-xs font-bold hover:bg-dash-soft-pink transition-all duration-300 flex items-center gap-1.5 ml-auto cursor-pointer"
+                              disabled={loadingDetailId === (res.assignmentId || res.id)}
+                              onClick={() => handleOpenDetail(res.assignmentId || res.id)}
+                              className="px-3 py-1.5 rounded-lg bg-dash-white-card border border-dash-border-gray hover:border-dash-primary-purple text-dash-primary-purple text-xs font-bold hover:bg-dash-soft-pink transition-all duration-300 flex items-center gap-1.5 ml-auto cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              <Eye size={13} />
-                              <span>View Details</span>
+                              {loadingDetailId === (res.assignmentId || res.id) ? (
+                                <>
+                                  <div className="w-3.5 h-3.5 border-2 border-dash-primary-purple border-t-transparent rounded-full animate-spin shrink-0" />
+                                  <span>Loading...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Eye size={13} />
+                                  <span>View Details</span>
+                                </>
+                              )}
                             </button>
                           </td>
                         </motion.tr>
@@ -5500,15 +5969,47 @@ const ResultsManager = ({ showToast, candidateGroups = [], candidates = [] }) =>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
                   <div className="bg-dash-light-blue-bg/30 border border-dash-border-gray rounded-xl p-3.5">
                     <span className="text-[10px] text-dash-light-purple font-bold uppercase tracking-wider block mb-1">Assessment</span>
-                    <span className="text-xs font-bold text-dash-dark-purple">{selectedResult.assessmentName}</span>
+                    <span className="text-xs font-bold text-dash-dark-purple truncate block" title={selectedResult.assessmentName}>{selectedResult.assessmentName || 'Technical Assessment'}</span>
                   </div>
                   <div className="bg-dash-light-blue-bg/30 border border-dash-border-gray rounded-xl p-3.5">
                     <span className="text-[10px] text-dash-light-purple font-bold uppercase tracking-wider block mb-1">Submitted On</span>
-                    <span className="text-xs font-semibold text-dash-dark-purple">
-                      {new Date(selectedResult.createdAt).toLocaleDateString()} {new Date(selectedResult.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    <span className="text-xs font-semibold text-dash-dark-purple block">
+                      {selectedResult.createdAt ? `${new Date(selectedResult.createdAt).toLocaleDateString()} ${new Date(selectedResult.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : 'Recent'}
+                    </span>
+                  </div>
+                  <div className="bg-dash-light-blue-bg/30 border border-dash-border-gray rounded-xl p-3.5">
+                    <span className="text-[10px] text-dash-light-purple font-bold uppercase tracking-wider block mb-1">Candidate Email</span>
+                    <span className="text-xs font-semibold text-dash-dark-purple truncate block" title={selectedResult.candidateEmail}>{selectedResult.candidateEmail || 'N/A'}</span>
+                  </div>
+                  <div className="bg-dash-light-blue-bg/30 border border-dash-border-gray rounded-xl p-3.5">
+                    <span className="text-[10px] text-dash-light-purple font-bold uppercase tracking-wider block mb-1">Time Taken</span>
+                    <span className="text-xs font-semibold text-dash-dark-purple block">
+                      {selectedResult.timeTaken ? `${Math.floor(selectedResult.timeTaken / 60)}m ${selectedResult.timeTaken % 60}s` : 'N/A'}
+                    </span>
+                  </div>
+                  <div className="bg-dash-light-blue-bg/30 border border-dash-border-gray rounded-xl p-3.5">
+                    <span className="text-[10px] text-dash-light-purple font-bold uppercase tracking-wider block mb-1">Trust Score</span>
+                    <span className="text-xs font-bold block" style={{
+                      color: (() => {
+                        const exits = (selectedResult.activitySummary?.totalWarnings ?? selectedResult.warningCount ?? 0) + (selectedResult.autoSubmitted ? 1 : 0);
+                        const trust = Math.max(0, 100 - exits * 20 - (selectedResult.activitySummary?.tabSwitches ?? 0) * 10);
+                        return trust >= 80 ? '#149470' : trust >= 50 ? '#D97706' : '#E11D48';
+                      })()
+                    }}>
+                      {(() => {
+                        const exits = (selectedResult.activitySummary?.totalWarnings ?? selectedResult.warningCount ?? 0) + (selectedResult.autoSubmitted ? 1 : 0);
+                        const trust = Math.max(0, 100 - exits * 20 - (selectedResult.activitySummary?.tabSwitches ?? 0) * 10);
+                        return `${trust}% (${trust >= 80 ? 'High' : trust >= 50 ? 'Moderate' : 'Low'})`;
+                      })()}
+                    </span>
+                  </div>
+                  <div className="bg-dash-light-blue-bg/30 border border-dash-border-gray rounded-xl p-3.5">
+                    <span className="text-[10px] text-dash-light-purple font-bold uppercase tracking-wider block mb-1">Result Status</span>
+                    <span className={`text-xs font-extrabold px-2 py-0.5 rounded-full inline-block mt-0.5 ${((selectedResult.passFail === 'Pass') || ((selectedResult.percentage ?? 0) >= 50)) ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                      {selectedResult.passFail || ((selectedResult.percentage ?? 0) >= 50 ? 'Pass' : 'Fail')}
                     </span>
                   </div>
                 </div>
@@ -5763,11 +6264,11 @@ const ResultsManager = ({ showToast, candidateGroups = [], candidates = [] }) =>
                               transition={{ duration: 0.2 }}
                               className="border-t border-dash-border-gray/25 p-4 space-y-4 text-xs select-text bg-[#fcfcff]"
                             >
-                              {q.type === 'CODING' || q.type === 'PYTHON_CODING' ? (
+                              {['CODING', 'PYTHON_CODING', 'SQL', 'SCENARIO_CODING'].includes((q.type || '').toUpperCase()) ? (
                                 <div className="space-y-4 w-full">
                                   <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 relative font-mono overflow-x-auto text-[11px] text-zinc-100 max-h-[300px]">
-                                    <div className="absolute right-3.5 top-3 text-[9px] font-bold text-zinc-600 uppercase tracking-wider select-none">Submitted Code</div>
-                                    <SyntaxHighlighter code={q.candidateAnswer || '# No answer submitted.'} language="python" />
+                                    <div className="absolute right-3.5 top-3 text-[9px] font-bold text-zinc-600 uppercase tracking-wider select-none">Submitted Code ({q.type})</div>
+                                    <SyntaxHighlighter code={q.candidateAnswer || '# No answer submitted.'} language={(q.type || '').toUpperCase() === 'SQL' ? 'sql' : 'python'} />
                                   </div>
                                   
                                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -5862,6 +6363,13 @@ const ResultsManager = ({ showToast, candidateGroups = [], candidates = [] }) =>
                       </div>
                     );
                   })}
+                  {(!selectedResult.questionsAnalysis || selectedResult.questionsAnalysis.length === 0) && (
+                    <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200 text-slate-500 text-xs">
+                      <AlertCircle size={24} className="mx-auto mb-2 text-slate-400" />
+                      <p className="font-bold text-slate-700">No question-level breakdown available</p>
+                      <p className="text-[11px] text-slate-500 mt-1">This assessment may have been evaluated at an overall level, or question details have not been recorded yet.</p>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -6001,7 +6509,7 @@ const EnglishResultsManager = ({ showToast, handleOpenEnglishReport }) => {
   const [loading, setLoading] = useState(false);
   const [downloadingId, setDownloadingId] = useState(null);
 
-  const fetchAssessments = async () => {
+  const fetchAssessments = React.useCallback(async () => {
     try {
       setLoading(true);
       const res = await api.get('/api/recruiter/english-assessments');
@@ -6012,11 +6520,11 @@ const EnglishResultsManager = ({ showToast, handleOpenEnglishReport }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
   useEffect(() => {
     fetchAssessments();
-  }, []);
+  }, [fetchAssessments]);
 
   const formatDuration = (sec) => {
     if (!sec) return '0s';
@@ -6211,7 +6719,7 @@ const OverallResultsManager = ({ showToast }) => {
   const [search, setSearch] = useState('');
   const [selectedRecCandidate, setSelectedRecCandidate] = useState(null);
 
-  const fetchOverallResults = async () => {
+  const fetchOverallResults = React.useCallback(async () => {
     try {
       setLoading(true);
       const res = await api.get('/api/recruiter/overall-results');
@@ -6222,11 +6730,11 @@ const OverallResultsManager = ({ showToast }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
   useEffect(() => {
     fetchOverallResults();
-  }, []);
+  }, [fetchOverallResults]);
 
   const getRecommendation = (item) => {
     if (item.ai_recommendation) return item.ai_recommendation;

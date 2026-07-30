@@ -24,8 +24,8 @@ const Login = () => {
         } else if (user.role === 'recruiter') {
           navigate('/recruiter/dashboard', { replace: true });
         }
-      } catch (err) {
-        console.error("Error parsing user from localStorage:", err);
+      } catch {
+        // Ignore parse error
       }
     }
   }, [navigate]);

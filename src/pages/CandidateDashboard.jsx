@@ -4,6 +4,7 @@ import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import Editor from '@monaco-editor/react';
 import logo from '../assets/systech.jpg';
 import api from '../api';
+import ActionButton from '../components/ActionButton';
 import { useExamSecurity } from '../hooks/useExamSecurity';
 import { ExamSecurityMonitor } from '../components/ExamSecurityMonitor';
 import {
@@ -36,12 +37,15 @@ import {
   Key,
   Send,
   Mic,
-  VolumeX
+  VolumeX,
+  ShieldAlert,
+  Lock,
+  ListOrdered
 } from 'lucide-react';
 
 const MAX_QUESTIONS = 8;
 
-const DatabaseSchemaVisualizer = ({ schemaLines, dataLines }) => {
+const DatabaseSchemaVisualizer = ({ schemaLines, dataLines, liveSchemaMap }) => {
   const [parsedTables, setParsedTables] = React.useState([]);
   const [activeTableIdx, setActiveTableIdx] = React.useState(0);
   const [viewMode, setViewMode] = React.useState('schema'); // 'schema' | 'data'
@@ -57,7 +61,7 @@ const DatabaseSchemaVisualizer = ({ schemaLines, dataLines }) => {
     if (schemaLines && Array.isArray(schemaLines)) {
       schemaLines.forEach(sql => {
         const cleaned = sql.replace(/\s+/g, ' ').trim();
-        const match = cleaned.match(/CREATE\s+TABLE\s+(\w+)\s*\((.*)\)/i);
+        const match = cleaned.match(/(?:CREATE\s+TABLE|--\s*Schema\s*table:?)\s+([a-zA-Z0-9_.\-\[\]]+)\s*\((.*)\)/i);
         if (match) {
           const tableName = match[1];
           const columnsText = match[2];
@@ -90,15 +94,25 @@ const DatabaseSchemaVisualizer = ({ schemaLines, dataLines }) => {
                 type = typeMatch[1];
               }
             }
-            const isPrimaryKey = col.toUpperCase().includes("PRIMARY KEY");
-            const isForeignKey = col.toUpperCase().includes("REFERENCES");
+            const isPrimaryKey = col.toUpperCase().includes("PRIMARY KEY") || col.toUpperCase().includes(" PK");
+            const isForeignKey = col.toUpperCase().includes("REFERENCES") || col.toUpperCase().includes(" FK");
 
             return { name, type, isPrimaryKey, isForeignKey };
           }).filter(c => c.name);
 
+          let finalColumns = parsedColumns;
+          if (liveSchemaMap && liveSchemaMap[tableName] && Array.isArray(liveSchemaMap[tableName].columns) && liveSchemaMap[tableName].columns.length > 0) {
+            finalColumns = liveSchemaMap[tableName].columns.map(c => ({
+              name: c.name,
+              type: c.type,
+              isPrimaryKey: c.is_pk || c.isPrimaryKey || false,
+              isForeignKey: c.name.toLowerCase().includes('id') && !c.is_pk
+            }));
+          }
+
           tables[tableName] = {
             name: tableName,
-            columns: parsedColumns,
+            columns: finalColumns,
             rows: []
           };
         }
@@ -108,7 +122,7 @@ const DatabaseSchemaVisualizer = ({ schemaLines, dataLines }) => {
     if (dataLines && Array.isArray(dataLines)) {
       dataLines.forEach(sql => {
         const cleaned = sql.replace(/\s+/g, ' ').trim();
-        const match = cleaned.match(/INSERT\s+INTO\s+(\w+)\s+(?:VALUES\s*)?\((.*)\);?/i);
+        const match = cleaned.match(/INSERT\s+INTO\s+([a-zA-Z0-9_.\-\[\]]+)\s+(?:VALUES\s*)?\((.*)\);?/i);
         if (match) {
           const tableName = match[1];
 
@@ -162,7 +176,7 @@ const DatabaseSchemaVisualizer = ({ schemaLines, dataLines }) => {
 
     setParsedTables(Object.values(tables));
     setActiveTableIdx(0);
-  }, [schemaLines, dataLines]);
+  }, [schemaLines, dataLines, liveSchemaMap]);
 
   if (parsedTables.length === 0) {
     // If we have raw schemas/data but parser couldn't read them, show raw text
@@ -250,10 +264,19 @@ const DatabaseSchemaVisualizer = ({ schemaLines, dataLines }) => {
 
       {activeTable && (
         <div className="mt-1 flex flex-col gap-2">
-          {parsedTables.length === 1 && (
-            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
-              <Table size={13} className="text-slate-400" />
-              <span>Table: {activeTable.name}</span>
+          {parsedTables.length >= 1 && (
+            <div className="flex flex-wrap items-center gap-2.5 text-xs font-bold text-slate-700 py-1">
+              <div className="flex items-center gap-1.5 bg-purple-50 text-purple-900 px-3 py-1 rounded-lg border border-purple-200/60 font-mono shadow-2xs">
+                <Database size={13} className="text-purple-600" />
+                <span className="text-[10px] text-purple-500 uppercase tracking-wider font-extrabold mr-0.5">Schema:</span>
+                <span>{activeTable.name.includes('.') ? activeTable.name.split('.')[0] : 'dbo'}</span>
+              </div>
+              <div className="flex items-center gap-1.5 bg-indigo-50 text-indigo-900 px-3 py-1 rounded-lg border border-indigo-200/60 font-mono shadow-2xs">
+                <Table size={13} className="text-indigo-600" />
+                <span className="text-[10px] text-indigo-500 uppercase tracking-wider font-extrabold mr-0.5">Table:</span>
+                <span>{activeTable.name.includes('.') ? activeTable.name.split('.')[1] : activeTable.name}</span>
+              </div>
+              <span className="text-[11px] font-mono text-slate-400 font-normal">({activeTable.name})</span>
             </div>
           )}
 
@@ -323,6 +346,519 @@ const DatabaseSchemaVisualizer = ({ schemaLines, dataLines }) => {
 
 /* CandidateResultsView removed */
 
+const ExpectedOutputTable = React.memo(({ rawOutput }) => {
+  if (!rawOutput) return null;
+
+  const lines = rawOutput.split('\n').map(l => l.trim()).filter(Boolean);
+  const tableLines = lines.filter(l => l.startsWith('|') || (l.includes('|') && !l.toLowerCase().includes('showing')));
+  
+  let recordCountText = "";
+  const countLine = lines.find(l => l.toLowerCase().includes('showing') || l.toLowerCase().includes('records returned') || l.toLowerCase().includes('top'));
+  if (countLine) {
+    recordCountText = countLine.replace(/[*#]/g, '').trim();
+  }
+
+  if (tableLines.length >= 2) {
+    const headerCells = tableLines[0]
+      .split('|')
+      .map(cell => cell.trim())
+      .filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
+
+    const dataRows = [];
+    for (let i = 1; i < tableLines.length; i++) {
+      const line = tableLines[i];
+      if (/^[|:\- \t]+$/.test(line) || line.includes('---')) continue;
+      const rowCells = line
+        .split('|')
+        .map(cell => cell.trim())
+        .filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
+      if (rowCells.length > 0) {
+        dataRows.push(rowCells);
+      }
+    }
+
+    if (headerCells.length > 0) {
+      const displayFooterText = recordCountText || `Showing ${dataRows.length} of ${dataRows.length} returned records`;
+      
+      return (
+        <div className="mt-3 flex flex-col bg-[#111111] border border-zinc-800 rounded-xl overflow-hidden shadow-inner text-white select-text font-mono text-xs">
+          <div className="bg-[#171717] px-3.5 py-2 border-b border-zinc-800 flex items-center justify-between shrink-0">
+            <span className="text-emerald-400 font-bold font-sans text-[11px] flex items-center gap-1.5 uppercase tracking-wider">
+              <Table size={13} className="text-emerald-400" />
+              <span>Expected Output (Table Format)</span>
+            </span>
+            <span className="text-[10px] text-zinc-500 font-mono font-semibold">SQL Data Table</span>
+          </div>
+          <div className="overflow-x-auto overflow-y-auto max-h-[220px] scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-zinc-900">
+            <table className="min-w-full divide-y divide-zinc-800/80 text-left text-xs text-zinc-200 border-collapse">
+              <thead className="bg-[#1a1a1a] font-extrabold uppercase tracking-wider text-[10px] text-zinc-400 sticky top-0 z-10 shadow-xs">
+                <tr>
+                  <th className="px-3 py-2 text-zinc-500 w-10 text-center bg-[#1a1a1a] border-r border-zinc-800/60 font-sans">#</th>
+                  {headerCells.map((col, idx) => (
+                    <th key={idx} className="px-3.5 py-2 whitespace-nowrap text-dash-primary-purple font-mono border-r border-zinc-800/40 last:border-0 bg-[#1a1a1a]">
+                      {col}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-800/50 font-mono text-[11px] bg-[#111111]">
+                {dataRows.length > 0 ? (
+                  dataRows.map((row, rowIdx) => (
+                    <tr key={rowIdx} className={`transition-colors hover:bg-zinc-800/80 ${rowIdx % 2 === 0 ? 'bg-[#121212]' : 'bg-[#181818]'}`}>
+                      <td className="px-3 py-1.5 text-zinc-500 font-sans text-[10px] text-center bg-zinc-900/60 border-r border-zinc-800/60 font-bold">
+                        {rowIdx + 1}
+                      </td>
+                      {headerCells.map((_, colIdx) => {
+                        const val = row[colIdx] !== undefined ? row[colIdx] : "NULL";
+                        const isNull = val === "NULL" || val === "" || val.toLowerCase() === "null";
+                        return (
+                          <td key={colIdx} className="px-3.5 py-1.5 whitespace-nowrap text-zinc-200 border-r border-zinc-800/30 last:border-0">
+                            {isNull ? <em className="text-zinc-500 font-sans italic font-semibold">NULL</em> : val}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={headerCells.length + 1} className="px-4 py-6 text-center text-zinc-500 font-sans italic text-xs">
+                      No records generated for sample output.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <div className="bg-[#171717] px-3.5 py-2 border-t border-zinc-800 text-zinc-400 text-[11px] font-sans font-semibold flex items-center justify-between shrink-0">
+            <span>{displayFooterText}</span>
+            <span className="text-emerald-400 font-mono text-[10px] uppercase font-extrabold tracking-wide bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/50">
+              Target Schema Matched
+            </span>
+          </div>
+        </div>
+      );
+    }
+  }
+
+  return (
+    <div className="mt-3 bg-[#111111] border border-zinc-800 rounded-xl p-3.5 text-white shadow-inner">
+      <span className="block font-extrabold text-zinc-400 uppercase tracking-wider text-[10px] mb-1.5 flex items-center gap-1.5">
+        <Table size={13} className="text-emerald-400" />
+        <span>Expected Output Format:</span>
+      </span>
+      <pre className="text-xs font-mono font-semibold text-zinc-300 bg-zinc-900 p-2.5 rounded border border-zinc-800 overflow-x-auto whitespace-pre-wrap max-h-[220px] overflow-y-auto scrollbar-thin">
+        {rawOutput}
+      </pre>
+    </div>
+  );
+});
+
+const QuestionCard = React.memo(({ question, isSql, isCoding, liveSchemaMap }) => {
+  if (!question) return null;
+
+  return (
+    <div className="flex flex-col gap-3 bg-white border border-slate-200/90 rounded-2xl p-3.5 select-text overflow-y-auto max-h-[660px] h-[660px] custom-scrollbar shadow-xs">
+      {isSql ? (
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
+            <span className="text-xs font-black uppercase tracking-wider text-dash-dark-purple flex items-center gap-2">
+              <Database size={16} className="text-dash-primary-purple" />
+              <span>SQL Assessment Question</span>
+            </span>
+            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-purple-100 text-purple-700 uppercase shadow-2xs">
+              T-SQL / SQL Server
+            </span>
+          </div>
+
+          {question.scenario && (
+            <div>
+              <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Scenario Context</h4>
+              <p className="text-xs font-semibold text-slate-700 leading-relaxed whitespace-pre-line bg-slate-50 border border-slate-200/60 rounded-xl p-3 shadow-2xs">
+                {question.scenario}
+              </p>
+            </div>
+          )}
+
+          <div>
+            <h4 className="text-xs font-extrabold text-dash-primary-purple uppercase tracking-wider mb-1.5">Problem Statement & Task</h4>
+            <p className="text-sm font-extrabold text-slate-900 leading-relaxed whitespace-pre-wrap bg-indigo-50/40 border border-purple-100 rounded-xl p-3.5 shadow-2xs">
+              {question.question || question.problemStatement}
+            </p>
+          </div>
+
+          {question.constraints && question.constraints.length > 0 && (
+            <div className="bg-amber-50/60 border border-amber-200/70 rounded-xl p-3">
+              <h4 className="text-[10px] font-extrabold text-amber-800 uppercase tracking-wider mb-1">Constraints & Requirements</h4>
+              <ul className="list-disc pl-4 text-xs font-semibold text-amber-900 space-y-1">
+                {question.constraints.map((c, i) => <li key={i}>{c}</li>)}
+              </ul>
+            </div>
+          )}
+
+          <DatabaseSchemaVisualizer
+            schemaLines={question.databaseSchema}
+            dataLines={question.sampleData}
+            liveSchemaMap={liveSchemaMap}
+          />
+
+          <ExpectedOutputTable rawOutput={question.expectedOutput || question.exampleOutput} />
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {question.scenario && (
+            <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-3 shadow-2xs">
+              <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Scenario Context</h4>
+              <p className="text-xs font-semibold text-slate-700 leading-relaxed whitespace-pre-line">
+                {question.scenario}
+              </p>
+            </div>
+          )}
+          <div>
+            <h4 className="text-xs font-extrabold text-dash-primary-purple uppercase tracking-wider mb-1.5">Problem Description</h4>
+            <p className="text-sm font-extrabold text-slate-900 leading-relaxed whitespace-pre-wrap bg-indigo-50/40 border border-purple-100 rounded-xl p-3.5 shadow-2xs">
+              {question.question || question.problemStatement || question.title}
+            </p>
+          </div>
+          {(question.function_name || question.functionName) && (
+            <div className="bg-purple-50/70 border border-purple-200/50 rounded-xl p-2.5 flex items-center gap-2">
+              <Code size={14} className="text-dash-primary-purple shrink-0" />
+              <span className="text-xs font-bold text-dash-dark-purple">
+                Expected Function: <code className="font-mono text-purple-700 font-extrabold bg-white px-2 py-0.5 rounded border border-purple-200/50">{question.function_name || question.functionName}(...)</code>
+              </span>
+            </div>
+          )}
+          {question.inputFormat && (
+            <div>
+              <h4 className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">Input Format</h4>
+              <p className="text-xs font-medium text-slate-600 leading-normal">{question.inputFormat}</p>
+            </div>
+          )}
+          {question.outputFormat && (
+            <div>
+              <h4 className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">Output Format</h4>
+              <p className="text-xs font-medium text-slate-600 leading-normal">{question.outputFormat}</p>
+            </div>
+          )}
+          {question.constraints && question.constraints.length > 0 && (
+            <div>
+              <h4 className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">Constraints</h4>
+              <ul className="list-disc pl-4 text-xs font-medium text-slate-600 space-y-1">
+                {question.constraints.map((c, i) => <li key={i}>{c}</li>)}
+              </ul>
+            </div>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-1">
+            <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-2.5 shadow-2xs">
+              <span className="block font-bold text-slate-400 uppercase tracking-wider text-[9px] mb-1">Sample Input:</span>
+              <pre className="text-xs font-mono font-semibold text-slate-700 bg-white p-2 rounded border border-slate-200/60 overflow-x-auto whitespace-pre-wrap">{question.sampleInput || question.exampleInput || "No input."}</pre>
+            </div>
+            <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-2.5 shadow-2xs">
+              <span className="block font-bold text-slate-400 uppercase tracking-wider text-[9px] mb-1">Sample Output:</span>
+              <pre className="text-xs font-mono font-semibold text-slate-700 bg-white p-2 rounded border border-slate-200/60 overflow-x-auto whitespace-pre-wrap">{question.sampleOutput || question.exampleOutput || "No output."}</pre>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+});
+
+const SqlStudioEditor = React.memo(({ isSql, currentIdx, answerValue, onAnswerChange, isFullscreen, onReset, onToggleFullscreen, onRunCode, isExecuting }) => {
+  return (
+    <div className="flex flex-col shrink-0 w-full shadow-lg rounded-xl overflow-hidden border border-zinc-800">
+      <div className="flex flex-wrap items-center justify-between px-3.5 py-2 bg-[#171717] border-b border-zinc-800 gap-2 shrink-0">
+        <div className="flex items-center gap-2.5">
+          <div className="p-1.5 rounded-lg bg-purple-950/80 text-purple-400 border border-purple-800/50 shadow-inner">
+            <Code size={15} />
+          </div>
+          <span className="text-xs font-black tracking-wide text-zinc-200 font-sans">
+            {isSql ? 'SQL Studio Editor (T-SQL)' : 'Python 3 Studio Editor'}
+          </span>
+          {isSql && (
+            <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-950/70 px-2.5 py-0.5 rounded-md border border-emerald-800/60 ml-2 flex items-center gap-1.5 shadow-2xs">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block animate-pulse"></span>
+              AdventureWorks Live Connected
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          {onRunCode && (
+            <ActionButton
+              onClick={onRunCode}
+              isLoading={isExecuting}
+              loadingText="Executing..."
+              disabled={isExecuting}
+              icon={Play}
+              iconSize={13}
+              className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[11px] uppercase tracking-wider shadow-xs transition-all flex items-center gap-1 border-none cursor-pointer"
+            >
+              {isSql ? 'Execute Query' : 'Run Script'}
+            </ActionButton>
+          )}
+          <button
+            type="button"
+            onClick={() => onReset(currentIdx)}
+            title="Reset query template"
+            className="px-2.5 py-1 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors cursor-pointer bg-transparent border border-zinc-800/80 hover:border-zinc-700 flex items-center gap-1.5 text-[11px] font-bold"
+          >
+            <RotateCcw size={13} />
+            <span>Reset Script</span>
+          </button>
+          <button
+            type="button"
+            onClick={onToggleFullscreen}
+            title="Toggle Fullscreen Studio"
+            className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors cursor-pointer bg-transparent border border-zinc-800/80 hover:border-zinc-700"
+          >
+            {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+          </button>
+        </div>
+      </div>
+
+      <div className={`w-full overflow-hidden bg-[#1e1e1e] relative shrink-0 ${isFullscreen ? 'h-[45vh]' : 'h-[340px] min-h-[340px] max-h-[340px]'}`}>
+        <Editor
+          key={`studio_editor_${currentIdx}_${isSql ? 'sql' : 'python'}`}
+          height="100%"
+          defaultLanguage={isSql ? "sql" : "python"}
+          language={isSql ? "sql" : "python"}
+          value={answerValue || ''}
+          onChange={(val) => onAnswerChange(val || '')}
+          theme="vs-dark"
+          options={{
+            fontSize: 14,
+            fontFamily: 'Fira Code, Source Code Pro, monospace',
+            minimap: { enabled: false },
+            lineNumbers: 'on',
+            automaticLayout: true,
+            cursorBlinking: 'smooth',
+            tabSize: 4,
+            bracketPairColorization: { enabled: true },
+            autoIndent: 'advanced',
+            scrollBeyondLastLine: false,
+            padding: { top: 12, bottom: 12 },
+            overviewRulerLanes: 0,
+            hideCursorInOverviewRuler: true,
+            scrollbar: {
+              vertical: 'visible',
+              horizontal: 'visible',
+              useShadows: true
+            }
+          }}
+        />
+      </div>
+    </div>
+  );
+});
+
+const QueryResultGrid = React.memo(({ isSql, consoleTab, setConsoleTab, sqlQueryResult, consoleOutput, syntaxError, runtimeError, isExecuting, executionStatus, executionTime, customInput, setCustomInput, expectedOutputText, resultGridRef }) => {
+  return (
+    <div 
+      ref={resultGridRef}
+      tabIndex={-1}
+      className="flex flex-col h-[260px] min-h-[240px] max-h-[280px] shrink-0 w-full bg-[#111111] border border-zinc-800 rounded-xl overflow-hidden shadow-xl focus:outline-none focus:ring-1 focus:ring-dash-primary-purple/50 select-text"
+    >
+      <div className="flex flex-wrap items-center justify-between bg-[#171717] px-3.5 py-2 border-b border-zinc-800 gap-2 shrink-0">
+        <div className="flex items-center gap-5">
+          <button
+            type="button"
+            onClick={() => setConsoleTab('output')}
+            className={`text-[11px] font-extrabold uppercase tracking-wider pb-0.5 transition-all cursor-pointer bg-transparent border-0 flex items-center gap-1.5 ${consoleTab === 'output' ? 'text-emerald-400 border-b-2 border-emerald-400' : 'text-zinc-500 hover:text-zinc-300'}`}
+          >
+            <Terminal size={13} className={consoleTab === 'output' ? 'text-emerald-400' : 'text-zinc-500'} />
+            <span>{isSql ? 'Query Result Grid' : 'Console Output'}</span>
+          </button>
+
+          {isSql && expectedOutputText && (
+            <button
+              type="button"
+              onClick={() => setConsoleTab('compare')}
+              className={`text-[11px] font-extrabold uppercase tracking-wider pb-0.5 transition-all cursor-pointer bg-transparent border-0 flex items-center gap-1.5 ${consoleTab === 'compare' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-zinc-500 hover:text-zinc-300'}`}
+            >
+              <Table size={13} className={consoleTab === 'compare' ? 'text-purple-400' : 'text-zinc-500'} />
+              <span>Expected vs Actual Comparison</span>
+            </button>
+          )}
+
+          {!isSql && (
+            <button
+              type="button"
+              onClick={() => setConsoleTab('input')}
+              className={`text-[11px] font-extrabold uppercase tracking-wider pb-0.5 transition-all cursor-pointer bg-transparent border-0 ${consoleTab === 'input' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-zinc-500 hover:text-zinc-300'}`}
+            >
+              Custom Input
+            </button>
+          )}
+        </div>
+
+        {executionStatus && (
+          <div className="flex items-center gap-3.5 font-mono text-[11px]">
+            {sqlQueryResult && (
+              <span className="text-zinc-400 font-sans font-semibold">Rows: <strong className="text-emerald-400 font-mono">{sqlQueryResult.rowCount ?? sqlQueryResult.rows?.length ?? 0}</strong></span>
+            )}
+            <span className="text-zinc-400 font-sans font-semibold">Time: <strong className="text-zinc-200 font-mono">{Math.round(executionTime)}ms</strong></span>
+            <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider ${
+              executionStatus === 'Success'
+                ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/60'
+                : executionStatus === 'Syntax Error'
+                  ? 'bg-amber-950 text-amber-400 border border-amber-800/60'
+                  : 'bg-red-950 text-red-400 border border-red-800/60'
+            }`}>
+              {executionStatus}
+            </span>
+          </div>
+        )}
+      </div>
+
+      <div className="flex-1 overflow-hidden flex flex-col font-mono text-xs p-2.5">
+        {consoleTab === 'compare' && isSql ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-700 p-0.5">
+            <div className="flex flex-col gap-1.5 border border-zinc-800/90 bg-[#0a0a0a] p-2.5 rounded-xl overflow-hidden shadow-inner">
+              <span className="text-[11px] font-bold text-purple-400 uppercase tracking-wider font-sans border-b border-zinc-800/80 pb-1.5 flex items-center justify-between">
+                <span>Expected Target Output</span>
+                <span className="text-[9px] text-zinc-500">Benchmark</span>
+              </span>
+              <div className="flex-1 overflow-y-auto overflow-x-auto max-h-[195px]">
+                <ExpectedOutputTable rawOutput={expectedOutputText} />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5 border border-zinc-800/90 bg-[#0a0a0a] p-2.5 rounded-xl overflow-hidden shadow-inner">
+              <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider font-sans border-b border-zinc-800/80 pb-1.5 flex items-center justify-between">
+                <span>Actual Query Results ({sqlQueryResult?.rows?.length ?? 0} rows)</span>
+                <span className="text-[9px] text-zinc-500">AdventureWorks DB</span>
+              </span>
+              <div className="flex-1 overflow-y-auto overflow-x-auto max-h-[195px] rounded-lg border border-zinc-800/80 bg-[#0d0d0d]">
+                {sqlQueryResult && (sqlQueryResult.columns || sqlQueryResult.rows) ? (
+                  <table className="min-w-full divide-y divide-zinc-800 text-left text-xs text-zinc-200 border-collapse">
+                    <thead className="bg-[#1a1a1a] font-extrabold uppercase tracking-wider text-[10px] text-zinc-400 sticky top-0 z-10">
+                      <tr>
+                        <th className="px-2.5 py-1.5 text-zinc-500 w-8 text-center bg-[#1a1a1a] border-r border-zinc-800/60 font-sans">#</th>
+                        {sqlQueryResult.columns?.map((col, idx) => (
+                          <th key={idx} className="px-3 py-1.5 text-emerald-400 whitespace-nowrap border-r border-zinc-800/40 last:border-0 bg-[#1a1a1a] font-mono">{col}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-800/50 font-mono text-[11px] bg-[#111111]">
+                      {sqlQueryResult.rows && sqlQueryResult.rows.length > 0 ? (
+                        sqlQueryResult.rows.map((row, rowIdx) => (
+                          <tr key={rowIdx} className={`hover:bg-zinc-800/80 transition-colors ${rowIdx % 2 === 0 ? 'bg-[#121212]' : 'bg-[#181818]'}`}>
+                            <td className="px-2.5 py-1 text-zinc-500 font-sans text-[10px] text-center bg-zinc-900/50 border-r border-zinc-800/60 font-bold">{rowIdx + 1}</td>
+                            {sqlQueryResult.columns.map((col, colIdx) => (
+                              <td key={colIdx} className="px-3 py-1 whitespace-nowrap text-zinc-300 border-r border-zinc-800/30 last:border-0">
+                                {row[col] !== null && row[col] !== undefined ? String(row[col]) : <em className="text-zinc-600 font-sans italic">NULL</em>}
+                              </td>
+                            ))}
+                          </tr>
+                        ))
+                      ) : (
+                        <tr><td colSpan={(sqlQueryResult.columns?.length || 0) + 1} className="p-6 text-center text-zinc-500 font-sans italic text-xs">No records matched your criteria.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                ) : syntaxError || runtimeError ? (
+                  <div className="text-red-400 p-3 text-xs font-mono whitespace-pre-wrap">{syntaxError || runtimeError}</div>
+                ) : (
+                  <div className="p-8 text-center text-zinc-500 font-sans italic text-xs">Click <strong className="text-emerald-400 font-semibold">Execute Query</strong> below to compare Actual Output against Target Schema.</div>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : consoleTab === 'output' ? (
+          <div className="flex flex-col flex-1 h-full min-w-0 overflow-hidden">
+            {syntaxError && (
+              <div className="bg-amber-950/40 border border-amber-800/60 rounded-xl p-3 flex flex-col gap-1.5 overflow-y-auto max-h-full">
+                <span className="text-[10px] font-extrabold uppercase text-amber-400 tracking-wider font-sans">Syntax Error:</span>
+                <pre className="text-amber-300 whitespace-pre-wrap leading-relaxed font-mono">{syntaxError}</pre>
+              </div>
+            )}
+
+            {runtimeError && (
+              <div className="bg-red-950/40 border border-red-800/60 rounded-xl p-3 flex flex-col gap-1.5 overflow-y-auto max-h-full">
+                <span className="text-[10px] font-extrabold uppercase text-red-400 tracking-wider font-sans">Runtime Error:</span>
+                <pre className="text-red-300 whitespace-pre-wrap leading-relaxed font-mono">{runtimeError}</pre>
+              </div>
+            )}
+
+            {sqlQueryResult && (sqlQueryResult.columns || sqlQueryResult.rows) ? (
+              <div className="flex flex-col flex-1 h-full min-w-0 overflow-hidden">
+                <div className="flex items-center justify-between text-[11px] font-extrabold text-zinc-400 font-sans pb-2 shrink-0">
+                  <span className="text-emerald-400 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span>
+                    AdventureWorks SQL Server Result Grid (Live)
+                  </span>
+                  <span className="text-[10px] text-zinc-500 font-mono hidden sm:inline">Server: 172.176.122.4 | SSMS Studio Mode</span>
+                </div>
+                <div className="flex-1 w-full overflow-x-auto overflow-y-auto rounded-xl border border-zinc-800/90 bg-[#0d0d0d] shadow-inner scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-zinc-900">
+                  {sqlQueryResult.columns && sqlQueryResult.columns.length > 0 ? (
+                    <table className="min-w-full divide-y divide-zinc-800/80 text-left text-xs text-zinc-200 border-collapse">
+                      <thead className="bg-[#1a1a1a] font-extrabold uppercase tracking-wider text-[10px] text-zinc-400 sticky top-0 z-10 shadow-sm">
+                        <tr>
+                          <th className="px-3 py-2 text-zinc-500 w-10 text-center bg-[#1a1a1a] border-r border-zinc-800/60 font-sans">#</th>
+                          {sqlQueryResult.columns.map((col, idx) => (
+                            <th key={idx} className="px-3.5 py-2 whitespace-nowrap text-dash-primary-purple font-mono border-r border-zinc-800/40 last:border-0 bg-[#1a1a1a]">{col}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-800/50 font-mono text-[11px] bg-[#111111]">
+                        {sqlQueryResult.rows && sqlQueryResult.rows.length > 0 ? (
+                          sqlQueryResult.rows.map((row, rowIdx) => (
+                            <tr key={rowIdx} className={`hover:bg-zinc-800/80 transition-colors ${rowIdx % 2 === 0 ? 'bg-[#121212]' : 'bg-[#181818]'}`}>
+                              <td className="px-3 py-1.5 text-zinc-500 font-sans text-[10px] text-center bg-zinc-900/50 border-r border-zinc-800/60 font-bold">{rowIdx + 1}</td>
+                              {sqlQueryResult.columns.map((col, colIdx) => (
+                                <td key={colIdx} className="px-3.5 py-1.5 whitespace-nowrap text-zinc-300 border-r border-zinc-800/30 last:border-0">
+                                  {row[col] !== null && row[col] !== undefined ? String(row[col]) : <em className="text-zinc-600 font-sans italic">NULL</em>}
+                                </td>
+                              ))}
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={sqlQueryResult.columns.length + 1} className="px-4 py-8 text-center text-zinc-400 font-sans italic text-xs">
+                              Query executed successfully. Zero records matched your criteria.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="p-6 text-center text-zinc-400 font-sans italic text-xs">
+                      No records found.
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : consoleOutput && (
+              <div className="bg-zinc-900/70 border border-zinc-800 rounded-xl p-3 flex flex-col gap-1.5 overflow-y-auto max-h-full">
+                <span className="text-[10px] font-extrabold uppercase text-zinc-400 tracking-wider font-sans">Console Output:</span>
+                <pre className="text-zinc-200 whitespace-pre-wrap leading-relaxed font-mono">{consoleOutput}</pre>
+              </div>
+            )}
+
+            {!syntaxError && !runtimeError && !consoleOutput && !sqlQueryResult && !isExecuting && (
+              <div className="flex-1 flex items-center justify-center p-4 border border-dashed border-zinc-800/80 rounded-xl bg-zinc-950/40 text-center">
+                <span className="text-zinc-500 font-sans italic text-xs">
+                  Click <strong className="text-emerald-400 font-semibold">Execute Query</strong> below or in the studio toolbar to execute T-SQL against the AdventureWorks database and display live results here.
+                </span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2 h-full">
+            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider font-sans">Piped directly to script stdin:</span>
+            <textarea
+              value={customInput}
+              onChange={(e) => setCustomInput(e.target.value)}
+              placeholder="Enter custom stdin test arguments..."
+              className="w-full flex-1 p-3 bg-[#0a0a0a] border border-zinc-800 text-zinc-200 text-xs font-mono rounded-xl focus:outline-none focus:border-dash-primary-purple transition-all resize-none shadow-inner"
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
+
 const sortQuestionsForCandidate = (rawQuestions) => {
   if (!Array.isArray(rawQuestions) || rawQuestions.length === 0) return [];
 
@@ -372,7 +908,15 @@ const sortQuestionsForCandidate = (rawQuestions) => {
   return sorted;
 };
 
-const isQuestionAnswered = (q, idx, answers) => {
+const getSqlDefaultStarter = (q) => {
+  if (!q) return "-- Write your T-SQL query here against the live AdventureWorks database\nSELECT * FROM HumanResources.Employee;";
+  const schemaText = Array.isArray(q.databaseSchema) ? q.databaseSchema.join(" ") : String(q.databaseSchema || "");
+  const tableMatch = schemaText.match(/(?:CREATE\s+TABLE|--\s*(?:Table|Schema)\s*(?:table)?)\s+([a-zA-Z0-9_.\-\[\]]+)/i) || schemaText.match(/([a-zA-Z0-9_]+\.[a-zA-Z0-9_]+)/);
+  const tableName = tableMatch ? tableMatch[1] : "HumanResources.Employee";
+  return `-- Write your T-SQL query here against the live AdventureWorks database\nSELECT * FROM ${tableName};`;
+};
+
+const isQuestionAnswered = (q, idx, answers, executionOutputs = {}) => {
   if (!q || answers === undefined || answers === null) return false;
   const ans = answers[idx];
   if (ans === undefined || ans === null || ans === '') return false;
@@ -382,15 +926,23 @@ const isQuestionAnswered = (q, idx, answers) => {
     return String(ans).trim() !== '';
   }
 
-  // Default starter templates
-  const starter = q.starterCode || q.starter_code || q.codeTemplate || q.exampleCode || '';
-  const isSql = (q.subject || q.language || '').toLowerCase().includes('sql') || (q.question || '').toUpperCase().includes('SELECT');
-  const isCoding = isSql || (q.type || '').includes('CODING') || (q.subject || q.language || '').toLowerCase().includes('python');
-
+  const isSql = (q.subject || q.language || '').toLowerCase().includes('sql') || (q.question || '').toUpperCase().includes('SELECT') || (q.type || '').toUpperCase().includes('SQL');
   const trimmedAns = String(ans).trim();
+
+  if (isSql) {
+    const execOut = executionOutputs ? executionOutputs[idx] : null;
+    const isExecutedSuccess = Boolean(execOut && (execOut.executionStatus === 'Success' || (execOut.sqlQueryResult && execOut.sqlQueryResult.status === 'Success')));
+    const starter = q.starterCode || q.starter_code || q.codeTemplate || q.exampleCode || '';
+    const isStarter = starter && trimmedAns === String(starter).trim();
+    const isDefaultStarter = trimmedAns === '-- Write your SQL query here' || trimmedAns === getSqlDefaultStarter(q).trim() || trimmedAns.includes('Write your T-SQL query here');
+
+    return isExecutedSuccess && trimmedAns.length > 0 && !isStarter && !isDefaultStarter;
+  }
+
+  // Default starter templates for Python/coding
+  const starter = q.starterCode || q.starter_code || q.codeTemplate || q.exampleCode || '';
   if (starter && trimmedAns === String(starter).trim()) return false;
-  if (isSql && trimmedAns === '-- Write your SQL query here') return false;
-  if (isCoding && trimmedAns === 'def solution():\n    pass\n\nif __name__ == "__main__":\n    solution()') return false;
+  if (trimmedAns === 'def solution():\n    pass\n\nif __name__ == "__main__":\n    solution()') return false;
 
   return trimmedAns.length > 0;
 };
@@ -437,7 +989,8 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
   const [isMuted, setIsMuted] = useState(false);
   const [techRedirectCountdown, setTechRedirectCountdown] = useState(null);
   const [aiIsSpeaking, setAiIsSpeaking] = useState(false);
-  const [voiceMode, setVoiceMode] = useState(true); // default to calling mode
+  const [aiVoiceGender, setAiVoiceGender] = useState('female'); // 'female' or 'male'
+  const [autoSubmitting, setAutoSubmitting] = useState(false);
   const [englishUploading, setEnglishUploading] = useState(false);
   const [englishUploadProgress, setEnglishUploadProgress] = useState(0);
   const [englishDragOver, setEnglishDragOver] = useState(false);
@@ -445,10 +998,17 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
   const englishFileInputRef = useRef(null);
   const recognitionRef = useRef(null);
   const mediaStreamRef = useRef(null);
+  const silenceTimerRef = useRef(null);
+  const currentTextRef = useRef('');
+  const isSubmittingRef = useRef(false);
+  const isRecordingRef = useRef(false);
 
   // Stop recording and stream on unmount
   useEffect(() => {
     return () => {
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current);
+      }
       if (recognitionRef.current) {
         try { recognitionRef.current.stop(); } catch (e) { }
       }
@@ -456,6 +1016,9 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
         try {
           mediaStreamRef.current.getTracks().forEach(track => track.stop());
         } catch (e) { }
+      }
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
       }
     };
   }, []);
@@ -483,6 +1046,10 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
   // Start English Interview session
   const handleStartEnglish = async () => {
+    if (englishInterview && englishInterview.status === 'COMPLETED') {
+      showToast("You have already completed this assessment. Multiple attempts are not allowed.");
+      return;
+    }
     try {
       setEnglishLoading(true);
       setAiTyping(true);
@@ -490,13 +1057,19 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       setEnglishInterview(res.data);
       setEnglishTimeLeft(900);
       setEnglishText('');
+      currentTextRef.current = '';
+
+      // Enable Full Screen Mode on start
+      if (englishExamSecurity?.requestFullscreen) {
+        await englishExamSecurity.requestFullscreen();
+      }
 
       // Auto TTS first question if not muted
       if (res.data && res.data.ai_question && !isMuted) {
         setTimeout(() => speakQuestion(res.data.ai_question), 800);
       }
 
-      showToast("English Interview started! Welcome aboard.");
+      showToast("English Interview started!");
     } catch (err) {
       console.error("Failed to start English Assessment:", err);
       const errMsg = err.response?.data?.detail || "Failed to start interview. Make sure your technical assessment is completed.";
@@ -509,8 +1082,15 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
   // Submit Answer to current question
   const handleRespondEnglish = async (textToSend) => {
-    const finalAnswer = (textToSend && typeof textToSend === 'string') ? textToSend : englishText;
-    if (!finalAnswer.trim()) return;
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+    const finalAnswer = (textToSend && typeof textToSend === 'string') ? textToSend : (englishText || currentTextRef.current);
+    if (!finalAnswer || !finalAnswer.trim() || isSubmittingRef.current) return;
+
+    isSubmittingRef.current = true;
+    setAutoSubmitting(true);
 
     // Stop recording if active
     if (isRecording) {
@@ -528,27 +1108,34 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       const res = await api.post('/api/english-assessment/respond', answerPayload);
 
       setEnglishText('');
+      currentTextRef.current = '';
 
       // Fetch latest status to refresh conversation list
       await fetchEnglishStatus();
 
-      showToast("Answer saved successfully!");
+      showToast("Answer recorded!");
       // Speak next question out loud if not muted
       if (res.data && res.data.ai_question && !isMuted) {
-        setTimeout(() => speakQuestion(res.data.ai_question), 800);
+        setTimeout(() => speakQuestion(res.data.ai_question), 600);
       }
     } catch (err) {
       console.error("Failed to submit English Assessment response:", err);
-      showToast("Network connection error. Retrying auto-save...");
+      const errMsg = err.response?.data?.detail || "Network connection error. Retrying auto-save...";
+      showToast(errMsg);
     } finally {
       setEnglishLoading(false);
       setAiTyping(false);
+      setAutoSubmitting(false);
+      isSubmittingRef.current = false;
     }
   };
 
   // Conclude/Complete English Interview
   const handleCompleteEnglish = async () => {
-    // Stop recording if active
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
     if (isRecording) {
       stopRecording();
     }
@@ -572,19 +1159,9 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     }
   };
 
-  // Reset and retake the English Interview
+  // Reset and retake the English Interview (Disabled - One Attempt Only)
   const handleRetryEnglish = async () => {
-    try {
-      setEnglishLoading(true);
-      await api.post('/api/english-assessment/retry');
-      showToast("English assessment reset. You can now start a new interview.");
-      await fetchEnglishStatus();
-    } catch (err) {
-      console.error("Failed to retry English interview:", err);
-      showToast("Failed to reset interview. Please try again.");
-    } finally {
-      setEnglishLoading(false);
-    }
+    showToast("You have already completed this assessment. Multiple attempts are not allowed.");
   };
 
   // Upload and parse resume specifically for English Assessment
@@ -619,16 +1196,14 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
         },
       });
 
-      showToast('Resume uploaded and analyzed successfully!');
+      showToast('Resume uploaded successfully!');
 
-      // Update candidate user state so profile contains parsed details
       setCandidate(prev => ({
         ...prev,
         resume: response.data.resume_score || 85,
         name: response.data.full_name || response.data.name || prev.name
       }));
 
-      // Immediately trigger interview start!
       await handleStartEnglish();
 
     } catch (err) {
@@ -650,7 +1225,11 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       window.speechSynthesis.cancel();
       setAiIsSpeaking(true);
 
-      // If mic is recording, temporarily stop it to avoid feedback loop
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current);
+        silenceTimerRef.current = null;
+      }
+
       if (isRecording) {
         stopRecording();
       }
@@ -660,11 +1239,35 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       utterance.lang = 'en-US';
 
       const voices = window.speechSynthesis.getVoices();
-      const englishVoice = voices.find(v => v.lang.startsWith('en') && v.name.includes('Google')) ||
-        voices.find(v => v.lang.startsWith('en')) ||
-        voices[0];
-      if (englishVoice) {
-        utterance.voice = englishVoice;
+      let selectedVoiceObj = null;
+
+      if (aiVoiceGender === 'male') {
+        selectedVoiceObj = voices.find(v => v.lang.startsWith('en') && (
+          v.name.toLowerCase().includes('male') ||
+          v.name.toLowerCase().includes('david') ||
+          v.name.toLowerCase().includes('mark') ||
+          v.name.toLowerCase().includes('guy') ||
+          v.name.toLowerCase().includes('alex') ||
+          v.name.toLowerCase().includes('daniel') ||
+          v.name.toLowerCase().includes('fred') ||
+          v.name.toLowerCase().includes('george')
+        )) || voices.find(v => v.lang.startsWith('en'));
+        utterance.pitch = 0.85;
+      } else {
+        selectedVoiceObj = voices.find(v => v.lang.startsWith('en') && (
+          v.name.toLowerCase().includes('female') ||
+          v.name.toLowerCase().includes('zira') ||
+          v.name.toLowerCase().includes('jenny') ||
+          v.name.toLowerCase().includes('samantha') ||
+          v.name.toLowerCase().includes('victoria') ||
+          v.name.toLowerCase().includes('karen') ||
+          v.name.toLowerCase().includes('google us english')
+        )) || voices.find(v => v.lang.startsWith('en'));
+        utterance.pitch = 1.05;
+      }
+
+      if (selectedVoiceObj) {
+        utterance.voice = selectedVoiceObj;
       }
 
       utterance.onstart = () => {
@@ -673,13 +1276,13 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
       utterance.onend = () => {
         setAiIsSpeaking(false);
-        // Automatically start recording when AI finishes speaking, in Voice Mode!
-        if (voiceMode && !isMuted) {
+        // Automatically activate microphone when AI finishes speaking!
+        if (!isMuted) {
           const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
           if (SpeechRecognition) {
             setTimeout(() => {
               startRecording(SpeechRecognition);
-            }, 500);
+            }, 400);
           }
         }
       };
@@ -724,29 +1327,24 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     }
   };
 
-  const startRecording = async (SpeechRecognition) => {
-    try {
-      // 1. Acquire media stream with noise suppression constraints to activate browser audio processing
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true
-          }
-        });
-        mediaStreamRef.current = stream;
-      } catch (err) {
-        console.warn("Failed to apply microphone noise suppression constraints:", err);
-      }
+  const startRecording = (SpeechRecognition) => {
+    if (isSubmittingRef.current || aiIsSpeaking) return;
 
+    if (recognitionRef.current) {
+      try { recognitionRef.current.abort(); } catch (e) { }
+      recognitionRef.current = null;
+    }
+
+    try {
       const rec = new SpeechRecognition();
-      rec.continuous = true; // Continuous listening, no silence-based auto-stop
-      rec.interimResults = true; // Show words as candidate speaks
+      rec.continuous = true;
+      rec.interimResults = true;
       rec.lang = 'en-US';
 
       rec.onstart = () => {
+        console.log("[STT] Speech Recognition active");
         setIsRecording(true);
+        isRecordingRef.current = true;
         setVoiceUsed(true);
       };
 
@@ -760,30 +1358,73 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
             interimTranscript += event.results[i][0].transcript;
           }
         }
-        const text = localFinalTranscript + interimTranscript;
+        const text = (localFinalTranscript + interimTranscript).trim();
+        console.log("[STT Live Text]:", text);
         setEnglishText(text);
+        currentTextRef.current = text;
+
+        if (text.length > 0) {
+          if (silenceTimerRef.current) {
+            clearTimeout(silenceTimerRef.current);
+          }
+          // Automatically submit candidate response after 2.2 seconds of silence
+          silenceTimerRef.current = setTimeout(() => {
+            if (currentTextRef.current && currentTextRef.current.trim().length > 0 && !isSubmittingRef.current) {
+              console.log("[English Assessment] Silence detected! Auto-submitting response...");
+              handleRespondEnglish(currentTextRef.current);
+            }
+          }, 2200);
+        }
       };
 
       rec.onerror = (e) => {
-        console.error("Speech Recognition Error:", e.error);
+        console.warn("[STT Error]:", e.error);
+        if (e.error === 'no-speech') {
+          // Ignore no-speech error; stay active so user can speak whenever ready
+          return;
+        }
+        if (e.error === 'aborted') {
+          return;
+        }
         setIsRecording(false);
+        isRecordingRef.current = false;
       };
 
       rec.onend = () => {
-        setIsRecording(false);
+        console.log("[STT End]");
+        // Auto-restart if candidate is still in recording mode and AI is not speaking
+        if (isRecordingRef.current && !isSubmittingRef.current && !aiIsSpeaking) {
+          try {
+            rec.start();
+          } catch (err) {
+            console.warn("STT auto-restart error:", err);
+            setIsRecording(false);
+            isRecordingRef.current = false;
+          }
+        } else {
+          setIsRecording(false);
+          isRecordingRef.current = false;
+        }
       };
 
       recognitionRef.current = rec;
+      isRecordingRef.current = true;
       rec.start();
     } catch (e) {
-      console.error(e);
+      console.error("[STT Exception]:", e);
       setIsRecording(false);
+      isRecordingRef.current = false;
     }
   };
 
   const stopRecording = () => {
+    isRecordingRef.current = false;
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
     if (recognitionRef.current) {
-      recognitionRef.current.stop();
+      try { recognitionRef.current.stop(); } catch (e) { }
       recognitionRef.current = null;
     }
     if (mediaStreamRef.current) {
@@ -827,6 +1468,16 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
   const [assignments, setAssignments] = useState([]);
   const [loadingAssignments, setLoadingAssignments] = useState(true);
   const [activeAssignment, setActiveAssignment] = useState(null);
+
+  const handleOpenInstructions = (assignment) => {
+    const asm = assignment?.assessment || assignment || {};
+    const startTimeVal = assignment?.startTime || assignment?.start_time || asm?.startTime || asm?.start_time;
+    if (startTimeVal && new Date(startTimeVal).getTime() > Date.now()) {
+      showToast("This assessment is not available yet. Please wait until the scheduled time.");
+      return;
+    }
+    handleStartExam(assignment);
+  };
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [readNotifications, setReadNotifications] = useState(() => {
@@ -891,11 +1542,177 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     currentQuestionIndex: 0,
     answers: {},
     executionOutputs: {},
+    visitedQuestions: { 0: true },
     timeLeft: 0,
     submitted: false
   });
 
   const prevQuestionIndexRef = useRef(examState.currentQuestionIndex);
+  const sqlCompletionProviderRef = useRef(null);
+  const liveSchemaRef = useRef(null);
+  const resultGridRef = useRef(null);
+  const [liveSchemaMap, setLiveSchemaMap] = useState(null);
+
+  const scrollToResults = () => {
+    setTimeout(() => {
+      if (resultGridRef.current) {
+        resultGridRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        try { resultGridRef.current.focus({ preventScroll: false }); } catch (e) {}
+      }
+    }, 150);
+  };
+
+  useEffect(() => {
+    // Automatically connect and cache live database schema metadata for assessment session
+    const fetchLiveSchema = async () => {
+      try {
+        const res = await api.get('/api/assessment/live-schema');
+        if (res.data && res.data.tables_map) {
+          liveSchemaRef.current = res.data.tables_map;
+          setLiveSchemaMap(res.data.tables_map);
+          console.info("[Candidate Dashboard] Cached Live Database schema metadata for SQL Editor autocomplete & schema viewer.");
+        }
+      } catch (err) {
+        console.error("Could not load live SQL schema metadata:", err);
+      }
+    };
+    if (activeTab === 'technical' && activeAssignment) {
+      fetchLiveSchema();
+    }
+  }, [activeTab, activeAssignment]);
+
+  const handleEditorDidMount = (editor, monaco) => {
+    if (sqlCompletionProviderRef.current) {
+      try { sqlCompletionProviderRef.current.dispose(); } catch (_e) {}
+    }
+
+    sqlCompletionProviderRef.current = monaco.languages.registerCompletionItemProvider('sql', {
+      triggerCharacters: ['.', ' ', '\n', '\t', '\r'],
+      provideCompletionItems: (model, position) => {
+        const textUntilPosition = model.getValueInRange({
+          startLineNumber: position.lineNumber,
+          startColumn: 1,
+          endLineNumber: position.lineNumber,
+          endColumn: position.column
+        });
+
+        const word = model.getWordUntilPosition(position);
+        const range = {
+          startLineNumber: position.lineNumber,
+          endLineNumber: position.lineNumber,
+          startColumn: word.startColumn,
+          endColumn: word.endColumn
+        };
+
+        const schemaMap = liveSchemaRef.current || {};
+        const suggestions = [];
+
+        // Check if user is typing after a dot: e.g. "HumanResources." or "HumanResources.Employee." or "Employee."
+        const match = textUntilPosition.match(/([a-zA-Z0-9_]+)\.(?:([a-zA-Z0-9_]+)\.)?$/);
+        
+        if (match) {
+          const part1 = match[1]; // e.g. "HumanResources" or "Employee"
+          const part2 = match[2]; // e.g. "Employee" if typing "HumanResources.Employee."
+
+          if (part2) {
+            // Case 3: Typed Schema.Table. -> suggest available columns of that table
+            const fullTab = `${part1}.${part2}`;
+            const tabInfo = schemaMap[fullTab] || Object.values(schemaMap).find(t => t.table.toLowerCase() === part2.toLowerCase() && t.schema.toLowerCase() === part1.toLowerCase());
+            if (tabInfo && Array.isArray(tabInfo.columns)) {
+              tabInfo.columns.forEach(col => {
+                suggestions.push({
+                  label: col.name,
+                  kind: monaco.languages.CompletionItemKind.Field,
+                  insertText: col.name,
+                  detail: `${col.type} ${col.is_pk ? '(PK)' : ''} - Column in ${fullTab}`,
+                  documentation: `Column of table ${fullTab}`,
+                  range: range
+                });
+              });
+            }
+          } else {
+            // Case 2: Typed Part1. -> Part1 could be a Schema (propose Tables in that schema) OR a Table (propose Columns)
+            const matchedSchemaTables = Object.values(schemaMap).filter(t => t.schema.toLowerCase() === part1.toLowerCase());
+            if (matchedSchemaTables.length > 0) {
+              matchedSchemaTables.forEach(t => {
+                suggestions.push({
+                  label: t.table,
+                  kind: monaco.languages.CompletionItemKind.Class,
+                  insertText: t.table,
+                  detail: `Table in schema ${t.schema}`,
+                  documentation: `Table ${t.schema}.${t.table} in live AdventureWorks database`,
+                  range: range
+                });
+              });
+            }
+
+            // Also check if part1 is a table name (without schema prefix)
+            const matchedTableInfo = Object.values(schemaMap).find(t => t.table.toLowerCase() === part1.toLowerCase());
+            if (matchedTableInfo && Array.isArray(matchedTableInfo.columns)) {
+              matchedTableInfo.columns.forEach(col => {
+                suggestions.push({
+                  label: col.name,
+                  kind: monaco.languages.CompletionItemKind.Field,
+                  insertText: col.name,
+                  detail: `${col.type} ${col.is_pk ? '(PK)' : ''} - Column in ${matchedTableInfo.schema}.${matchedTableInfo.table}`,
+                  documentation: `Column of table ${matchedTableInfo.schema}.${matchedTableInfo.table}`,
+                  range: range
+                });
+              });
+            }
+          }
+        } else {
+          // Case 1: Typing freely -> suggest available schemas (HumanResources, Person, Sales, Production, Purchasing, dbo, etc.), tables, and SQL keywords
+          const schemasSet = new Set(Object.values(schemaMap).map(t => t.schema));
+          ['HumanResources', 'Person', 'Sales', 'Production', 'Purchasing', 'dbo'].forEach(s => schemasSet.add(s));
+          
+          schemasSet.forEach(s => {
+            suggestions.push({
+              label: s,
+              kind: monaco.languages.CompletionItemKind.Module,
+              insertText: s,
+              detail: `Schema in AdventureWorks database`,
+              documentation: `SQL Server database schema: ${s}`,
+              range: range
+            });
+          });
+
+          // Suggest fully qualified table names
+          Object.entries(schemaMap).forEach(([fullName, t]) => {
+            suggestions.push({
+              label: fullName,
+              kind: monaco.languages.CompletionItemKind.Struct,
+              insertText: fullName,
+              detail: `Table (${t.columns?.length || 0} columns)`,
+              documentation: `Fully qualified table name in AdventureWorks`,
+              range: range
+            });
+            suggestions.push({
+              label: t.table,
+              kind: monaco.languages.CompletionItemKind.Class,
+              insertText: `${t.schema}.${t.table}`,
+              detail: `Table in ${t.schema}`,
+              documentation: `Auto-completes to fully qualified T-SQL name: ${t.schema}.${t.table}`,
+              range: range
+            });
+          });
+
+          // Standard T-SQL keywords
+          ['SELECT', 'FROM', 'WHERE', 'JOIN', 'LEFT JOIN', 'RIGHT JOIN', 'INNER JOIN', 'ON', 'GROUP BY', 'ORDER BY', 'HAVING', 'DESC', 'ASC', 'TOP', 'DISTINCT', 'WITH', 'AS', 'AND', 'OR', 'NOT', 'IN', 'IS NULL', 'IS NOT NULL', 'COUNT', 'SUM', 'AVG', 'MIN', 'MAX', 'BETWEEN', 'LIKE'].forEach(kw => {
+            suggestions.push({
+              label: kw,
+              kind: monaco.languages.CompletionItemKind.Keyword,
+              insertText: kw,
+              detail: 'T-SQL Keyword',
+              range: range
+            });
+          });
+        }
+
+        return { suggestions };
+      }
+    });
+  };
 
   // Sync compiler output state and starter code when navigating between questions
   useEffect(() => {
@@ -959,7 +1776,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       let starter = question.starterCode || question.starter_code || question.codeTemplate || question.exampleCode || null;
       if (!starter) {
         if (isSql) {
-          starter = '-- Write your SQL query here\n';
+          starter = getSqlDefaultStarter(question);
         } else if (isCoding) {
           starter = `def solution():\n    pass\n\nif __name__ == "__main__":\n    solution()`;
         } else {
@@ -979,7 +1796,26 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     prevQuestionIndexRef.current = currentIdx;
   }, [examState.currentQuestionIndex, activeAssignment]);
 
-  const isExamActive = !!(activeAssignment && !examState.submitted && activeTab === 'technical' && !isSubmitModalOpen && !isSubmittingManual);
+  // Automatically mark current question as visited as soon as candidate opens or navigates to it
+  useEffect(() => {
+    if (activeAssignment && !examState.submitted && activeTab === 'technical' && examState.currentQuestionIndex !== undefined && examState.currentQuestionIndex !== null) {
+      const idx = examState.currentQuestionIndex;
+      setExamState(prev => {
+        if (prev.visitedQuestions && prev.visitedQuestions[idx]) {
+          return prev;
+        }
+        return {
+          ...prev,
+          visitedQuestions: {
+            ...(prev.visitedQuestions || {}),
+            [idx]: true
+          }
+        };
+      });
+    }
+  }, [examState.currentQuestionIndex, activeAssignment, examState.submitted, activeTab]);
+
+  const isExamActive = !!(activeAssignment && !examState.submitted && activeTab === 'technical');
 
   const parseDuration = (durStr) => {
     if (typeof durStr === 'number') return durStr;
@@ -1016,9 +1852,45 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     }
   });
 
-  // Lock body scroll when active in assessment
+  // Initialize Exam Security hook for English Communication Assessment
+  const isEnglishActive = activeTab === 'english' && englishInterview && englishInterview.status === 'IN_PROGRESS';
+
+  const englishExamSecurity = useExamSecurity({
+    active: isEnglishActive,
+    assignmentId: englishInterview?.assignment_id || activeAssignment?.id || activeAssignment?.assignmentId,
+    questionNumber: (englishInterview?.conversations?.length || 0) + 1,
+    remainingTime: formatTime(englishTimeLeft),
+    maxViolations: 3,
+    maxWarnings: 3,
+    gracePeriodSeconds: 15,
+    onLock: (reason) => {
+      showToast(`Security Alert: ${reason}`);
+    },
+    onViolation: (violation) => {
+      showToast(`Security Warning: ${violation.type} - ${violation.description}`);
+    }
+  });
+
+  // Auto-submit English Assessment on 4th proctoring violation
   useEffect(() => {
-    if (isExamActive) {
+    if (isEnglishActive && englishExamSecurity.autoSubmittedDueToViolations) {
+      handleCompleteEnglish();
+    }
+  }, [isEnglishActive, englishExamSecurity.autoSubmittedDueToViolations]);
+
+  // Request fullscreen when English assessment starts or resumes in progress
+  useEffect(() => {
+    if (isEnglishActive) {
+      englishExamSecurity.requestFullscreen();
+    }
+  }, [isEnglishActive]);
+
+  // Hide navigation bar when Technical Assessment is active or when English Assessment is in Full-Screen mode
+  const hideNavigation = isExamActive || (isEnglishActive && englishExamSecurity.isFullscreen);
+
+  // Lock body scroll when active in technical or english assessment
+  useEffect(() => {
+    if (isExamActive || (isEnglishActive && englishExamSecurity.isFullscreen)) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = 'auto';
@@ -1026,14 +1898,30 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     return () => {
       document.body.style.overflow = 'auto';
     };
-  }, [isExamActive]);
+  }, [isExamActive, isEnglishActive, englishExamSecurity.isFullscreen]);
 
   const fetchAssignments = async () => {
     try {
       setLoadingAssignments(true);
       const response = await api.get('/api/assignments/candidate');
       if (Array.isArray(response.data)) {
-        setAssignments(response.data);
+        const seenIds = new Set();
+        const seenAssessmentIds = new Set();
+        const deduplicated = response.data.filter(asm => {
+          if (!asm) return false;
+          const idKey = asm.id ? String(asm.id) : null;
+          const asmIdKey = (asm.assessment_id || asm.assessmentId || asm.assessment?.id)
+            ? String(asm.assessment_id || asm.assessmentId || asm.assessment?.id)
+            : null;
+
+          if (idKey && seenIds.has(idKey)) return false;
+          if (asmIdKey && seenAssessmentIds.has(asmIdKey)) return false;
+
+          if (idKey) seenIds.add(idKey);
+          if (asmIdKey) seenAssessmentIds.add(asmIdKey);
+          return true;
+        });
+        setAssignments(deduplicated);
       } else {
         setAssignments([]);
       }
@@ -1064,7 +1952,10 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                 saved.examState.timeLeft = Math.max(0, saved.examState.timeLeft - elapsedSeconds);
               }
               setActiveAssignment(saved.assignment);
-              setExamState(saved.examState);
+              setExamState({
+                ...saved.examState,
+                visitedQuestions: saved.examState.visitedQuestions || { [saved.examState.currentQuestionIndex || 0]: true }
+              });
               setActiveTab('technical');
               break;
             }
@@ -1164,7 +2055,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
         if (starter) {
           initialAnswers[idx] = starter;
         } else if (isSql) {
-          initialAnswers[idx] = '-- Write your SQL query here\n';
+          initialAnswers[idx] = getSqlDefaultStarter(q);
         } else if (isCoding) {
           initialAnswers[idx] = `def solution():\n    pass\n\nif __name__ == "__main__":\n    solution()`;
         } else {
@@ -1190,6 +2081,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
         currentQuestionIndex: 0,
         answers: initialAnswers,
         executionOutputs: {},
+        visitedQuestions: { 0: true },
         timeLeft: parseDuration(asm.duration || "30") * 60,
         submitted: false
       });
@@ -1215,18 +2107,27 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
   };
 
   const handleSubmitExam = async (assignmentIdOverride, securityMetadata = {}) => {
-    const targetId = assignmentIdOverride || activeAssignment?.id || activeAssignment?.assignmentId || activeAssignment?._id;
+    // If string passed (or object from proctoring), use string or fallback to activeAssignment ID
+    const targetId = (typeof assignmentIdOverride === 'string' ? assignmentIdOverride : null) || activeAssignment?.id || activeAssignment?.assignmentId || activeAssignment?._id;
     if (!targetId) {
       console.error("No active target assignment ID found for submission.");
       showToast("Error: No active assignment ID found.");
       return;
     }
 
-    if (isSubmittingManual) {
+    if (isSubmittingManual || examState.submitted) {
       return;
     }
 
+    // 1. Immediately disable submit button to prevent duplicate clicks
     setIsSubmittingManual(true);
+
+    // 2. Instantly display success toast notification
+    showToast("Assessment submitted successfully.");
+
+    // 3. Immediately transition UI state to submitted and close modal
+    setExamState(prev => ({ ...prev, submitted: true }));
+    setIsSubmitModalOpen(false);
 
     try {
       try {
@@ -1257,31 +2158,57 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
         warningHistory: securityMetadata?.warningHistory || examSecurity?.warningHistory || []
       };
 
-      await api.post('/api/assessment/submit', payload);
+      // 4. Perform actual assessment submission asynchronously in the background
+      api.post('/api/assessment/submit', payload)
+        .then(() => {
+          fetchAssignments();
+        })
+        .catch(err => {
+          console.error("Background assessment submission log:", err);
+          const status = err.response?.status;
+          const detail = err?.response?.data?.detail;
+          const errMsg = typeof detail === 'string' ? detail : (detail?.message || "Error submitting assessment. Please try again.");
+          showToast(errMsg);
 
-      setExamState(prev => ({ ...prev, submitted: true }));
-      setIsSubmitModalOpen(false);
-      await fetchAssignments();
+          // If the assignment is missing, unauthorized, or expired, clean up local storage and exit technical view
+          if (status === 404 || status === 403 || (status === 400 && String(errMsg).toLowerCase().includes("expire"))) {
+            try {
+              localStorage.removeItem(`recruitai_active_exam_${targetId}`);
+            } catch (_e) { }
+            setActiveAssignment(null);
+            setExamState(null);
+            setActiveTab('dashboard');
+          }
+        })
+        .finally(() => {
+          setIsSubmittingManual(false);
+        });
+
     } catch (err) {
-      console.error("Failed to submit exam:", err);
-      const status = err.response?.status;
-      const detail = err?.response?.data?.detail;
-      const errMsg = typeof detail === 'string' ? detail : (detail?.message || "Error submitting assessment. Please try again.");
-      showToast(errMsg);
-
-      // If the assignment is missing, unauthorized, or expired, clean up local storage and exit technical view
-      if (status === 404 || status === 403 || (status === 400 && String(errMsg).toLowerCase().includes("expire"))) {
-        try {
-          localStorage.removeItem(`recruitai_active_exam_${targetId}`);
-        } catch (_e) { }
-        setActiveAssignment(null);
-        setExamState(null);
-        setActiveTab('dashboard');
-      }
-    } finally {
+      console.error("Failed to prepare submission payload:", err);
       setIsSubmittingManual(false);
     }
   };
+
+  useEffect(() => {
+    if (examState.executionOutputs && examState.executionOutputs[examState.currentQuestionIndex]) {
+      const saved = examState.executionOutputs[examState.currentQuestionIndex];
+      setConsoleOutput(saved.consoleOutput || '');
+      setRuntimeError(saved.runtimeError || '');
+      setSyntaxError(saved.syntaxError || '');
+      setExecutionTime(saved.executionTime || 0);
+      setExecutionStatus(saved.executionStatus || '');
+      setSqlQueryResult(saved.sqlQueryResult || null);
+      if (saved.customInput !== undefined) setCustomInput(saved.customInput);
+    } else {
+      setConsoleOutput('');
+      setRuntimeError('');
+      setSyntaxError('');
+      setExecutionTime(0);
+      setExecutionStatus('');
+      setSqlQueryResult(null);
+    }
+  }, [examState.currentQuestionIndex]);
 
   const handleRunCode = async (currentCode, currentQuestion) => {
     if (!currentCode) return;
@@ -1349,45 +2276,76 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
         const res = await api.post('/run-sql', payload);
         const data = res.data;
 
-        if (data.status === 'Success' && Array.isArray(data.rows)) {
-          let tableText = `Query Executed Successfully! (${data.rowCount} rows, ${data.executionTime}ms)\n\n`;
-          if (data.columns && data.columns.length > 0) {
-            tableText += data.columns.join(' | ') + '\n';
-            tableText += data.columns.map(() => '---').join('-|-') + '\n';
-            data.rows.slice(0, 50).forEach(row => {
-              tableText += data.columns.map(col => String(row[col] ?? '')).join(' | ') + '\n';
-            });
-            if (data.rows.length > 50) {
-              tableText += `\n... ${data.rows.length - 50} more rows truncated.`;
-            }
+        const isSuccess = data.status === 'Success' || data.success === true;
+        if (isSuccess && !data.runtime_error && !data.syntax_error) {
+          const rows = Array.isArray(data.rows) ? data.rows : (Array.isArray(data.output?.rows) ? data.output.rows : []);
+          let cols = Array.isArray(data.columns) && data.columns.length > 0
+            ? data.columns
+            : (Array.isArray(data.output?.columns) && data.output.columns.length > 0 ? data.output.columns : []);
+          if (cols.length === 0 && rows.length > 0 && typeof rows[0] === 'object' && rows[0] !== null) {
+            cols = Object.keys(rows[0]);
           }
-          setSqlQueryResult(data);
-          setConsoleOutput(tableText);
+
+          const execTime = data.executionTime ?? data.output?.executionTime ?? 0;
+          const rowCount = data.rowCount ?? data.output?.rowCount ?? rows.length;
+
+          const sqlData = {
+            ...data,
+            columns: cols,
+            rows: rows,
+            rowCount: rowCount,
+            executionTime: execTime,
+            query: currentCode,
+            status: 'Success'
+          };
+
+          const successMsg = "Query executed successfully.";
+          setSqlQueryResult(sqlData);
+          setConsoleOutput(successMsg);
           setRuntimeError('');
           setSyntaxError('');
-          setExecutionTime((data.executionTime || 0) / 1000);
+          setExecutionTime(execTime);
           setExecutionStatus('Success');
 
           setExamState(prev => ({
             ...prev,
+            answers: {
+              ...(prev.answers || {}),
+              [examState.currentQuestionIndex]: currentCode
+            },
             executionOutputs: {
               ...(prev.executionOutputs || {}),
               [examState.currentQuestionIndex]: {
-                consoleOutput: tableText,
+                consoleOutput: successMsg,
                 runtimeError: '',
                 syntaxError: '',
-                executionTime: (data.executionTime || 0) / 1000,
+                executionTime: execTime,
                 executionStatus: 'Success',
-                sqlQueryResult: data,
+                sqlQueryResult: sqlData,
                 customInput,
-                consoleTab: 'output'
+                consoleTab: 'output',
+                timestamp: Date.now()
               }
             }
           }));
+
+          // Non-blocking background auto-save to backend
+          const activeAsmId = activeAssignment?.assessment_id || activeAssignment?.assessment?.id;
+          const currentQ = currentQuestion;
+          const qId = String(currentQ?.id || currentQ?.question || currentQ?.title || examState.currentQuestionIndex);
+          if (activeAsmId) {
+            api.post('/api/assessment/submit-code', {
+              assessmentId: activeAsmId,
+              questionId: qId,
+              code: currentCode,
+              assignmentId: activeAssignment?.id
+            }).catch(e => console.warn("[AutoSave] Background SQL answer auto-save notice:", e));
+          }
         } else {
-          const rErr = data.runtime_error || 'SQL Query Execution Error';
+          const rErr = data.runtime_error || data.error || 'SQL Query Execution Error';
           const sErr = data.syntax_error || '';
-          const exTime = (data.executionTime || 0) / 1000;
+          const exTime = data.executionTime || 0;
+          // IMPORTANT: Set sqlQueryResult to null when error occurs so empty grid doesn't display under error message!
           setSqlQueryResult(null);
           setConsoleOutput('');
           setRuntimeError(rErr);
@@ -1437,6 +2395,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
         }));
       } finally {
         setIsExecuting(false);
+        scrollToResults();
       }
       return;
     }
@@ -1504,6 +2463,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       }));
     } finally {
       setIsExecuting(false);
+      scrollToResults();
     }
   };
 
@@ -1547,7 +2507,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       const isCoding = q && (q.type === 'CODING' || q.type === 'PYTHON_CODING' || (q.subject || '').toLowerCase().includes('python'));
       const starter = q?.starterCode || q?.starter_code || q?.codeTemplate || q?.exampleCode;
       const template = starter || (isSql
-        ? '-- Write your SQL query here\n'
+        ? getSqlDefaultStarter(q)
         : isCoding
           ? `def solution():\n    pass\n\nif __name__ == "__main__":\n    solution()`
           : '');
@@ -1783,7 +2743,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       </AnimatePresence>
 
       {/* 1. SIDEBAR (Full-Height Solid Layout matching Recruiter) */}
-      {!isExamActive && (
+      {!hideNavigation && (
         <aside className="hidden lg:flex flex-col w-[260px] h-screen shrink-0 bg-dash-sidebar-bg pt-8 pb-8 pl-6 pr-0 relative z-30 text-dash-dark-purple shadow-[4px_0_24px_rgba(0,0,0,0.03)] justify-between">
           <div>
             {/* Branding */}
@@ -1861,7 +2821,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       )}
 
       {/* Mobile Sidebar Backdrop & Content */}
-      {!isExamActive && (
+      {!hideNavigation && (
         <>
           <AnimatePresence>
             {sidebarOpen && (
@@ -1964,9 +2924,9 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       )}
 
       {/* 2. MAIN WORKSPACE */}
-      <main className={isExamActive ? "fixed inset-0 z-40 bg-dash-light-blue-bg overflow-hidden flex flex-col p-4 sm:p-6 lg:p-8 w-screen h-screen" : "flex-1 min-w-0 p-4 sm:p-6 lg:p-8 flex flex-col gap-6 relative z-20 overflow-y-auto h-screen max-h-screen"}>
+      <main className={hideNavigation ? "fixed inset-0 z-40 bg-dash-light-blue-bg overflow-hidden flex flex-col p-4 sm:p-6 lg:p-8 w-screen h-screen" : "flex-1 min-w-0 p-4 sm:p-6 lg:p-8 flex flex-col gap-6 relative z-20 overflow-y-auto h-screen max-h-screen"}>
         {/* HEADER SECTION (Horizontal White Card style) */}
-        {!isExamActive && (
+        {!hideNavigation && (
           <header className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-5 px-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-2 lg:mt-0 shadow-[0_4px_20px_rgba(87,82,170,0.03)]">
             <div className="flex items-center gap-3">
               {/* Hamburger menu for small screens */}
@@ -2054,7 +3014,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                                       onClick={() => {
                                         setShowNotifications(false);
                                         setActiveTab('technical');
-                                        handleStartExam(notif.assignment);
+                                        handleOpenInstructions(notif.assignment);
                                       }}
                                       className="px-2.5 py-1 bg-dash-primary-purple text-white text-[9px] font-extrabold rounded-lg border-0 cursor-pointer hover:bg-dash-dark-purple transition-all"
                                     >
@@ -2193,13 +3153,14 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                           );
                         }
                         return (
-                          <button
-                            onClick={() => handleStartExam(assignment)}
-                            className="w-full py-3 rounded-xl bg-dash-primary-purple text-dash-white-card font-bold text-sm hover:bg-dash-dark-purple transition-all duration-200 shadow-md cursor-pointer border-0 flex items-center justify-center gap-2"
+                          <ActionButton
+                            onClick={() => handleOpenInstructions(assignment)}
+                            icon={Play}
+                            iconSize={14}
+                            className="w-full py-3 rounded-xl bg-dash-primary-purple text-dash-white-card font-bold text-sm hover:bg-dash-dark-purple shadow-md"
                           >
-                            <Play size={14} />
-                            <span>{isInProgress ? 'Resume Assessment' : 'Start Assessment'}</span>
-                          </button>
+                            {isInProgress ? 'Resume Technical Assessment' : 'Start Technical Assessment'}
+                          </ActionButton>
                         );
                       })()}
                     </div>
@@ -2273,8 +3234,8 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
           const phaseTotalQuestions = isMcqPhase ? totalMcqs : totalScenarios;
           const currentTopic = question.topic || question.subject || "General";
-          const answeredCount = questions.filter((q, idx) => isQuestionAnswered(q, idx, examState.answers)).length;
-          const overallProgressPercent = questions.length > 0 ? Math.round((answeredCount / questions.length) * 100) : 0;
+          const visitedCount = questions.filter((q, idx) => Boolean(examState.visitedQuestions?.[idx])).length;
+          const overallProgressPercent = questions.length > 0 ? Math.round((visitedCount / questions.length) * 100) : 0;
 
           const hasOptions = question && Array.isArray(question.options) && question.options.length > 0;
           const isSql = !hasOptions && question ? (((question.type === 'SCENARIO' || question.type === 'SCENARIO_CODING' || question.type === 'CODING') && (question.subject || question.language || '').toLowerCase() === 'sql') || (question.question || '').toUpperCase().includes('SELECT')) : false;
@@ -2290,40 +3251,83 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
           const hasNext = currentIdx < questions.length - 1;
 
           return (
-            <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 items-start animate-fade-in w-full">
+            <div className="flex flex-col gap-4 animate-fade-in w-full select-none">
 
-              {/* LEFT: Navigator & Progress Side */}
-              <div className="xl:col-span-1 bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-5 shadow-[0_4px_20px_rgba(87,82,170,0.02)] flex flex-col gap-6">
-
-                {/* Header Timer */}
-                <div className="flex flex-col gap-1 text-center bg-dash-soft-pink border border-dash-border-gray/50 rounded-2xl p-4">
-                  <span className="text-[10px] font-bold text-dash-light-purple uppercase tracking-wider">Time Remaining</span>
-                  <span className="font-plus-jakarta font-extrabold text-2xl text-red-600 font-mono tracking-wider">
-                    {formatTime(examState.timeLeft)}
+              {/* TOP HEADER BAR: Assessment Title, Topic, Timer, Progress & Top-Right Submit Button */}
+              <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-2xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
+                
+                {/* Title & Phase/Topic */}
+                <div className="flex items-center gap-3">
+                  <span className="px-3 py-1 rounded-xl text-[11px] font-black uppercase tracking-wider bg-dash-primary-purple text-white shadow-xs">
+                    {currentPhaseLabel}
                   </span>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-extrabold text-dash-dark-purple flex items-center gap-1.5">
+                      <span className="text-slate-400 font-bold">Topic:</span>
+                      <span className="text-dash-primary-purple">{currentTopic}</span>
+                    </span>
+                    <span className="text-[11px] font-bold text-slate-500">
+                      Question {currentIdx + 1} of {questions.length} (Sequence #{question.sequence_order || currentIdx + 1})
+                    </span>
+                  </div>
                 </div>
 
-                {/* Questions Grid Selector Grouped by Phase */}
-                <div className="flex flex-col gap-4">
+                {/* Timer & Overall Progress */}
+                <div className="flex items-center gap-5 flex-wrap">
+                  {/* Timer Box */}
+                  <div className="flex items-center gap-2 bg-dash-soft-pink border border-dash-border-gray/50 rounded-xl px-3.5 py-1.5 shadow-2xs">
+                    <span className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider">Time Remaining:</span>
+                    <span className="font-plus-jakarta font-extrabold text-xl text-red-600 font-mono tracking-wider">
+                      {formatTime(examState.timeLeft)}
+                    </span>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="hidden md:flex items-center gap-3 border-l border-slate-200/80 pl-4">
+                    <div className="flex flex-col items-end">
+                      <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">Overall Progress</span>
+                      <span className="text-xs font-extrabold text-dash-primary-purple">{overallProgressPercent}% ({visitedCount}/{questions.length})</span>
+                    </div>
+                    <div className="w-20 h-2.5 rounded-full bg-slate-200 overflow-hidden shrink-0">
+                      <div className="h-full bg-dash-primary-purple rounded-full transition-all duration-300" style={{ width: `${overallProgressPercent}%` }} />
+                    </div>
+                  </div>
+
+                  {/* TOP-RIGHT CORNER: Submit Assessment Button */}
+                  <button
+                    onClick={() => setIsSubmitModalOpen(true)}
+                    className="py-2 px-4 rounded-xl border border-red-200 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs shadow-sm transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.02]"
+                  >
+                    <CheckCircle2 size={15} />
+                    <span>Submit Assessment</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* HORIZONTAL QUESTION NUMBER NAVIGATION BAR (Clean Single Line Alignment) */}
+              <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-2xl px-4 py-2.5 shadow-2xs flex flex-wrap lg:flex-nowrap items-center justify-between gap-3 overflow-x-auto dashboard-scrollbar">
+                <div className="flex items-center gap-3 overflow-x-auto py-0.5 dashboard-scrollbar flex-1">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 shrink-0 flex items-center gap-1.5 mr-1">
+                    <ListOrdered size={15} className="text-dash-primary-purple" />
+                    <span>Navigator:</span>
+                  </span>
+
                   {totalMcqs > 0 && (
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Phase 1 – MCQs ({totalMcqs})</h4>
-                        {isMcqPhase && <span className="text-[9px] font-extrabold px-2 py-0.5 rounded-md bg-purple-100 text-purple-700">Active</span>}
-                      </div>
-                      <div className="grid grid-cols-4 gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-[9px] font-black text-purple-700 bg-purple-100 px-2 py-1 rounded-md uppercase tracking-wider shrink-0">Phase 1 (MCQ)</span>
+                      <div className="flex items-center gap-1.5">
                         {mcqQuestions.map((q, idx) => {
                           const isCurrent = idx === currentIdx;
-                          const isAnswered = isQuestionAnswered(q, idx, examState.answers);
+                          const isVisited = Boolean(examState.visitedQuestions?.[idx]);
                           return (
                             <button
                               key={idx}
                               onClick={() => setExamState(prev => ({ ...prev, currentQuestionIndex: idx }))}
-                              className={`w-10 h-10 rounded-xl font-extrabold text-xs flex items-center justify-center cursor-pointer border transition-all duration-200 ${isCurrent
-                                ? 'bg-dash-primary-purple text-white border-dash-primary-purple shadow-sm'
-                                : isAnswered
-                                  ? 'bg-dash-success-green/10 text-dash-success-green border-[#22c55e]/20 hover:bg-dash-success-green/20'
-                                  : 'bg-dash-soft-pink border border-dash-border-gray/50 text-dash-light-purple hover:bg-dash-border-gray'
+                              className={`w-8 h-8 rounded-lg font-extrabold text-xs flex items-center justify-center cursor-pointer border transition-all duration-200 shrink-0 ${isCurrent
+                                ? 'bg-dash-primary-purple text-white border-dash-primary-purple shadow-sm scale-105'
+                                : isVisited
+                                  ? 'bg-dash-success-green/10 text-dash-success-green border-[#22c55e]/30 hover:bg-dash-success-green/20'
+                                  : 'bg-slate-100 border-slate-200/80 text-slate-600 hover:bg-slate-200/70'
                                 }`}
                             >
                               {idx + 1}
@@ -2334,26 +3338,27 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                     </div>
                   )}
 
+                  {totalMcqs > 0 && totalScenarios > 0 && (
+                    <div className="h-4 w-px bg-slate-200 shrink-0 mx-1" />
+                  )}
+
                   {totalScenarios > 0 && (
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Phase 2 – Scenario ({totalScenarios})</h4>
-                        {!isMcqPhase && <span className="text-[9px] font-extrabold px-2 py-0.5 rounded-md bg-purple-100 text-purple-700">Active</span>}
-                      </div>
-                      <div className="grid grid-cols-4 gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-[9px] font-black text-indigo-700 bg-indigo-100 px-2 py-1 rounded-md uppercase tracking-wider shrink-0">Phase 2 (Coding)</span>
+                      <div className="flex items-center gap-1.5">
                         {scenarioQuestions.map((q, sIdx) => {
                           const realIdx = totalMcqs + sIdx;
                           const isCurrent = realIdx === currentIdx;
-                          const isAnswered = isQuestionAnswered(q, realIdx, examState.answers);
+                          const isVisited = Boolean(examState.visitedQuestions?.[realIdx]);
                           return (
                             <button
                               key={realIdx}
                               onClick={() => setExamState(prev => ({ ...prev, currentQuestionIndex: realIdx }))}
-                              className={`w-10 h-10 rounded-xl font-extrabold text-xs flex items-center justify-center cursor-pointer border transition-all duration-200 ${isCurrent
-                                ? 'bg-dash-primary-purple text-white border-dash-primary-purple shadow-sm'
-                                : isAnswered
-                                  ? 'bg-dash-success-green/10 text-dash-success-green border-[#22c55e]/20 hover:bg-dash-success-green/20'
-                                  : 'bg-dash-soft-pink border border-dash-border-gray/50 text-dash-light-purple hover:bg-dash-border-gray'
+                              className={`w-8 h-8 rounded-lg font-extrabold text-xs flex items-center justify-center cursor-pointer border transition-all duration-200 shrink-0 ${isCurrent
+                                ? 'bg-dash-primary-purple text-white border-dash-primary-purple shadow-sm scale-105'
+                                : isVisited
+                                  ? 'bg-dash-success-green/10 text-dash-success-green border-[#22c55e]/30 hover:bg-dash-success-green/20'
+                                  : 'bg-slate-100 border-slate-200/80 text-slate-600 hover:bg-slate-200/70'
                                 }`}
                             >
                               {realIdx + 1}
@@ -2365,396 +3370,78 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                   )}
                 </div>
 
-                {/* Progress Stats */}
-                <div className="border-t border-dash-border-gray/25 pt-4 flex flex-col gap-2">
-                  <div className="flex justify-between text-xs font-bold text-dash-light-purple">
-                    <span>Progress</span>
-                    <span className="text-dash-dark-purple">
-                      {answeredCount} / {questions.length} Done
-                    </span>
+                <span className="text-[10px] font-extrabold text-dash-primary-purple bg-purple-50 px-2.5 py-1 rounded-lg border border-purple-200/50 shrink-0 uppercase tracking-wider ml-auto">
+                  {isSql ? 'SQL QUERY' : (isCoding ? 'PYTHON CODING' : 'MCQ')}
+                </span>
+              </div>
+
+              {/* TWO-COLUMN MAIN CONTENT LAYOUT */}
+              {isCoding ? (
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start w-full">
+                  {/* Left Column (5/12 width): Question Card */}
+                  <div className="lg:col-span-5 w-full flex flex-col gap-3">
+                    <QuestionCard
+                      question={question}
+                      isSql={isSql}
+                      isCoding={isCoding}
+                      liveSchemaMap={liveSchemaMap}
+                    />
                   </div>
-                  <div className="w-full h-2 rounded-full bg-dash-light-blue-bg overflow-hidden">
-                    <div
-                      className="h-full bg-dash-primary-purple rounded-full transition-all duration-300"
-                      style={{ width: `${overallProgressPercent}%` }}
+
+                  {/* Right Column (7/12 width): Compiler Studio & Output Grid */}
+                  <div className={`lg:col-span-7 w-full flex flex-col justify-between gap-3 bg-[#141414] border border-zinc-800/90 rounded-2xl p-3.5 shadow-2xl relative ${isFullscreen ? 'fixed inset-0 z-50 p-6 bg-[#141414] overflow-y-auto' : 'h-[660px] max-h-[660px] overflow-hidden'}`}>
+                    <SqlStudioEditor
+                      isSql={isSql}
+                      currentIdx={currentIdx}
+                      answerValue={examState.answers[currentIdx]}
+                      onAnswerChange={(val) => setExamState(prev => ({
+                        ...prev,
+                        answers: { ...prev.answers, [currentIdx]: val }
+                      }))}
+                      isFullscreen={isFullscreen}
+                      onReset={handleResetCode}
+                      onToggleFullscreen={() => setIsFullscreen(!isFullscreen)}
+                      onRunCode={() => handleRunCode(examState.answers[currentIdx], question)}
+                      isExecuting={isExecuting}
+                    />
+
+                    <QueryResultGrid
+                      isSql={isSql}
+                      consoleTab={consoleTab}
+                      setConsoleTab={setConsoleTab}
+                      sqlQueryResult={sqlQueryResult}
+                      consoleOutput={consoleOutput}
+                      syntaxError={syntaxError}
+                      runtimeError={runtimeError}
+                      isExecuting={isExecuting}
+                      executionStatus={executionStatus}
+                      executionTime={executionTime}
+                      customInput={customInput}
+                      setCustomInput={setCustomInput}
+                      expectedOutputText={question.expectedOutput || question.exampleOutput}
+                      resultGridRef={resultGridRef}
                     />
                   </div>
                 </div>
-
-                {/* Emergency Submit */}
-                <button
-                  onClick={() => setIsSubmitModalOpen(true)}
-                  className="w-full py-2.5 rounded-xl border border-red-200 bg-red-50 text-red-600 font-bold text-xs hover:bg-red-100 transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <CheckCircle2 size={14} />
-                  <span>Submit Assessment</span>
-                </button>
-              </div>
-
-              {/* RIGHT: Active Question Display */}
-              <div className="xl:col-span-3 flex flex-col gap-6">
-
-                {/* Question Info Header */}
-                <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-6 shadow-[0_4px_20px_rgba(87,82,170,0.02)] flex flex-col gap-4">
-                  {/* Phase & Topic Banner */}
-                  <div className="bg-gradient-to-r from-purple-50 via-indigo-50/70 to-blue-50 border border-purple-100/80 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                    <div className="flex flex-wrap items-center gap-3">
-                      <span className="px-3 py-1 rounded-xl text-[11px] font-black uppercase tracking-wider bg-dash-primary-purple text-white shadow-xs">
-                        {currentPhaseLabel}
-                      </span>
-                      <div className="flex flex-col">
-                        <span className="text-xs font-extrabold text-dash-dark-purple flex items-center gap-1.5">
-                          <span className="text-slate-400 font-bold">Topic:</span>
-                          <span className="text-dash-primary-purple">{currentTopic}</span>
-                        </span>
-                        <span className="text-[11px] font-bold text-slate-500">
-                          Question {phaseQuestionNum} of {phaseTotalQuestions} in this Phase
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-t-0 border-purple-100/60 pt-2 sm:pt-0">
-                      <div className="flex flex-col items-end">
-                        <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">Overall Progress</span>
-                        <span className="text-xs font-extrabold text-dash-primary-purple">{overallProgressPercent}% Complete</span>
-                      </div>
-                      <div className="w-20 h-2 rounded-full bg-slate-200 overflow-hidden shrink-0">
-                        <div className="h-full bg-dash-primary-purple rounded-full transition-all duration-300" style={{ width: `${overallProgressPercent}%` }} />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between border-b border-dash-border-gray/25 pb-3">
-                    <span className="text-xs font-bold text-dash-light-purple uppercase tracking-wider">
-                      Question {currentIdx + 1} of {questions.length} (Sequence #{question.sequence_order || currentIdx + 1})
-                    </span>
-                    <span className="px-3 py-1 rounded-full text-[10px] font-extrabold tracking-wide uppercase bg-dash-soft-pink border border-dash-border-gray/50 text-dash-primary-purple">
-                      {isSql ? 'SQL QUERY' : (isCoding ? 'PYTHON CODING' : (question.options && question.options.length > 0 ? 'MCQ' : 'SCENARIO'))}
-                    </span>
-                  </div>
-
-                  {/* Question Scenario if SCENARIO type and not SQL and not Coding */}
-                  {question.scenario && !isCoding && (
-                    <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-2xl p-5">
-                      <h5 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Scenario Context:</h5>
-                      <p className="text-sm font-semibold text-slate-800 leading-relaxed whitespace-pre-line">
+              ) : (
+                <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-2xl p-5 sm:p-6 shadow-sm flex flex-col gap-4">
+                  {question.scenario && (
+                    <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-2xl p-3.5">
+                      <h5 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Scenario Context:</h5>
+                      <p className="text-xs sm:text-sm font-semibold text-slate-800 leading-relaxed whitespace-pre-line">
                         {question.scenario}
                       </p>
                     </div>
                   )}
 
-                  {/* Question text if not coding */}
-                  {!isCoding && (
-                    <div>
-                      <h3 className="font-plus-jakarta font-extrabold text-lg text-dash-dark-purple leading-relaxed">
-                        {question.question}
-                      </h3>
-                    </div>
-                  )}
+                  <div>
+                    <h3 className="font-plus-jakarta font-extrabold text-xl sm:text-2xl text-dash-dark-purple leading-snug">
+                      {question.question}
+                    </h3>
+                  </div>
 
-                  {/* Options (MCQ) or Monaco Editor (Coding/Python/SQL) */}
-                  {isCoding ? (
-                    <div className="flex flex-col lg:flex-row gap-5 items-stretch mt-2 w-full select-none">
-                      {/* Left: Problem Details */}
-                      <div className="flex-1 flex flex-col gap-4 bg-slate-50 border border-slate-200/60 rounded-2xl p-5 overflow-y-auto max-h-[550px] select-text">
-                        {isSql ? (
-                          <div className="flex flex-col gap-3">
-                            {question.scenario && (
-                              <div>
-                                <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Scenario Context</h4>
-                                <p className="text-xs font-semibold text-slate-700 leading-relaxed whitespace-pre-line bg-white border border-slate-200/50 rounded-xl p-3">
-                                  {question.scenario}
-                                </p>
-                              </div>
-                            )}
-                            <div>
-                              <h4 className="text-xs font-extrabold text-dash-primary-purple uppercase tracking-wider mb-1.5">SQL Query Task</h4>
-                              <p className="text-xs font-bold text-slate-800 leading-relaxed whitespace-pre-wrap">
-                                {question.question || question.problemStatement}
-                              </p>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex flex-col gap-3">
-                            {question.scenario && (
-                              <div className="bg-white border border-slate-200/60 rounded-xl p-3.5">
-                                <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Scenario Context</h4>
-                                <p className="text-xs font-semibold text-slate-700 leading-relaxed whitespace-pre-line">
-                                  {question.scenario}
-                                </p>
-                              </div>
-                            )}
-                            <div>
-                              <h4 className="text-xs font-extrabold text-dash-primary-purple uppercase tracking-wider mb-1.5">Problem Description</h4>
-                              <p className="text-xs font-bold text-slate-800 leading-relaxed whitespace-pre-wrap">
-                                {question.question || question.problemStatement || question.title}
-                              </p>
-                            </div>
-                            {(question.function_name || question.functionName) && (
-                              <div className="bg-purple-50/70 border border-purple-200/50 rounded-xl p-3 flex items-center gap-2">
-                                <Code size={13} className="text-dash-primary-purple shrink-0" />
-                                <span className="text-xs font-bold text-dash-dark-purple">
-                                  Expected Function: <code className="font-mono text-purple-700 font-extrabold bg-white px-2 py-0.5 rounded border border-purple-200/50">{question.function_name || question.functionName}(...)</code>
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {isSql ? (
-                          <>
-                            <DatabaseSchemaVisualizer
-                              schemaLines={question.databaseSchema}
-                              dataLines={question.sampleData}
-                            />
-                            {(question.expectedOutput || question.exampleOutput) && (
-                              <div className="mt-2 bg-white border border-slate-200/50 rounded-xl p-3">
-                                <span className="block font-bold text-slate-400 uppercase tracking-wider text-[9px] mb-1">Expected Output Format:</span>
-                                <pre className="text-xs font-mono font-semibold text-slate-700 bg-slate-50 p-2 rounded border border-slate-100 overflow-x-auto whitespace-pre-wrap">{question.expectedOutput || question.exampleOutput}</pre>
-                              </div>
-                            )}
-                          </>
-                        ) : (
-                          <>
-                            {question.inputFormat && (
-                              <div>
-                                <h4 className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">Input Format</h4>
-                                <p className="text-xs font-medium text-slate-600 leading-normal">{question.inputFormat}</p>
-                              </div>
-                            )}
-                            {question.outputFormat && (
-                              <div>
-                                <h4 className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">Output Format</h4>
-                                <p className="text-xs font-medium text-slate-600 leading-normal">{question.outputFormat}</p>
-                              </div>
-                            )}
-                            {question.constraints && question.constraints.length > 0 && (
-                              <div>
-                                <h4 className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1.5">Constraints</h4>
-                                <ul className="list-disc pl-4 text-xs font-medium text-slate-600 space-y-1">
-                                  {question.constraints.map((c, i) => <li key={i}>{c}</li>)}
-                                </ul>
-                              </div>
-                            )}
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                              <div className="bg-white border border-slate-200/50 rounded-xl p-3">
-                                <span className="block font-bold text-slate-400 uppercase tracking-wider text-[9px] mb-1.5">Sample Input:</span>
-                                <pre className="text-xs font-mono font-semibold text-slate-700 bg-slate-50 p-2 rounded border border-slate-100 overflow-x-auto whitespace-pre-wrap">{question.sampleInput || question.exampleInput || "No input."}</pre>
-                              </div>
-                              <div className="bg-white border border-slate-200/50 rounded-xl p-3">
-                                <span className="block font-bold text-slate-400 uppercase tracking-wider text-[9px] mb-1.5">Sample Output:</span>
-                                <pre className="text-xs font-mono font-semibold text-slate-700 bg-slate-50 p-2 rounded border border-slate-100 overflow-x-auto whitespace-pre-wrap">{question.sampleOutput || question.exampleOutput || "No output."}</pre>
-                              </div>
-                            </div>
-                          </>
-                        )}
-                      </div>
-
-                      {/* Right: Monaco Editor and Console */}
-                      <div className={`flex-1 flex flex-col gap-4 border border-dash-border-gray rounded-2xl p-4 bg-[#1e1e1e] text-white shadow-lg relative ${isFullscreen ? 'fixed inset-0 z-50 p-6' : ''}`}>
-                        <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-                          <div className="flex items-center gap-2">
-                            <Code size={14} className="text-dash-primary-purple" />
-                            <span className="text-xs font-bold text-zinc-300">
-                              {isSql ? 'SQL Query Editor' : 'Python 3 Editor'}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleResetCode(currentIdx)}
-                              title="Reset query template"
-                              className="p-1.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors cursor-pointer bg-transparent border-0"
-                            >
-                              <RotateCcw size={13} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setIsFullscreen(!isFullscreen)}
-                              className="p-1.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors cursor-pointer bg-transparent border-0"
-                            >
-                              {isFullscreen ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Monaco Editor Component */}
-                        <div className={`w-full overflow-hidden rounded-xl border border-zinc-800 ${isFullscreen ? 'h-[60vh]' : 'h-[300px]'}`}>
-                          <Editor
-                            key={`editor_${currentIdx}_${isSql ? 'sql' : 'python'}`}
-                            height="100%"
-                            defaultLanguage={isSql ? "sql" : "python"}
-                            language={isSql ? "sql" : "python"}
-                            value={examState.answers[currentIdx] || ''}
-                            onChange={(val) => setExamState(prev => ({
-                              ...prev,
-                              answers: { ...prev.answers, [currentIdx]: val || '' }
-                            }))}
-                            theme="vs-dark"
-                            options={{
-                              fontSize: 12,
-                              fontFamily: 'Fira Code, Source Code Pro, monospace',
-                              minimap: { enabled: false },
-                              lineNumbers: 'on',
-                              automaticLayout: true,
-                              cursorBlinking: 'smooth',
-                              tabSize: 4,
-                              bracketPairColorization: { enabled: true },
-                              autoIndent: 'advanced'
-                            }}
-                          />
-                        </div>
-
-                        {/* Run/Submit Actions */}
-                        <div className="flex items-center justify-between border-t border-zinc-800 pt-3">
-                          <div className="flex items-center gap-1.5 text-xs text-zinc-400 font-semibold bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-xl">
-                            <Terminal size={12} className="text-zinc-500" />
-                            <span>Console</span>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleRunCode(examState.answers[currentIdx], question)}
-                              disabled={isExecuting || isSubmittingCode}
-                              className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer border border-zinc-700 transition-colors disabled:opacity-50"
-                            >
-                              {isExecuting ? (
-                                <Loader2 size={12} className="animate-spin text-dash-primary-purple" />
-                              ) : (
-                                <Play size={12} className="text-emerald-400" />
-                              )}
-                              <span>{isExecuting ? 'Running...' : (isSql ? 'Run Query' : 'Run Code')}</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleSubmitCode(examState.answers[currentIdx], question)}
-                              disabled={isExecuting || isSubmittingCode}
-                              className="px-4 py-2 bg-dash-primary-purple hover:bg-dash-dark-purple text-white font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer border-0 transition-colors disabled:opacity-50 shadow-md"
-                            >
-                              {isSubmittingCode ? (
-                                <Loader2 size={12} className="animate-spin" />
-                              ) : (
-                                <CheckCircle2 size={12} />
-                              )}
-                              <span>{isSubmittingCode ? 'Submitting...' : (isSql ? 'Submit Query' : 'Submit Code')}</span>
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Output and Input Tabs console */}
-                        <div className="bg-[#151515] border border-zinc-800/80 rounded-xl p-3.5 flex flex-col gap-3">
-                          <div className="flex flex-col gap-3">
-                            <div className="flex items-center gap-2 border-b border-zinc-800/40 pb-2">
-                              <button
-                                type="button"
-                                onClick={() => setConsoleTab('output')}
-                                className={`text-[10px] font-extrabold uppercase tracking-wider pb-1 px-1 border-b-2 transition-all cursor-pointer bg-transparent border-0 ${consoleTab === 'output' ? 'border-dash-primary-purple text-white' : 'border-transparent text-zinc-500'}`}
-                              >
-                                Console Output
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setConsoleTab('input')}
-                                className={`text-[10px] font-extrabold uppercase tracking-wider pb-1 px-1 border-b-2 transition-all cursor-pointer bg-transparent border-0 ${consoleTab === 'input' ? 'border-dash-primary-purple text-white' : 'border-transparent text-zinc-500'}`}
-                              >
-                                Custom Test Input
-                              </button>
-                            </div>
-
-                            {consoleTab === 'output' ? (
-                              <div className="text-xs font-mono select-text max-h-[160px] overflow-y-auto pr-1 flex flex-col gap-2">
-                                {executionStatus && (
-                                  <div className="flex items-center justify-between bg-zinc-900/80 p-2 rounded-lg border border-zinc-800">
-                                    <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded ${executionStatus === 'Success'
-                                      ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/50'
-                                      : executionStatus === 'Syntax Error'
-                                        ? 'bg-amber-950/80 text-amber-400 border border-amber-800/50'
-                                        : 'bg-red-950/80 text-red-400 border border-red-800/50'
-                                      }`}>
-                                      {executionStatus}
-                                    </span>
-                                    <span className="text-[10px] text-zinc-400 font-semibold">
-                                      Execution Time: <strong className="text-zinc-200">{executionTime}s</strong>
-                                    </span>
-                                  </div>
-                                )}
-
-                                {syntaxError && (
-                                  <div className="bg-amber-950/40 border border-amber-800/50 rounded-lg p-2.5 flex flex-col gap-1">
-                                    <span className="text-[10px] font-extrabold uppercase text-amber-400 tracking-wider">Syntax Error:</span>
-                                    <pre className="text-amber-300 whitespace-pre-wrap leading-relaxed">{syntaxError}</pre>
-                                  </div>
-                                )}
-
-                                {runtimeError && (
-                                  <div className="bg-red-950/40 border border-red-800/50 rounded-lg p-2.5 flex flex-col gap-1">
-                                    <span className="text-[10px] font-extrabold uppercase text-red-400 tracking-wider">Runtime Error:</span>
-                                    <pre className="text-red-300 whitespace-pre-wrap leading-relaxed">{runtimeError}</pre>
-                                  </div>
-                                )}
-
-                                {sqlQueryResult && sqlQueryResult.columns && sqlQueryResult.columns.length > 0 ? (
-                                  <div className="flex flex-col gap-2 my-1">
-                                    <div className="flex items-center justify-between text-[11px] font-bold text-zinc-400">
-                                      <span className="text-emerald-400">Query Result Table ({sqlQueryResult.rowCount || sqlQueryResult.rows?.length || 0} rows)</span>
-                                    </div>
-                                    <div className="overflow-x-auto overflow-y-auto max-h-[220px] rounded-xl border border-zinc-800 bg-[#111111]">
-                                      <table className="min-w-full divide-y divide-zinc-800 text-left text-xs text-zinc-200">
-                                        <thead className="bg-zinc-900 font-bold uppercase tracking-wider text-[10px] text-zinc-400 sticky top-0 z-10">
-                                          <tr>
-                                            <th className="px-3 py-2 text-zinc-500 w-10">#</th>
-                                            {sqlQueryResult.columns.map((col, idx) => (
-                                              <th key={idx} className="px-3 py-2 whitespace-nowrap text-dash-primary-purple">{col}</th>
-                                            ))}
-                                          </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-zinc-800/60 font-mono text-[11px]">
-                                          {sqlQueryResult.rows.map((row, rowIdx) => (
-                                            <tr key={rowIdx} className="hover:bg-zinc-800/40 transition-colors">
-                                              <td className="px-3 py-1.5 text-zinc-500 font-sans text-[10px]">{rowIdx + 1}</td>
-                                              {sqlQueryResult.columns.map((col, colIdx) => (
-                                                <td key={colIdx} className="px-3 py-1.5 whitespace-nowrap text-zinc-300">
-                                                  {row[col] !== null && row[col] !== undefined ? String(row[col]) : <em className="text-zinc-600 font-sans">NULL</em>}
-                                                </td>
-                                              ))}
-                                            </tr>
-                                          ))}
-                                        </tbody>
-                                      </table>
-                                    </div>
-                                  </div>
-                                ) : consoleOutput && (
-                                  <div className="bg-zinc-900/60 border border-zinc-800 rounded-lg p-2.5 flex flex-col gap-1">
-                                    <span className="text-[10px] font-extrabold uppercase text-zinc-400 tracking-wider">Output:</span>
-                                    <pre className="text-zinc-200 whitespace-pre-wrap leading-relaxed">{consoleOutput}</pre>
-                                  </div>
-                                )}
-
-                                {!syntaxError && !runtimeError && !consoleOutput && !sqlQueryResult && !isExecuting && (
-                                  <span className="text-zinc-500 italic p-1">Click "Run Query" or "Run Code" to execute script and see output here.</span>
-                                )}
-                              </div>
-                            ) : (
-                              <div className="flex flex-col gap-2">
-                                <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Piped directly to stdin:</span>
-                                <textarea
-                                  value={customInput}
-                                  onChange={(e) => setCustomInput(e.target.value)}
-                                  placeholder="Enter custom inputs for execution..."
-                                  rows={2}
-                                  className="w-full p-2 bg-zinc-900 border border-zinc-800 text-zinc-300 text-xs font-mono rounded-lg focus:outline-none focus:border-dash-primary-purple transition-all resize-none"
-                                />
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : question.options && question.options.length > 0 ? (
-                    <div className="flex flex-col gap-3 mt-2">
+                  {question.options && question.options.length > 0 ? (
+                    <div className="flex flex-col gap-2 mt-1">
                       {question.options.map((option, optIdx) => {
                         const isSelected = examState.answers[currentIdx] === option;
                         return (
@@ -2764,36 +3451,24 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                               ...prev,
                               answers: { ...prev.answers, [currentIdx]: option }
                             }))}
-                            className={`w-full text-left p-4 rounded-2xl border font-semibold text-sm transition-all duration-200 cursor-pointer flex items-between items-center group ${isSelected
-                              ? 'bg-dash-primary-purple/10 border-dash-primary-purple text-dash-dark-purple shadow-sm'
-                              : 'bg-dash-soft-pink border-dash-border-gray/50 text-dash-light-purple hover:bg-dash-border-gray hover:text-dash-dark-purple'
+                            className={`w-full text-left px-4 py-2.5 rounded-xl border font-semibold text-sm transition-all duration-200 cursor-pointer flex items-center justify-between group ${isSelected
+                              ? 'bg-dash-primary-purple/10 border-dash-primary-purple text-dash-dark-purple shadow-2xs font-bold'
+                              : 'bg-dash-soft-pink/60 border-dash-border-gray/40 text-slate-700 hover:bg-dash-border-gray/60 hover:text-dash-dark-purple'
                               }`}
                           >
-                            <span className="flex-1 pr-4">{option}</span>
-                            <div className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-all ${isSelected
+                            <span className="flex-1 pr-3 leading-snug">{option}</span>
+                            <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-all ${isSelected
                               ? 'border-dash-primary-purple bg-dash-primary-purple text-white'
-                              : 'border-dash-border-gray/60 group-hover:border-dash-light-purple'
+                              : 'border-slate-300 group-hover:border-dash-primary-purple'
                               }`}>
-                              {isSelected && <Check size={12} strokeWidth={3} />}
+                              {isSelected && <Check size={10} strokeWidth={3} />}
                             </div>
                           </button>
                         );
                       })}
                     </div>
                   ) : (
-                    <div className="flex flex-col gap-3 mt-2">
-                      {question.exampleInput && (
-                        <div className="grid grid-cols-2 gap-4 bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-mono text-slate-700">
-                          <div>
-                            <span className="block font-bold text-slate-400 uppercase tracking-wider text-[9px] mb-1">Example Input:</span>
-                            <span className="block">{question.exampleInput}</span>
-                          </div>
-                          <div>
-                            <span className="block font-bold text-slate-400 uppercase tracking-wider text-[9px] mb-1">Example Output:</span>
-                            <span className="block">{question.exampleOutput}</span>
-                          </div>
-                        </div>
-                      )}
+                    <div className="flex flex-col gap-3 mt-1">
                       <textarea
                         value={examState.answers[currentIdx] || ''}
                         onChange={(e) => setExamState(prev => ({
@@ -2801,45 +3476,64 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                           answers: { ...prev.answers, [currentIdx]: e.target.value }
                         }))}
                         placeholder="Write your code or answer explanation here..."
-                        rows={10}
-                        className="w-full p-4 rounded-2xl border border-dash-border-gray/50 bg-[#fafafa] font-mono text-sm focus:outline-none focus:ring-2 focus:ring-dash-primary-purple/40 focus:border-dash-primary-purple transition-all resize-y"
+                        rows={6}
+                        className="w-full p-3.5 rounded-2xl border border-dash-border-gray/50 bg-[#fafafa] font-mono text-sm focus:outline-none focus:ring-2 focus:ring-dash-primary-purple/40 focus:border-dash-primary-purple transition-all resize-y"
                       />
                     </div>
                   )}
+                </div>
+              )}
 
-                  {/* Navigation Buttons */}
-                  <div className="flex items-center justify-between border-t border-dash-border-gray/25 pt-5 mt-3">
-                    <button
-                      onClick={() => setExamState(prev => ({ ...prev, currentQuestionIndex: currentIdx - 1 }))}
-                      disabled={!hasPrev}
-                      className={`px-5 py-2.5 rounded-xl border border-dash-border-gray/50 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${hasPrev
-                        ? 'bg-dash-soft-pink text-dash-dark-purple hover:bg-dash-border-gray'
-                        : 'opacity-50 cursor-not-allowed text-dash-light-purple bg-transparent'
-                        }`}
+              {/* NATURAL BOTTOM ACTION BAR (Left: Previous | Center: Run Query | Right: Next Question) */}
+              <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-2xl px-5 py-3.5 shadow-sm flex items-center justify-between gap-4 w-full">
+                <div className="flex-1 flex justify-start">
+                  <button
+                    onClick={() => setExamState(prev => ({ ...prev, currentQuestionIndex: currentIdx - 1 }))}
+                    disabled={!hasPrev}
+                    className={`px-5 py-2.5 rounded-xl border font-extrabold text-xs flex items-center gap-2 transition-all cursor-pointer ${hasPrev
+                      ? 'bg-slate-100 text-slate-800 border-slate-300 hover:bg-slate-200 hover:scale-[1.01]'
+                      : 'opacity-40 cursor-not-allowed text-slate-400 border-slate-200 bg-slate-50'
+                      }`}
+                  >
+                    <ChevronLeft size={16} />
+                    <span>Previous</span>
+                  </button>
+                </div>
+
+                <div className="flex-1 flex justify-center">
+                  {isCoding && (
+                    <ActionButton
+                      onClick={() => handleRunCode(examState.answers[currentIdx], question)}
+                      isLoading={isExecuting}
+                      loadingText="Executing Query..."
+                      disabled={isSubmittingCode}
+                      icon={Play}
+                      iconSize={15}
+                      className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl shadow-sm hover:scale-[1.02] border-none cursor-pointer flex items-center gap-2"
                     >
-                      <ChevronLeft size={16} />
-                      <span>Previous</span>
+                      {isSql ? 'Run Query / Execute Query' : 'Run Code / Execute Script'}
+                    </ActionButton>
+                  )}
+                </div>
+
+                <div className="flex-1 flex justify-end">
+                  {hasNext ? (
+                    <button
+                      onClick={() => setExamState(prev => ({ ...prev, currentQuestionIndex: currentIdx + 1 }))}
+                      className="px-5 py-2.5 rounded-xl bg-dash-primary-purple hover:bg-dash-dark-purple text-white font-extrabold text-xs transition-all flex items-center gap-2 cursor-pointer border-0 shadow-sm hover:scale-[1.01]"
+                    >
+                      <span>Next Question</span>
+                      <ChevronRight size={16} />
                     </button>
-
-                    {hasNext ? (
-                      <button
-                        onClick={() => setExamState(prev => ({ ...prev, currentQuestionIndex: currentIdx + 1 }))}
-                        className="px-6 py-2.5 rounded-xl bg-dash-primary-purple text-dash-white-card font-bold text-xs hover:bg-dash-dark-purple transition-all flex items-center gap-1.5 cursor-pointer border-0"
-                      >
-                        <span>Next</span>
-                        <ChevronRight size={16} />
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => setIsSubmitModalOpen(true)}
-                        className="px-6 py-2.5 rounded-xl bg-[#22c55e] text-white font-bold text-xs hover:bg-[#16a34a] transition-all flex items-center gap-1.5 cursor-pointer border-0"
-                      >
-                        <CheckCircle2 size={16} />
-                        <span>Finish & Submit</span>
-                      </button>
-                    )}
-                  </div>
-
+                  ) : (
+                    <button
+                      onClick={() => setIsSubmitModalOpen(true)}
+                      className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs transition-all flex items-center gap-2 cursor-pointer border-0 shadow-md hover:scale-[1.01]"
+                    >
+                      <CheckCircle2 size={16} />
+                      <span>Finish Assessment</span>
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -2864,18 +3558,68 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                   </div>
                   <div>
                     <h3 className="font-plus-jakarta font-extrabold text-2xl text-dash-dark-purple tracking-tight">
-                      English Speaking Assessment
+                      English Communication Assessment
                     </h3>
-                    <p className="text-xs font-bold text-dash-light-purple mt-1 uppercase tracking-wider">AI HR Interviewer</p>
+                    <p className="text-xs font-bold text-dash-light-purple mt-1 uppercase tracking-wider">Real-Time AI HR Interview</p>
                   </div>
 
-                  <div className="bg-dash-soft-pink/40 border border-dash-border-gray/40 rounded-2xl p-6 text-left w-full space-y-4 text-xs font-medium text-dash-dark-purple leading-relaxed">
-                    <p className="font-bold text-sm border-b border-dash-border-gray/25 pb-2 text-dash-primary-purple">Welcome to the English Assessment.</p>
-                    <p>Hello! I am your AI HR Interviewer today.</p>
-                    <p>I will evaluate your English communication skills through a realistic, conversational HR interview tailored to your uploaded resume background.</p>
-                    <p>• The interview will take approximately <strong>15 minutes</strong>.</p>
-                    <p>• You can type your answers or speak using your microphone (Speech-to-Text).</p>
-                    <p>Please answer naturally and professionally. Good luck!</p>
+                  {/* AI Voice Selection Options */}
+                  <div className="w-full text-left space-y-2">
+                    <label className="text-xs font-extrabold text-dash-dark-purple uppercase tracking-wider block">
+                      Choose AI HR Interviewer Voice:
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 w-full">
+                      <button
+                        type="button"
+                        onClick={() => setAiVoiceGender('female')}
+                        className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer flex items-center gap-3.5 ${
+                          aiVoiceGender === 'female'
+                            ? 'border-dash-primary-purple bg-dash-primary-purple/10 shadow-sm ring-2 ring-dash-primary-purple/20'
+                            : 'border-dash-border-gray/50 bg-slate-50/50 hover:border-dash-primary-purple/50'
+                        }`}
+                      >
+                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-xl shrink-0 ${
+                          aiVoiceGender === 'female' ? 'bg-dash-primary-purple text-white' : 'bg-slate-200 text-slate-700'
+                        }`}>
+                          👩‍💼
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-extrabold text-dash-dark-purple flex items-center justify-between">
+                            <span>Female Voice</span>
+                            {aiVoiceGender === 'female' && <span className="text-[10px] bg-dash-primary-purple text-white px-2 py-0.5 rounded-full font-bold">Selected</span>}
+                          </div>
+                          <div className="text-[10px] text-slate-500 font-bold mt-0.5">Sophia - Natural & Clear</div>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setAiVoiceGender('male')}
+                        className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer flex items-center gap-3.5 ${
+                          aiVoiceGender === 'male'
+                            ? 'border-dash-primary-purple bg-dash-primary-purple/10 shadow-sm ring-2 ring-dash-primary-purple/20'
+                            : 'border-dash-border-gray/50 bg-slate-50/50 hover:border-dash-primary-purple/50'
+                        }`}
+                      >
+                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-xl shrink-0 ${
+                          aiVoiceGender === 'male' ? 'bg-dash-primary-purple text-white' : 'bg-slate-200 text-slate-700'
+                        }`}>
+                          👨‍💼
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-extrabold text-dash-dark-purple flex items-center justify-between">
+                            <span>Male Voice</span>
+                            {aiVoiceGender === 'male' && <span className="text-[10px] bg-dash-primary-purple text-white px-2 py-0.5 rounded-full font-bold">Selected</span>}
+                          </div>
+                          <div className="text-[10px] text-slate-500 font-bold mt-0.5">Alex - Warm & Professional</div>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="bg-dash-soft-pink/40 border border-dash-border-gray/40 rounded-2xl p-4 text-left w-full text-xs font-medium text-dash-dark-purple leading-relaxed">
+                    <p className="font-bold text-dash-primary-purple">🎤 Continuous Voice Interview Protocol:</p>
+                    <p className="mt-1">The AI will ask concise HR questions one at a time. Once the AI finishes speaking, your microphone automatically turns ON. Speak naturally — silence will automatically submit your response and continue the conversation.</p>
                   </div>
 
                   {englishInterview.is_eligible === false ? (
@@ -2905,7 +3649,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                           }
                         }}
                         onClick={() => englishFileInputRef.current && englishFileInputRef.current.click()}
-                        className={`w-full py-8 border-2 border-dashed rounded-[20px] transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${englishDragOver
+                        className={`w-full py-7 border-2 border-dashed rounded-[20px] transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${englishDragOver
                             ? 'border-dash-primary-purple bg-dash-primary-purple/5 scale-[0.99]'
                             : 'border-dash-border-gray hover:border-dash-primary-purple hover:bg-dash-light-blue-bg/40'
                           }`}
@@ -2935,14 +3679,16 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                       {candidate && candidate.resume && candidate.resume > 0 && (
                         <div className="flex flex-col items-center gap-2 mt-2">
                           <span className="text-[10px] text-slate-400 font-bold">— OR —</span>
-                          <button
-                            type="button"
+                          <ActionButton
                             onClick={handleStartEnglish}
-                            className="px-8 py-3.5 rounded-xl bg-dash-primary-purple text-white font-bold text-xs hover:bg-dash-dark-purple transition-all duration-200 shadow-md cursor-pointer border-0 flex items-center gap-2 justify-center w-full"
+                            isLoading={englishLoading}
+                            loadingText="Starting Voice Interview..."
+                            icon={Play}
+                            iconSize={13}
+                            className="px-8 py-3.5 rounded-xl bg-dash-primary-purple text-white font-bold text-xs hover:bg-dash-dark-purple shadow-md justify-center w-full"
                           >
-                            <Play size={13} />
-                            <span>Start Interview with Previously Uploaded Resume</span>
-                          </button>
+                            Start Voice Interview with Previously Uploaded Resume
+                          </ActionButton>
                         </div>
                       )}
                     </div>
@@ -2956,6 +3702,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
               const currentQ = englishInterview.current_question || {};
               const currentQNum = conversations.length;
               const activeQuestionText = currentQ.ai_question || englishInterview.ai_question || "Please introduce yourself.";
+              const interviewerName = aiVoiceGender === 'male' ? 'Alex' : 'Sophia';
 
               return (
                 <div className="flex flex-col gap-6 w-full flex-1 animate-fade-in select-text">
@@ -2976,361 +3723,249 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                     }
                   `}</style>
 
-                  {/* Header / Mode Switcher bar */}
+                  {/* Header Bar */}
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-dash-white-card border border-dash-border-gray/50 rounded-[20px] p-4 shadow-sm w-full">
                     <div className="flex items-center gap-3">
                       <div className="w-2.5 h-2.5 rounded-full bg-[#22c55e] animate-pulse" />
-                      <span className="text-xs font-bold text-dash-dark-purple">Sophia - RecruitAI AI HR Manager</span>
+                      <div>
+                        <span className="text-xs font-extrabold text-dash-dark-purple block flex items-center gap-1.5">
+                          <span>{interviewerName} - RecruitAI AI HR Manager</span>
+                          <span className="text-[9px] bg-dash-primary-purple/10 text-dash-primary-purple px-2 py-0.5 rounded-full font-bold uppercase">
+                            {aiVoiceGender} Voice
+                          </span>
+                        </span>
+                        <span className="text-[10px] font-extrabold text-dash-primary-purple">Question {currentQNum + 1} of 8</span>
+                      </div>
                     </div>
 
-                    <div className="flex items-center bg-slate-100 rounded-xl p-1 border border-slate-200/50">
+                    {/* Progress Bar & Warning Counter */}
+                    <div className="flex items-center gap-4 flex-1 max-w-md mx-4">
+                      <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-dash-primary-purple transition-all duration-500" 
+                          style={{ width: `${Math.min(100, Math.round(((currentQNum + 1) / 8) * 100))}%` }} 
+                        />
+                      </div>
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 shrink-0">
+                        <ShieldAlert size={13} />
+                        <span className="text-[10px] font-black">{englishExamSecurity.fullscreenExitCount} / 3 Warn</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
                       <button
                         type="button"
-                        onClick={() => setVoiceMode(true)}
-                        className={`px-4 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer border-none ${voiceMode
-                          ? 'bg-dash-primary-purple text-white shadow-sm'
-                          : 'text-slate-500 hover:text-slate-800'
-                          }`}
+                        onClick={handleCompleteEnglish}
+                        disabled={englishLoading || aiTyping}
+                        className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs shadow-md transition-all cursor-pointer border-none shrink-0"
                       >
-                        🎙️ Calling Mode
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setVoiceMode(false)}
-                        className={`px-4 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer border-none ${!voiceMode
-                          ? 'bg-dash-primary-purple text-white shadow-sm'
-                          : 'text-slate-500 hover:text-slate-800'
-                          }`}
-                      >
-                        💬 Chat Mode
+                        Finish Assessment
                       </button>
                     </div>
                   </div>
 
-                  {voiceMode ? (
-                    /* VOICE CALL MODE CONTAINER */
-                    <div className="w-full flex flex-col items-center justify-between bg-gradient-to-b from-[#1c133a] to-[#0a0614] border border-[#2d1b54]/40 rounded-[32px] p-6 sm:p-10 shadow-[0_10px_35px_rgba(45,27,84,0.3)] min-h-[500px] text-center gap-8 relative overflow-hidden select-none">
+                  {/* VOICE CALL INTERVIEW ROOM CONTAINER */}
+                  <div className="w-full flex flex-col items-center justify-between bg-gradient-to-b from-[#1c133a] to-[#0a0614] border border-[#2d1b54]/40 rounded-[32px] p-6 sm:p-10 shadow-[0_10px_35px_rgba(45,27,84,0.3)] min-h-[520px] text-center gap-8 relative overflow-hidden select-none">
 
-                      {/* Interactive Waveform / Avatar center */}
-                      <div className="flex flex-col items-center gap-5 my-auto relative z-10 w-full">
-                        <div className="relative w-44 h-44 flex items-center justify-center rounded-full bg-white/5 border border-white/10 shadow-[0_0_50px_rgba(139,92,246,0.15)]">
+                    {/* Interactive Waveform / Avatar center */}
+                    <div className="flex flex-col items-center gap-5 my-auto relative z-10 w-full">
+                      <div className="relative w-44 h-44 flex items-center justify-center rounded-full bg-white/5 border border-white/10 shadow-[0_0_50px_rgba(139,92,246,0.15)]">
 
-                          {/* Pulse wave rings based on state */}
-                          {isRecording && (
-                            <>
-                              <div className="absolute inset-0 rounded-full border border-emerald-500/30 animate-ripple-fast" style={{ animationDelay: '0s' }} />
-                              <div className="absolute inset-0 rounded-full border border-emerald-500/20 animate-ripple-fast" style={{ animationDelay: '0.4s' }} />
-                              <div className="absolute inset-0 rounded-full border border-emerald-500/10 animate-ripple-fast" style={{ animationDelay: '0.8s' }} />
-                            </>
-                          )}
-
-                          {aiIsSpeaking && (
-                            <>
-                              <div className="absolute inset-0 rounded-full border border-violet-500/30 animate-ripple-medium" style={{ animationDelay: '0s' }} />
-                              <div className="absolute inset-0 rounded-full border border-violet-500/20 animate-ripple-medium" style={{ animationDelay: '0.6s' }} />
-                              <div className="absolute inset-0 rounded-full border border-violet-500/10 animate-ripple-medium" style={{ animationDelay: '1.2s' }} />
-                            </>
-                          )}
-
-                          {(aiTyping || englishLoading) && (
-                            <>
-                              <div className="absolute inset-0 rounded-full border border-slate-400/20 animate-ripple-slow" style={{ animationDelay: '0s' }} />
-                              <div className="absolute inset-0 rounded-full border border-slate-400/10 animate-ripple-slow" style={{ animationDelay: '1.5s' }} />
-                            </>
-                          )}
-
-                          {/* Inner Avatar Box */}
-                          <div className={`w-28 h-28 rounded-full flex items-center justify-center text-white shadow-2xl relative z-10 transition-all duration-500 ${isRecording
-                              ? 'bg-emerald-600 shadow-emerald-500/30 border-2 border-emerald-400/40'
-                              : aiIsSpeaking
-                                ? 'bg-violet-600 shadow-violet-500/30 border-2 border-violet-400/40'
-                                : 'bg-[#231b42] border border-[#40356c]'
-                            }`}>
-                            <Volume2 size={40} className={isRecording ? "animate-pulse" : aiIsSpeaking ? "animate-bounce" : ""} />
-                          </div>
-                        </div>
-
-                        {/* Speech status label */}
-                        <div className="bg-white/5 border border-white/10 rounded-full px-5 py-1.5 text-xs font-bold text-white shadow-sm flex items-center gap-2">
-                          <span className={`w-2 h-2 rounded-full ${isRecording
-                              ? 'bg-emerald-500 animate-ping'
-                              : aiIsSpeaking
-                                ? 'bg-violet-500 animate-pulse'
-                                : 'bg-slate-400'
-                            }`} />
-                          <span>
-                            {isRecording
-                              ? 'Listening... Please speak'
-                              : aiIsSpeaking
-                                ? 'Sophia is speaking...'
-                                : aiTyping || englishLoading
-                                  ? 'Thinking...'
-                                  : 'Sophia is ready'}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Question Text Box */}
-                      <div className="w-full max-w-2xl bg-white/5 border border-white/10 rounded-2xl p-5 shadow-inner text-center z-10">
-                        <p className="text-white font-plus-jakarta font-extrabold text-base leading-relaxed">
-                          "{activeQuestionText}"
-                        </p>
-                      </div>
-
-                      {/* Candidate response bubble transcript */}
-                      <div className="w-full max-w-2xl z-10">
-                        {englishText ? (
-                          <div className="bg-emerald-950/40 border border-emerald-500/30 rounded-2xl p-4 text-left shadow-sm flex flex-col gap-1.5">
-                            <span className="text-[10px] font-extrabold text-emerald-400 uppercase tracking-widest">Captured Response (Transcript)</span>
-                            <p className="text-xs font-bold text-emerald-100 leading-relaxed font-sans">{englishText}</p>
-                          </div>
-                        ) : isRecording ? (
-                          <p className="text-xs text-slate-400 font-bold italic animate-pulse">Start speaking now... your answer transcript will appear here in real time.</p>
-                        ) : (
-                          <p className="text-xs text-slate-400 font-bold italic">Click the microphone to record your response.</p>
+                        {/* Pulse wave rings based on state */}
+                        {isRecording && (
+                          <>
+                            <div className="absolute inset-0 rounded-full border border-emerald-500/30 animate-ripple-fast" style={{ animationDelay: '0s' }} />
+                            <div className="absolute inset-0 rounded-full border border-emerald-500/20 animate-ripple-fast" style={{ animationDelay: '0.4s' }} />
+                            <div className="absolute inset-0 rounded-full border border-emerald-500/10 animate-ripple-fast" style={{ animationDelay: '0.8s' }} />
+                          </>
                         )}
-                      </div>
 
-                      {/* Audio room control bar */}
-                      <div className="w-full max-w-2xl flex items-center justify-between border-t border-white/10 pt-6 z-10 gap-4 mt-auto">
-                        {/* Remaining Time */}
-                        <div className="flex flex-col text-left">
-                          <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">Remaining Time</span>
-                          <span className="font-mono text-sm font-extrabold text-red-400">{formatTime(englishTimeLeft)}</span>
-                        </div>
+                        {aiIsSpeaking && (
+                          <>
+                            <div className="absolute inset-0 rounded-full border border-violet-500/30 animate-ripple-medium" style={{ animationDelay: '0s' }} />
+                            <div className="absolute inset-0 rounded-full border border-violet-500/20 animate-ripple-medium" style={{ animationDelay: '0.6s' }} />
+                            <div className="absolute inset-0 rounded-full border border-violet-500/10 animate-ripple-medium" style={{ animationDelay: '1.2s' }} />
+                          </>
+                        )}
 
-                        {/* Main Call controls */}
-                        <div className="flex items-center gap-3">
-                          {/* Mute button */}
-                          <button
-                            type="button"
-                            onClick={toggleMute}
-                            className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-200 cursor-pointer shadow-md ${isMuted
-                                ? 'bg-amber-600 border-amber-600 text-white hover:bg-amber-700'
-                                : 'bg-white/10 border-white/10 text-white hover:bg-white/20'
-                              }`}
-                            title={isMuted ? "Unmute Sophia's Voice" : "Mute Sophia's Voice"}
-                          >
-                            {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
-                          </button>
+                        {(aiTyping || englishLoading || autoSubmitting) && (
+                          <>
+                            <div className="absolute inset-0 rounded-full border border-amber-400/30 animate-ripple-slow" style={{ animationDelay: '0s' }} />
+                            <div className="absolute inset-0 rounded-full border border-amber-400/15 animate-ripple-slow" style={{ animationDelay: '1.2s' }} />
+                          </>
+                        )}
 
-                          {/* Record toggle */}
-                          <button
-                            type="button"
-                            onClick={toggleRecording}
-                            disabled={englishLoading || aiTyping || aiIsSpeaking}
-                            className={`w-14 h-14 rounded-full flex items-center justify-center border transition-all duration-200 cursor-pointer shadow-lg disabled:opacity-40 disabled:cursor-not-allowed ${isRecording
-                                ? 'bg-red-600 border-red-600 text-white hover:bg-red-700 animate-pulse'
-                                : 'bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700'
-                              }`}
-                            title={isRecording ? "Stop Recording" : "Start Speaking"}
-                          >
-                            <Mic size={24} className={isRecording ? "animate-pulse" : ""} />
-                          </button>
-
-                          {/* Done Speaking (Send) */}
-                          <button
-                            type="button"
-                            onClick={handleRespondEnglish}
-                            disabled={!englishText.trim() || englishLoading || aiTyping}
-                            className="px-5 h-12 rounded-full bg-[#10b981] hover:bg-[#059669] text-white flex items-center justify-center font-bold text-xs transition-all duration-200 cursor-pointer shadow-md border-none disabled:opacity-40 disabled:cursor-not-allowed"
-                            title="Send response to Sophia"
-                          >
-                            Done Speaking (Send)
-                          </button>
-
-                          {/* Conclude Interview */}
-                          <button
-                            type="button"
-                            onClick={handleCompleteEnglish}
-                            disabled={englishLoading || aiTyping || conversations.length < 3}
-                            className="px-5 h-12 rounded-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center font-bold text-xs transition-all duration-200 cursor-pointer shadow-md border-none disabled:opacity-40 disabled:cursor-not-allowed"
-                            title="Finish conversation and generate report"
-                          >
-                            Conclude Interview
-                          </button>
-                        </div>
-
-                        {/* Conversation Turns info */}
-                        <div className="flex flex-col text-right">
-                          <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">Conversation</span>
-                          <span className="text-sm font-extrabold text-white">{currentQNum} turns</span>
+                        {/* Inner Avatar Box */}
+                        <div className={`w-28 h-28 rounded-full flex items-center justify-center text-white shadow-2xl relative z-10 transition-all duration-500 ${isRecording
+                            ? 'bg-emerald-600 shadow-emerald-500/30 border-2 border-emerald-400/40'
+                            : aiIsSpeaking
+                              ? 'bg-violet-600 shadow-violet-500/30 border-2 border-violet-400/40'
+                              : autoSubmitting || aiTyping || englishLoading
+                                ? 'bg-amber-600 shadow-amber-500/30 border-2 border-amber-400/40'
+                                : 'bg-[#231b42] border border-[#40356c]'
+                          }`}>
+                          <Volume2 size={40} className={isRecording ? "animate-pulse" : aiIsSpeaking ? "animate-bounce" : ""} />
                         </div>
                       </div>
 
+                      {/* Speech status label */}
+                      <div className="bg-white/5 border border-white/10 rounded-full px-5 py-1.5 text-xs font-bold text-white shadow-sm flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full ${isRecording
+                            ? 'bg-emerald-500 animate-ping'
+                            : aiIsSpeaking
+                              ? 'bg-violet-500 animate-pulse'
+                              : autoSubmitting || aiTyping || englishLoading
+                                ? 'bg-amber-400 animate-ping'
+                                : 'bg-slate-400'
+                          }`} />
+                        <span>
+                          {isRecording
+                            ? '🎙️ Microphone Active — Listening to your response...'
+                            : aiIsSpeaking
+                              ? `🔊 ${interviewerName} is speaking...`
+                              : autoSubmitting
+                                ? '⏳ Silence detected — Submitting answer...'
+                                : aiTyping || englishLoading
+                                  ? `💭 ${interviewerName} is thinking...`
+                                  : `${interviewerName} is ready`}
+                        </span>
+                      </div>
                     </div>
-                  ) : (
-                    /* CHAT TEXT MODE CONTAINER */
-                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-stretch w-full flex-1 min-h-[550px]">
 
-                      {/* LEFT PANEL: AI HR Avatar & Status */}
-                      <div className="xl:col-span-1 bg-dash-white-card border border-dash-border-gray/50 rounded-[28px] p-6 shadow-[0_4px_20px_rgba(87,82,170,0.02)] flex flex-col justify-between items-center text-center gap-6">
+                    {/* Question Text Box */}
+                    <div className="w-full max-w-2xl bg-white/5 border border-white/10 rounded-2xl p-5 shadow-inner text-center z-10">
+                      <p className="text-white font-plus-jakarta font-extrabold text-base leading-relaxed">
+                        "{activeQuestionText}"
+                      </p>
+                    </div>
 
-                        <div className="flex flex-col items-center gap-4 w-full">
-                          {/* Visual Pulse Avatar */}
-                          <div className="relative w-36 h-36 flex items-center justify-center rounded-full bg-dash-primary-purple/10 border-4 border-dash-primary-purple/20 shadow-[0_0_30px_rgba(87,82,170,0.1)] overflow-hidden">
-                            <div className={`absolute inset-0 rounded-full border border-dash-primary-purple/20 animate-ping opacity-60 ${isRecording ? 'duration-1000' : ''}`} style={{ animationDuration: isRecording ? '1.5s' : '3s' }} />
-                            <div className="w-20 h-20 rounded-full bg-dash-primary-purple flex items-center justify-center text-white shadow-lg relative z-10">
-                              <Volume2 size={32} className={isRecording ? "animate-bounce" : aiTyping ? "animate-pulse" : ""} />
-                            </div>
-                          </div>
-
-                          <div>
-                            <h4 className="font-plus-jakarta font-extrabold text-base text-dash-dark-purple leading-tight">AI HR Interviewer</h4>
-                            <span className="text-[10px] text-dash-light-purple font-bold uppercase tracking-wider mt-1 block">Active Evaluation</span>
-                          </div>
-                        </div>
-
-                        {/* Meta stats grid */}
-                        <div className="grid grid-cols-2 gap-4 w-full bg-dash-light-blue-bg/40 border border-dash-border-gray/30 rounded-2xl p-4 text-xs font-semibold text-dash-dark-purple">
-                          <div className="flex flex-col gap-0.5 border-r border-dash-border-gray/20 pr-2">
-                            <span className="text-[9px] font-bold text-dash-light-purple uppercase tracking-wider">Interview Time</span>
-                            <span className="font-mono text-sm font-extrabold text-red-500">{formatTime(englishTimeLeft)}</span>
-                          </div>
-                          <div className="flex flex-col gap-0.5 pl-2">
-                            <span className="text-[9px] font-bold text-dash-light-purple uppercase tracking-wider">Turns</span>
-                            <span className="font-extrabold text-sm">{currentQNum} spoken</span>
-                          </div>
-                          <div className="flex flex-col gap-0.5 col-span-2 border-t border-dash-border-gray/25 pt-2 mt-1 items-center">
-                            <span className="text-[9px] font-bold text-dash-light-purple uppercase tracking-wider">Connection Status</span>
-                            <span className="flex items-center gap-1.5 mt-1 text-[11px] font-bold">
-                              <span className={`w-2 h-2 rounded-full ${englishLoading ? 'bg-amber-400 animate-pulse' : 'bg-[#22c55e]'}`} />
-                              {englishLoading ? 'Processing...' : 'Online & Connected'}
+                    {/* Candidate Live Response (Speech-to-Text) Container */}
+                    <div className="w-full max-w-2xl z-10 flex flex-col gap-2">
+                      <div className="bg-white/10 border border-white/20 rounded-2xl p-4 text-left shadow-lg backdrop-blur-md transition-all">
+                        <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className={`w-2.5 h-2.5 rounded-full ${isRecording ? 'bg-emerald-400 animate-ping' : 'bg-slate-400'}`} />
+                            <span className="text-[11px] font-extrabold text-white uppercase tracking-wider">
+                              {isRecording ? '🎙️ Live Speech-to-Text Active' : '📝 Candidate Spoken Response'}
                             </span>
                           </div>
-                        </div>
-
-                        {/* Mute and Guidelines footer */}
-                        <div className="flex flex-col gap-3 w-full border-t border-dash-border-gray/25 pt-4">
-                          <button
-                            onClick={toggleMute}
-                            className={`w-full py-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${isMuted
-                              ? 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100'
-                              : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                              }`}
-                          >
-                            {isMuted ? 'Unmute AI HR Voice' : 'Mute AI HR Voice'}
-                          </button>
-                          <p className="text-[10px] text-dash-light-purple font-medium leading-normal px-2">
-                            Speak clearly into the microphone. You can edit the transcribed text before clicking Send.
-                          </p>
-                        </div>
-
-                      </div>
-
-                      {/* RIGHT PANEL: Chat History & Input */}
-                      <div className="xl:col-span-2 bg-dash-white-card border border-dash-border-gray/50 rounded-[28px] p-6 shadow-[0_4px_20px_rgba(87,82,170,0.02)] flex flex-col justify-between gap-4">
-
-                        {/* Chat Messages Log */}
-                        <div className="flex-1 min-h-[300px] max-h-[380px] overflow-y-auto pr-1 flex flex-col gap-4 border-b border-dash-border-gray/20 pb-4">
-                          {conversations.map((msg, index) => {
-                            const isLastItem = index === conversations.length - 1;
-                            return (
-                              <div key={index} className="flex flex-col gap-3">
-                                {/* AI Question */}
-                                <div className="flex items-start gap-2.5 max-w-[85%] self-start animate-fade-in">
-                                  <div className="w-7 h-7 rounded-lg bg-dash-primary-purple/10 flex items-center justify-center text-dash-primary-purple shrink-0 mt-0.5 text-xs font-bold">HR</div>
-                                  <div className="bg-slate-50 border border-slate-200/60 rounded-2xl rounded-tl-none p-3.5 text-xs font-medium text-slate-800 leading-relaxed shadow-xs">
-                                    {msg.ai_question}
-                                  </div>
-                                </div>
-
-                                {/* Candidate Answer */}
-                                {msg.candidate_answer && (
-                                  <div className="flex items-start gap-2.5 max-w-[85%] self-end justify-end animate-fade-in">
-                                    <div className="bg-dash-primary-purple text-white rounded-2xl rounded-tr-none p-3.5 text-xs font-medium leading-relaxed shadow-sm">
-                                      {msg.candidate_answer}
-                                    </div>
-                                    <div className="w-7 h-7 rounded-full bg-dash-primary-purple flex items-center justify-center text-white shrink-0 mt-0.5 text-[10px] font-bold">ME</div>
-                                  </div>
-                                )}
-
-                                {/* Typing Indicator inside active item */}
-                                {isLastItem && aiTyping && !msg.candidate_answer && (
-                                  <div className="flex items-center gap-2 text-xs font-semibold text-dash-light-purple ml-9 mt-1 italic animate-pulse">
-                                    <Loader2 size={12} className="animate-spin" />
-                                    <span>AI HR is evaluating and generating next question...</span>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-
-                          {conversations.length === 0 && (
-                            <div className="h-full flex items-center justify-center text-center text-xs text-dash-light-purple italic">
-                              Click Start to begin. The AI HR interviewer will speak and present questions here.
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Mode Switcher Action Buttons */}
-                        <div className="flex items-center justify-between border-t border-dash-border-gray/20 pt-2 mt-1">
-                          <span className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider">
-                            {conversations.length} turns recorded
+                          <span className="text-[10px] text-emerald-300 font-extrabold italic">
+                            {englishText ? `${englishText.trim().split(/\s+/).filter(Boolean).length} words spoken` : isRecording ? 'Listening for speech...' : ''}
                           </span>
-                          <button
-                            type="button"
-                            onClick={handleCompleteEnglish}
-                            disabled={englishLoading || aiTyping || conversations.length < 3}
-                            className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition-all cursor-pointer border-0 disabled:opacity-40 disabled:cursor-not-allowed shadow-md"
-                          >
-                            Conclude Interview
-                          </button>
                         </div>
 
-                        {/* Response Input Control Panel */}
-                        <div className="flex flex-col gap-3">
-                          {/* Spoken indicator banner */}
-                          {isRecording && (
-                            <div className="bg-red-50 border border-red-200 text-red-600 rounded-xl p-2.5 text-xs font-bold flex items-center gap-2 animate-pulse">
-                              <span className="w-2.5 h-2.5 rounded-full bg-red-600 shrink-0 animate-ping" />
-                              <span>Listening... Speak naturally. Click Microphone button to stop.</span>
-                            </div>
+                        <textarea
+                          value={englishText}
+                          onChange={(e) => {
+                            setEnglishText(e.target.value);
+                            currentTextRef.current = e.target.value;
+                          }}
+                          placeholder={
+                            isRecording
+                              ? "Start speaking into your microphone... your voice will be transcribed into text here in real time."
+                              : aiIsSpeaking
+                                ? `Listening to ${interviewerName}... your mic will turn on automatically when ${interviewerName} finishes.`
+                                : "Click the microphone button to start speaking..."
+                          }
+                          rows={3}
+                          disabled={englishLoading || aiTyping || autoSubmitting}
+                          className="w-full bg-black/40 text-white font-sans text-xs font-semibold p-3 rounded-xl border border-white/10 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 resize-none shadow-inner leading-relaxed placeholder:text-slate-400 placeholder:italic"
+                        />
+
+                        <div className="flex items-center justify-between mt-2 pt-1 text-[10px] text-slate-300 font-medium">
+                          <span>
+                            {isRecording && englishText
+                              ? '✨ Silence after speaking will auto-submit your response.'
+                              : isRecording
+                                ? 'Speak clearly into your microphone.'
+                                : 'You can also type or edit your text above before sending.'}
+                          </span>
+                          {englishText && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEnglishText('');
+                                currentTextRef.current = '';
+                              }}
+                              className="text-slate-400 hover:text-white underline cursor-pointer border-none bg-transparent font-bold"
+                            >
+                              Clear
+                            </button>
                           )}
-
-                          <div className="flex items-end gap-2.5">
-                            <textarea
-                              value={englishText}
-                              onChange={(e) => setEnglishText(e.target.value)}
-                              placeholder="Type your response here or click the microphone to speak..."
-                              rows={3}
-                              disabled={englishLoading || aiTyping}
-                              className="flex-1 p-3 text-xs font-semibold bg-[#fafafa] border border-dash-border-gray/50 rounded-2xl focus:outline-none focus:ring-2 focus:ring-dash-primary-purple/40 focus:border-dash-primary-purple transition-all resize-none shadow-inner"
-                            />
-
-                            <div className="flex flex-col gap-2 shrink-0">
-                              {/* Microphone Button */}
-                              <button
-                                type="button"
-                                onClick={toggleRecording}
-                                disabled={englishLoading || aiTyping}
-                                className={`w-11 h-11 rounded-xl flex items-center justify-center border transition-all duration-200 cursor-pointer shadow-md ${isRecording
-                                  ? 'bg-red-600 text-white border-red-600 animate-pulse hover:bg-red-700'
-                                  : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
-                                  }`}
-                                title="Speak Response"
-                              >
-                                <Mic size={16} />
-                              </button>
-
-                              {/* Send Button */}
-                              <button
-                                type="button"
-                                onClick={handleRespondEnglish}
-                                disabled={!englishText.trim() || englishLoading || aiTyping}
-                                className="w-11 h-11 rounded-xl bg-dash-primary-purple text-white flex items-center justify-center hover:bg-dash-dark-purple transition-all duration-200 cursor-pointer shadow-md border-0 disabled:opacity-40 disabled:cursor-not-allowed"
-                                title="Send Message"
-                              >
-                                <Send size={16} />
-                              </button>
-                            </div>
-                          </div>
                         </div>
+                      </div>
+                    </div>
 
+                    {/* Audio room control bar */}
+                    <div className="w-full max-w-2xl flex items-center justify-between border-t border-white/10 pt-6 z-10 gap-4 mt-auto">
+                      {/* Remaining Time */}
+                      <div className="flex flex-col text-left">
+                        <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">Remaining Time</span>
+                        <span className="font-mono text-sm font-extrabold text-red-400">{formatTime(englishTimeLeft)}</span>
                       </div>
 
+                      {/* Main Call controls */}
+                      <div className="flex items-center gap-3">
+                        {/* Mute button */}
+                        <button
+                          type="button"
+                          onClick={toggleMute}
+                          className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-200 cursor-pointer shadow-md ${isMuted
+                              ? 'bg-amber-600 border-amber-600 text-white hover:bg-amber-700'
+                              : 'bg-white/10 border-white/10 text-white hover:bg-white/20'
+                            }`}
+                          title={isMuted ? `Unmute ${interviewerName}'s Voice` : `Mute ${interviewerName}'s Voice`}
+                        >
+                          {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+                        </button>
+
+                        {/* Record toggle */}
+                        <button
+                          type="button"
+                          onClick={toggleRecording}
+                          disabled={englishLoading || aiTyping || aiIsSpeaking}
+                          className={`w-14 h-14 rounded-full flex items-center justify-center border transition-all duration-200 cursor-pointer shadow-lg disabled:opacity-40 disabled:cursor-not-allowed ${isRecording
+                              ? 'bg-red-600 border-red-600 text-white hover:bg-red-700 animate-pulse'
+                              : 'bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700'
+                            }`}
+                          title={isRecording ? "Stop Recording" : "Start Microphone"}
+                        >
+                          <Mic size={24} className={isRecording ? "animate-pulse" : ""} />
+                        </button>
+
+                        {/* Send Response Button (Manual trigger if user doesn't wait for silence) */}
+                        <ActionButton
+                          onClick={() => handleRespondEnglish(englishText)}
+                          isLoading={englishLoading || autoSubmitting}
+                          loadingText="Sending..."
+                          disabled={!englishText.trim() || aiTyping}
+                          className="px-5 h-12 rounded-full bg-[#10b981] hover:bg-[#059669] text-white font-bold text-xs shadow-md"
+                          title="Send response"
+                        >
+                          Done Speaking (Send)
+                        </ActionButton>
+
+                        {/* Conclude Interview */}
+                        <ActionButton
+                          onClick={handleCompleteEnglish}
+                          isLoading={englishLoading}
+                          loadingText="Generating Report..."
+                          disabled={aiTyping || conversations.length < 3}
+                          className="px-5 h-12 rounded-full bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-md"
+                          title="Finish conversation and generate report"
+                        >
+                          Conclude Interview
+                        </ActionButton>
+                      </div>
+
+                      {/* Conversation Turns info */}
+                      <div className="flex flex-col text-right">
+                        <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">Turns</span>
+                        <span className="text-sm font-extrabold text-white">{currentQNum} turns</span>
+                      </div>
                     </div>
-                  )}
+
+                  </div>
                 </div>
               );
             })()}
@@ -3355,15 +3990,12 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                     <p className="text-[10px] text-dash-light-purple italic mt-2">You can safely navigate away or wait for updates from your recruiter.</p>
                   </div>
 
-                  <div className="flex w-full justify-center mt-2">
-                    <button
-                      onClick={handleRetryEnglish}
-                      disabled={englishLoading}
-                      className="px-6 py-3 rounded-xl bg-dash-primary-purple text-white font-bold text-xs hover:bg-dash-dark-purple transition-all duration-200 shadow-md cursor-pointer border-0 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
-                    >
-                      <RotateCcw size={14} />
-                      <span>Retry Assessment</span>
-                    </button>
+                  {/* One-attempt lock notice — no retry button */}
+                  <div className="flex w-full items-center justify-center gap-2.5 bg-amber-50 border border-amber-200/70 rounded-xl px-5 py-3 mt-2">
+                    <ShieldAlert size={15} className="text-amber-600 shrink-0" />
+                    <p className="text-xs font-bold text-amber-700">
+                      This assessment has been permanently submitted. Multiple attempts are not permitted.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -3395,6 +4027,14 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
         />
       )}
 
+      {isEnglishActive && (
+        <ExamSecurityMonitor
+          securityState={englishExamSecurity}
+          assessmentName="English Communication Assessment"
+          onAutoSubmit={() => handleCompleteEnglish()}
+        />
+      )}
+
       {/* Manual Submission Confirmation Modal */}
       <AnimatePresence>
         {isSubmitModalOpen && (
@@ -3420,38 +4060,32 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                 Are you sure you want to submit your assessment? After submission, you will not be able to modify your answers.
               </p>
               <div className="flex items-center gap-3 w-full">
-                <button
-                  type="button"
-                  disabled={isSubmittingManual}
+                <ActionButton
                   onClick={() => setIsSubmitModalOpen(false)}
+                  disabled={isSubmittingManual}
+                  variant="secondary"
                   className="flex-1 py-3 px-4 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={isSubmittingManual}
+                </ActionButton>
+                <ActionButton
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    handleSubmitExam();
+                    handleSubmitExam(activeAssignment?.id);
                   }}
-                  className="flex-1 py-3 px-4 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 transition-all shadow-md cursor-pointer flex items-center justify-center gap-2 disabled:bg-indigo-400 disabled:cursor-not-allowed"
+                  isLoading={isSubmittingManual}
+                  loadingText="Submitting..."
+                  className="flex-1 py-3 px-4 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 shadow-md"
                 >
-                  {isSubmittingManual ? (
-                    <>
-                      <Loader2 size={14} className="animate-spin" />
-                      <span>Submitting...</span>
-                    </>
-                  ) : (
-                    <span>Submit Assessment</span>
-                  )}
-                </button>
+                  Submit Assessment
+                </ActionButton>
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
+
     </div>
   );
 };

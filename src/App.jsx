@@ -35,8 +35,8 @@ const ResultsRedirect = ({ onLogout }) => {
       const user = JSON.parse(userStr);
       role = user.role;
     }
-  } catch (e) {
-    console.error("Error parsing user role for results redirect:", e);
+  } catch {
+    // Return to candidate dashboard on parse error
   }
 
   if (role === 'recruiter') {
