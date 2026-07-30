@@ -1002,6 +1002,10 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
   const mediaStreamRef = useRef(null);
   const silenceTimerRef = useRef(null);
   const currentTextRef = useRef('');
+  const finalTranscriptHistoryRef = useRef('');
+  const currentSessionFinalRef = useRef('');
+  const userDeactivatedMicRef = useRef(false);
+  const isTextModeRef = useRef(false);
   const isSubmittingRef = useRef(false);
   const isRecordingRef = useRef(false);
   const chatContainerRef = useRef(null);
@@ -1068,6 +1072,9 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       setEnglishTimeLeft(900);
       setEnglishText('');
       currentTextRef.current = '';
+      finalTranscriptHistoryRef.current = '';
+      currentSessionFinalRef.current = '';
+      userDeactivatedMicRef.current = false;
 
       // Enable Full Screen Mode on start
       if (englishExamSecurity?.requestFullscreen) {
@@ -1120,6 +1127,8 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
       setEnglishText('');
       currentTextRef.current = '';
+      finalTranscriptHistoryRef.current = '';
+      currentSessionFinalRef.current = '';
 
       // Fetch latest status to refresh conversation list
       await fetchEnglishStatus();
@@ -1254,6 +1263,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
   // TTS speak helper
   const speakQuestion = (text) => {
+    userDeactivatedMicRef.current = false;
     setUserDeactivatedMic(false);
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (typeof window !== 'undefined' && window.speechSynthesis) {
@@ -1265,9 +1275,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
         silenceTimerRef.current = null;
       }
 
-      if (isRecording) {
-        stopRecording();
-      }
+      stopRecording();
 
       const cleanText = text.replace(/Welcome to the English Assessment.*?Click "Start Interview" to begin\./gi, '');
       const utterance = new SpeechSynthesisUtterance(cleanText);
@@ -1315,6 +1323,13 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
           console.warn("[TTS] SpeechSynthesis took too long, auto-releasing speaking lock.");
           window.activeUtterance = null;
           setAiIsSpeaking(false);
+          if (SpeechRecognition && !isMuted && !isTextModeRef.current && !userDeactivatedMicRef.current && !isSubmittingRef.current) {
+            setTimeout(() => {
+              if (!isSubmittingRef.current && !userDeactivatedMicRef.current && !isTextModeRef.current) {
+                startRecording(SpeechRecognition);
+              }
+            }, 300);
+          }
         }
       }, 15000); // 15 seconds fallback
 
@@ -1326,6 +1341,14 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
         clearTimeout(speakingFallbackTimer);
         window.activeUtterance = null;
         setAiIsSpeaking(false);
+        // Automatically activate candidate microphone when AI finishes speaking!
+        if (SpeechRecognition && !isMuted && !isTextModeRef.current && !userDeactivatedMicRef.current && !isSubmittingRef.current) {
+          setTimeout(() => {
+            if (!isSubmittingRef.current && !userDeactivatedMicRef.current && !isTextModeRef.current) {
+              startRecording(SpeechRecognition);
+            }
+          }, 300);
+        }
       };
 
       utterance.onerror = (e) => {
@@ -1333,6 +1356,13 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
         console.error("[TTS Error]:", e);
         window.activeUtterance = null;
         setAiIsSpeaking(false);
+        if (SpeechRecognition && !isMuted && !isTextModeRef.current && !userDeactivatedMicRef.current && !isSubmittingRef.current) {
+          setTimeout(() => {
+            if (!isSubmittingRef.current && !userDeactivatedMicRef.current && !isTextModeRef.current) {
+              startRecording(SpeechRecognition);
+            }
+          }, 300);
+        }
       };
 
       window.speechSynthesis.speak(utterance);
@@ -1365,9 +1395,11 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     }
 
     if (isRecording) {
+      userDeactivatedMicRef.current = true;
       setUserDeactivatedMic(true);
       stopRecording();
     } else {
+      userDeactivatedMicRef.current = false;
       setUserDeactivatedMic(false);
       // Request / Verify Microphone permission explicitly
       try {
@@ -1389,8 +1421,13 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     }
   };
 
-  const startRecording = (SpeechRecognition, force = false) => {
-    if (isSubmittingRef.current || (aiIsSpeaking && !force) || isTextMode) return;
+  const startRecording = (SpeechRecognition, force = false, isAutoRestart = false) => {
+    if (isSubmittingRef.current || (aiIsSpeaking && !force) || isTextModeRef.current) return;
+
+    if (!isAutoRestart) {
+      finalTranscriptHistoryRef.current = '';
+      currentSessionFinalRef.current = '';
+    }
 
     if (recognitionRef.current) {
       try { recognitionRef.current.abort(); } catch (e) { }
@@ -1420,7 +1457,14 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
             interimTranscript += event.results[i][0].transcript;
           }
         }
-        const text = (localFinalTranscript + interimTranscript).trim();
+        currentSessionFinalRef.current = localFinalTranscript;
+
+        const currentSessionText = (localFinalTranscript + interimTranscript).trim();
+        const history = finalTranscriptHistoryRef.current;
+        const text = history 
+          ? (history + " " + currentSessionText).trim() 
+          : currentSessionText;
+
         console.log("[STT Live Text]:", text);
         setEnglishText(text);
         currentTextRef.current = text;
@@ -1463,11 +1507,17 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
       rec.onend = () => {
         console.log("[STT End]");
-        // Auto-restart with fresh SpeechRecognition instance and small timeout to prevent browser crash/InvalidStateError
-        if (isRecordingRef.current && !isSubmittingRef.current && !aiIsSpeaking && !isTextMode && !userDeactivatedMic) {
+        // Save current session's final transcript into history ref
+        if (currentSessionFinalRef.current) {
+          finalTranscriptHistoryRef.current = (finalTranscriptHistoryRef.current + " " + currentSessionFinalRef.current).trim();
+          currentSessionFinalRef.current = '';
+        }
+
+        // Auto-restart with fresh SpeechRecognition instance and small timeout
+        if (isRecordingRef.current && !isSubmittingRef.current && !aiIsSpeaking && !isTextModeRef.current && !userDeactivatedMicRef.current) {
           setTimeout(() => {
-            if (isRecordingRef.current && !isSubmittingRef.current && !aiIsSpeaking && !isTextMode && !userDeactivatedMic) {
-              startRecording(SpeechRecognition);
+            if (isRecordingRef.current && !isSubmittingRef.current && !aiIsSpeaking && !isTextModeRef.current && !userDeactivatedMicRef.current) {
+              startRecording(SpeechRecognition, false, true);
             }
           }, 300);
         } else {
@@ -4135,6 +4185,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                                 onClick={() => {
                                   setIsTextMode(prev => {
                                     const newVal = !prev;
+                                    isTextModeRef.current = newVal;
                                     if (newVal) stopRecording();
                                     return newVal;
                                   });
