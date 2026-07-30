@@ -1002,6 +1002,9 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
   const currentTextRef = useRef('');
   const isSubmittingRef = useRef(false);
   const isRecordingRef = useRef(false);
+  const [isStartingTechnical, setIsStartingTechnical] = useState(false);
+  const startingTechRef = useRef(false);
+  const startingEnglishRef = useRef(false);
 
   // Stop recording and stream on unmount
   useEffect(() => {
@@ -1046,8 +1049,11 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
   // Start English Interview session
   const handleStartEnglish = async () => {
+    if (startingEnglishRef.current || englishLoading) return;
+    startingEnglishRef.current = true;
     if (englishInterview && englishInterview.status === 'COMPLETED') {
       showToast("You have already completed this assessment. Multiple attempts are not allowed.");
+      startingEnglishRef.current = false;
       return;
     }
     try {
@@ -1064,9 +1070,16 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
         await englishExamSecurity.requestFullscreen();
       }
 
-      // Auto TTS first question if not muted
-      if (res.data && res.data.ai_question && !isMuted) {
-        setTimeout(() => speakQuestion(res.data.ai_question), 800);
+      // Auto TTS first question if not muted, or auto-start mic if muted
+      if (res.data && res.data.ai_question) {
+        if (!isMuted) {
+          setTimeout(() => speakQuestion(res.data.ai_question), 800);
+        } else {
+          const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+          if (SpeechRecognition) {
+            setTimeout(() => startRecording(SpeechRecognition), 800);
+          }
+        }
       }
 
       showToast("English Interview started!");
@@ -1077,6 +1090,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     } finally {
       setEnglishLoading(false);
       setAiTyping(false);
+      startingEnglishRef.current = false;
     }
   };
 
@@ -1114,9 +1128,16 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       await fetchEnglishStatus();
 
       showToast("Answer recorded!");
-      // Speak next question out loud if not muted
-      if (res.data && res.data.ai_question && !isMuted) {
-        setTimeout(() => speakQuestion(res.data.ai_question), 600);
+      // Speak next question out loud if not muted, or auto-start mic if muted
+      if (res.data && res.data.ai_question) {
+        if (!isMuted) {
+          setTimeout(() => speakQuestion(res.data.ai_question), 600);
+        } else {
+          const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+          if (SpeechRecognition) {
+            setTimeout(() => startRecording(SpeechRecognition), 600);
+          }
+        }
       }
     } catch (err) {
       console.error("Failed to submit English Assessment response:", err);
@@ -1221,6 +1242,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
   // TTS speak helper
   const speakQuestion = (text) => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       window.speechSynthesis.cancel();
       setAiIsSpeaking(true);
@@ -1277,21 +1299,27 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       utterance.onend = () => {
         setAiIsSpeaking(false);
         // Automatically activate microphone when AI finishes speaking!
-        if (!isMuted) {
-          const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-          if (SpeechRecognition) {
-            setTimeout(() => {
-              startRecording(SpeechRecognition);
-            }, 400);
-          }
+        if (SpeechRecognition) {
+          setTimeout(() => {
+            startRecording(SpeechRecognition);
+          }, 300);
         }
       };
 
       utterance.onerror = () => {
         setAiIsSpeaking(false);
+        if (SpeechRecognition) {
+          setTimeout(() => {
+            startRecording(SpeechRecognition);
+          }, 300);
+        }
       };
 
       window.speechSynthesis.speak(utterance);
+    } else {
+      if (SpeechRecognition) {
+        startRecording(SpeechRecognition);
+      }
     }
   };
 
@@ -1367,13 +1395,13 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
           if (silenceTimerRef.current) {
             clearTimeout(silenceTimerRef.current);
           }
-          // Automatically submit candidate response after 2.2 seconds of silence
+          // Automatically submit candidate response after 5 seconds of silence
           silenceTimerRef.current = setTimeout(() => {
             if (currentTextRef.current && currentTextRef.current.trim().length > 0 && !isSubmittingRef.current) {
-              console.log("[English Assessment] Silence detected! Auto-submitting response...");
+              console.log("[English Assessment] 5 seconds of silence detected! Auto-submitting response...");
               handleRespondEnglish(currentTextRef.current);
             }
-          }, 2200);
+          }, 5000);
         }
       };
 
@@ -1464,12 +1492,28 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     }
   }, [activeTab]);
 
+  // Auto-start microphone recording when in active English interview and AI is not speaking
+  useEffect(() => {
+    if (activeTab === 'english' && englishInterview && englishInterview.status === 'IN_PROGRESS' && !aiIsSpeaking && !isRecording && !isSubmittingRef.current && !englishLoading && !aiTyping && !autoSubmitting) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        const timer = setTimeout(() => {
+          if (!isRecordingRef.current && !isSubmittingRef.current && !aiIsSpeaking) {
+            startRecording(SpeechRecognition);
+          }
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [activeTab, englishInterview?.status, aiIsSpeaking, isRecording, englishLoading, aiTyping, autoSubmitting]);
+
 
   const [assignments, setAssignments] = useState([]);
   const [loadingAssignments, setLoadingAssignments] = useState(true);
   const [activeAssignment, setActiveAssignment] = useState(null);
 
   const handleOpenInstructions = (assignment) => {
+    if (startingTechRef.current || isStartingTechnical) return;
     const asm = assignment?.assessment || assignment || {};
     const startTimeVal = assignment?.startTime || assignment?.start_time || asm?.startTime || asm?.start_time;
     if (startTimeVal && new Date(startTimeVal).getTime() > Date.now()) {
@@ -2016,6 +2060,9 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
 
   const handleStartExam = async (assignment) => {
+    if (startingTechRef.current || isStartingTechnical) return;
+    startingTechRef.current = true;
+    setIsStartingTechnical(true);
     try {
       const asm = assignment?.assessment || assignment || {};
       const startTimeVal = assignment?.startTime || assignment?.start_time || asm?.startTime || asm?.start_time;
@@ -2103,6 +2150,9 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
         errMsg = err.message;
       }
       showToast(errMsg);
+    } finally {
+      setIsStartingTechnical(false);
+      startingTechRef.current = false;
     }
   };
 
@@ -3155,9 +3205,12 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                         return (
                           <ActionButton
                             onClick={() => handleOpenInstructions(assignment)}
+                            isLoading={isStartingTechnical}
+                            loadingText={isInProgress ? "Resuming Assessment..." : "Starting Technical Assessment..."}
+                            disabled={isStartingTechnical || startingTechRef.current}
                             icon={Play}
                             iconSize={14}
-                            className="w-full py-3 rounded-xl bg-dash-primary-purple text-dash-white-card font-bold text-sm hover:bg-dash-dark-purple shadow-md"
+                            className="w-full py-3 rounded-xl bg-dash-primary-purple text-dash-white-card font-bold text-sm hover:bg-dash-dark-purple shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             {isInProgress ? 'Resume Technical Assessment' : 'Start Technical Assessment'}
                           </ActionButton>
@@ -3757,9 +3810,10 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                             onClick={handleStartEnglish}
                             isLoading={englishLoading}
                             loadingText="Starting Voice Interview..."
+                            disabled={englishLoading || startingEnglishRef.current}
                             icon={Play}
                             iconSize={13}
-                            className="px-8 py-3.5 rounded-xl bg-dash-primary-purple text-white font-bold text-xs hover:bg-dash-dark-purple shadow-md justify-center w-full"
+                            className="px-8 py-3.5 rounded-xl bg-dash-primary-purple text-white font-bold text-xs hover:bg-dash-dark-purple shadow-md justify-center w-full disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             Start Voice Interview with Previously Uploaded Resume
                           </ActionButton>
@@ -3894,11 +3948,11 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                           }`} />
                         <span>
                           {isRecording
-                            ? '🎙️ Microphone Active — Listening to your response...'
+                            ? '🎙️ Candidate Speaking — Real-time Voice-to-Text Active...'
                             : aiIsSpeaking
-                              ? `🔊 ${interviewerName} is speaking...`
+                              ? `🔊 ${interviewerName} is asking a question...`
                               : autoSubmitting
-                                ? '⏳ Silence detected — Submitting answer...'
+                                ? '⏳ 5s silence detected — Proceeding to next question...'
                                 : aiTyping || englishLoading
                                   ? `💭 ${interviewerName} is thinking...`
                                   : `${interviewerName} is ready`}
@@ -3920,52 +3974,38 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                           <div className="flex items-center gap-2">
                             <span className={`w-2.5 h-2.5 rounded-full ${isRecording ? 'bg-emerald-400 animate-ping' : 'bg-slate-400'}`} />
                             <span className="text-[11px] font-extrabold text-white uppercase tracking-wider">
-                              {isRecording ? '🎙️ Live Speech-to-Text Active' : '📝 Candidate Spoken Response'}
+                              {isRecording ? '🎙️ Live Voice-to-Text (Auto)' : '📝 Spoken Response'}
                             </span>
                           </div>
                           <span className="text-[10px] text-emerald-300 font-extrabold italic">
-                            {englishText ? `${englishText.trim().split(/\s+/).filter(Boolean).length} words spoken` : isRecording ? 'Listening for speech...' : ''}
+                            {englishText ? `${englishText.trim().split(/\s+/).filter(Boolean).length} words spoken` : isRecording ? 'Listening for your voice...' : ''}
                           </span>
                         </div>
 
                         <textarea
                           value={englishText}
-                          onChange={(e) => {
-                            setEnglishText(e.target.value);
-                            currentTextRef.current = e.target.value;
-                          }}
+                          readOnly={true}
                           placeholder={
                             isRecording
-                              ? "Start speaking into your microphone... your voice will be transcribed into text here in real time."
+                              ? "Start speaking naturally into your microphone... your voice will be transcribed into text here in real time."
                               : aiIsSpeaking
-                                ? `Listening to ${interviewerName}... your mic will turn on automatically when ${interviewerName} finishes.`
-                                : "Click the microphone button to start speaking..."
+                                ? `Listening to ${interviewerName}... your microphone will activate automatically when ${interviewerName} finishes asking.`
+                                : "Waiting for interview turn..."
                           }
                           rows={3}
-                          disabled={englishLoading || aiTyping || autoSubmitting}
-                          className="w-full bg-black/40 text-white font-sans text-xs font-semibold p-3 rounded-xl border border-white/10 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 resize-none shadow-inner leading-relaxed placeholder:text-slate-400 placeholder:italic"
+                          className="w-full bg-black/40 text-white font-sans text-xs font-semibold p-3 rounded-xl border border-white/10 focus:outline-none resize-none shadow-inner leading-relaxed placeholder:text-slate-400 placeholder:italic select-none cursor-default"
                         />
 
                         <div className="flex items-center justify-between mt-2 pt-1 text-[10px] text-slate-300 font-medium">
                           <span>
                             {isRecording && englishText
-                              ? '✨ Silence after speaking will auto-submit your response.'
+                              ? '✨ Speech is transcribed live word by word. 5 seconds of silence will automatically submit your response.'
                               : isRecording
-                                ? 'Speak clearly into your microphone.'
-                                : 'You can also type or edit your text above before sending.'}
+                                ? '🎙️ Microphone active. Speak clearly into your microphone.'
+                                : autoSubmitting
+                                  ? '⏳ 5s silence detected — Auto-submitting response...'
+                                  : '🤖 Voice-driven interview — Typing is disabled.'}
                           </span>
-                          {englishText && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEnglishText('');
-                                currentTextRef.current = '';
-                              }}
-                              className="text-slate-400 hover:text-white underline cursor-pointer border-none bg-transparent font-bold"
-                            >
-                              Clear
-                            </button>
-                          )}
                         </div>
                       </div>
                     </div>
@@ -3992,32 +4032,6 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                         >
                           {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
                         </button>
-
-                        {/* Record toggle */}
-                        <button
-                          type="button"
-                          onClick={toggleRecording}
-                          disabled={englishLoading || aiTyping || aiIsSpeaking}
-                          className={`w-14 h-14 rounded-full flex items-center justify-center border transition-all duration-200 cursor-pointer shadow-lg disabled:opacity-40 disabled:cursor-not-allowed ${isRecording
-                              ? 'bg-red-600 border-red-600 text-white hover:bg-red-700 animate-pulse'
-                              : 'bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700'
-                            }`}
-                          title={isRecording ? "Stop Recording" : "Start Microphone"}
-                        >
-                          <Mic size={24} className={isRecording ? "animate-pulse" : ""} />
-                        </button>
-
-                        {/* Send Response Button (Manual trigger if user doesn't wait for silence) */}
-                        <ActionButton
-                          onClick={() => handleRespondEnglish(englishText)}
-                          isLoading={englishLoading || autoSubmitting}
-                          loadingText="Sending..."
-                          disabled={!englishText.trim() || aiTyping}
-                          className="px-5 h-12 rounded-full bg-[#10b981] hover:bg-[#059669] text-white font-bold text-xs shadow-md"
-                          title="Send response"
-                        >
-                          Done Speaking (Send)
-                        </ActionButton>
 
                         {/* Conclude Interview */}
                         <ActionButton
