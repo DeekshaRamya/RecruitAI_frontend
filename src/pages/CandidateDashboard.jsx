@@ -37,6 +37,7 @@ import {
   Key,
   Send,
   Mic,
+  MicOff,
   VolumeX,
   ShieldAlert,
   Lock,
@@ -351,7 +352,7 @@ const ExpectedOutputTable = React.memo(({ rawOutput }) => {
 
   const lines = rawOutput.split('\n').map(l => l.trim()).filter(Boolean);
   const tableLines = lines.filter(l => l.startsWith('|') || (l.includes('|') && !l.toLowerCase().includes('showing')));
-  
+
   let recordCountText = "";
   const countLine = lines.find(l => l.toLowerCase().includes('showing') || l.toLowerCase().includes('records returned') || l.toLowerCase().includes('top'));
   if (countLine) {
@@ -379,7 +380,7 @@ const ExpectedOutputTable = React.memo(({ rawOutput }) => {
 
     if (headerCells.length > 0) {
       const displayFooterText = recordCountText || `Showing ${dataRows.length} of ${dataRows.length} returned records`;
-      
+
       return (
         <div className="mt-3 flex flex-col bg-[#111111] border border-zinc-800 rounded-xl overflow-hidden shadow-inner text-white select-text font-mono text-xs">
           <div className="bg-[#171717] px-3.5 py-2 border-b border-zinc-800 flex items-center justify-between shrink-0">
@@ -653,7 +654,7 @@ const SqlStudioEditor = React.memo(({ isSql, currentIdx, answerValue, onAnswerCh
 
 const QueryResultGrid = React.memo(({ isSql, consoleTab, setConsoleTab, sqlQueryResult, consoleOutput, syntaxError, runtimeError, isExecuting, executionStatus, executionTime, customInput, setCustomInput, expectedOutputText, resultGridRef }) => {
   return (
-    <div 
+    <div
       ref={resultGridRef}
       tabIndex={-1}
       className="flex flex-col h-[260px] min-h-[240px] max-h-[280px] shrink-0 w-full bg-[#111111] border border-zinc-800 rounded-xl overflow-hidden shadow-xl focus:outline-none focus:ring-1 focus:ring-dash-primary-purple/50 select-text"
@@ -697,13 +698,12 @@ const QueryResultGrid = React.memo(({ isSql, consoleTab, setConsoleTab, sqlQuery
               <span className="text-zinc-400 font-sans font-semibold">Rows: <strong className="text-emerald-400 font-mono">{sqlQueryResult.rowCount ?? sqlQueryResult.rows?.length ?? 0}</strong></span>
             )}
             <span className="text-zinc-400 font-sans font-semibold">Time: <strong className="text-zinc-200 font-mono">{Math.round(executionTime)}ms</strong></span>
-            <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider ${
-              executionStatus === 'Success'
-                ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/60'
-                : executionStatus === 'Syntax Error'
-                  ? 'bg-amber-950 text-amber-400 border border-amber-800/60'
-                  : 'bg-red-950 text-red-400 border border-red-800/60'
-            }`}>
+            <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider ${executionStatus === 'Success'
+              ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/60'
+              : executionStatus === 'Syntax Error'
+                ? 'bg-amber-950 text-amber-400 border border-amber-800/60'
+                : 'bg-red-950 text-red-400 border border-red-800/60'
+              }`}>
               {executionStatus}
             </span>
           </div>
@@ -983,6 +983,8 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
   const [englishInterview, setEnglishInterview] = useState(null);
   const [englishText, setEnglishText] = useState('');
   const [isRecording, setIsRecording] = useState(false);
+  const [isTextMode, setIsTextMode] = useState(false);
+  const [userDeactivatedMic, setUserDeactivatedMic] = useState(false);
   const [englishTimeLeft, setEnglishTimeLeft] = useState(900); // 15 minutes = 900 seconds
   const [aiTyping, setAiTyping] = useState(false);
   const [voiceUsed, setVoiceUsed] = useState(false);
@@ -1002,8 +1004,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
   const currentTextRef = useRef('');
   const isSubmittingRef = useRef(false);
   const isRecordingRef = useRef(false);
-  const finalTranscriptHistoryRef = useRef('');
-  const currentSessionFinalRef = useRef('');
+  const chatContainerRef = useRef(null);
   const [isStartingTechnical, setIsStartingTechnical] = useState(false);
   const startingTechRef = useRef(false);
   const startingEnglishRef = useRef(false);
@@ -1058,6 +1059,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       startingEnglishRef.current = false;
       return;
     }
+
     try {
       setEnglishLoading(true);
       setAiTyping(true);
@@ -1072,16 +1074,9 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
         await englishExamSecurity.requestFullscreen();
       }
 
-      // Auto TTS first question if not muted, or auto-start mic if muted
-      if (res.data && res.data.ai_question) {
-        if (!isMuted) {
-          setTimeout(() => speakQuestion(res.data.ai_question), 800);
-        } else {
-          const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-          if (SpeechRecognition) {
-            setTimeout(() => startRecording(SpeechRecognition), 800);
-          }
-        }
+      // Auto TTS first question if not muted
+      if (res.data && res.data.ai_question && !isMuted) {
+        setTimeout(() => speakQuestion(res.data.ai_question), 800);
       }
 
       showToast("English Interview started!");
@@ -1130,16 +1125,9 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       await fetchEnglishStatus();
 
       showToast("Answer recorded!");
-      // Speak next question out loud if not muted, or auto-start mic if muted
-      if (res.data && res.data.ai_question) {
-        if (!isMuted) {
-          setTimeout(() => speakQuestion(res.data.ai_question), 600);
-        } else {
-          const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-          if (SpeechRecognition) {
-            setTimeout(() => startRecording(SpeechRecognition), 600);
-          }
-        }
+      // Speak next question out loud if not muted
+      if (res.data && res.data.ai_question && !isMuted) {
+        setTimeout(() => speakQuestion(res.data.ai_question), 600);
       }
     } catch (err) {
       console.error("Failed to submit English Assessment response:", err);
@@ -1182,24 +1170,9 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     }
   };
 
-  // Reset and retake the English Interview
+  // Reset and retake the English Interview (Disabled - One Attempt Only)
   const handleRetryEnglish = async () => {
-    const confirmRetry = window.confirm("Are you sure you want to retry this assessment? This will permanently delete your previous interview and scores.");
-    if (!confirmRetry) return;
-
-    try {
-      setEnglishLoading(true);
-      const res = await api.post('/api/english-assessment/retry');
-      setEnglishInterview(res.data || null);
-      showToast("English interview has been reset. You can now start a new attempt.");
-      await fetchEnglishStatus();
-    } catch (err) {
-      console.error("Failed to retry English Assessment:", err);
-      const errMsg = err.response?.data?.detail || "Failed to reset English assessment. Please try again.";
-      showToast(errMsg);
-    } finally {
-      setEnglishLoading(false);
-    }
+    showToast("You have already completed this assessment. Multiple attempts are not allowed.");
   };
 
   // Upload and parse resume specifically for English Assessment
@@ -1257,8 +1230,31 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     }
   };
 
+  // Get chat dialogue messages list
+  const getChatMessages = () => {
+    const list = [];
+    if (!englishInterview) return list;
+    
+    const apiConvs = englishInterview.conversations || [];
+    if (apiConvs.length > 0) {
+      apiConvs.forEach(c => {
+        list.push({ type: 'ai', text: c.ai_question });
+        if (c.candidate_answer) {
+          list.push({ type: 'candidate', text: c.candidate_answer });
+        }
+      });
+    } else {
+      const rootQ = englishInterview.ai_question || englishInterview.current_question?.ai_question;
+      if (rootQ) {
+        list.push({ type: 'ai', text: rootQ });
+      }
+    }
+    return list;
+  };
+
   // TTS speak helper
   const speakQuestion = (text) => {
+    setUserDeactivatedMic(false);
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       window.speechSynthesis.cancel();
@@ -1275,6 +1271,10 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
       const cleanText = text.replace(/Welcome to the English Assessment.*?Click "Start Interview" to begin\./gi, '');
       const utterance = new SpeechSynthesisUtterance(cleanText);
+
+      // Store utterance globally to prevent garbage collection in Chrome/Safari
+      window.activeUtterance = utterance;
+
       utterance.lang = 'en-US';
 
       const voices = window.speechSynthesis.getVoices();
@@ -1309,34 +1309,33 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
         utterance.voice = selectedVoiceObj;
       }
 
+      // Set a fallback timer to release the speaking lock if the browser gets stuck
+      const speakingFallbackTimer = setTimeout(() => {
+        if (window.activeUtterance === utterance) {
+          console.warn("[TTS] SpeechSynthesis took too long, auto-releasing speaking lock.");
+          window.activeUtterance = null;
+          setAiIsSpeaking(false);
+        }
+      }, 15000); // 15 seconds fallback
+
       utterance.onstart = () => {
         setAiIsSpeaking(true);
       };
 
       utterance.onend = () => {
+        clearTimeout(speakingFallbackTimer);
+        window.activeUtterance = null;
         setAiIsSpeaking(false);
-        // Automatically activate microphone when AI finishes speaking!
-        if (SpeechRecognition) {
-          setTimeout(() => {
-            startRecording(SpeechRecognition);
-          }, 300);
-        }
       };
 
-      utterance.onerror = () => {
+      utterance.onerror = (e) => {
+        clearTimeout(speakingFallbackTimer);
+        console.error("[TTS Error]:", e);
+        window.activeUtterance = null;
         setAiIsSpeaking(false);
-        if (SpeechRecognition) {
-          setTimeout(() => {
-            startRecording(SpeechRecognition);
-          }, 300);
-        }
       };
 
       window.speechSynthesis.speak(utterance);
-    } else {
-      if (SpeechRecognition) {
-        startRecording(SpeechRecognition);
-      }
     }
   };
 
@@ -1358,7 +1357,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
   };
 
   // Toggle Microphone / Web Speech API Speech-to-Text
-  const toggleRecording = () => {
+  const toggleRecording = async () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
       showToast("Speech Recognition is not supported in this browser. Please use Chrome, Edge, or Safari.");
@@ -1366,19 +1365,32 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     }
 
     if (isRecording) {
+      setUserDeactivatedMic(true);
       stopRecording();
     } else {
-      startRecording(SpeechRecognition);
+      setUserDeactivatedMic(false);
+      // Request / Verify Microphone permission explicitly
+      try {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          stream.getTracks().forEach(track => track.stop());
+        }
+      } catch (err) {
+        console.error("Microphone permission check failed:", err);
+        showToast("Microphone access is denied. Please click the Lock icon in your browser address bar to allow microphone access.");
+        return;
+      }
+
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+      setAiIsSpeaking(false);
+      startRecording(SpeechRecognition, true);
     }
   };
 
-  const startRecording = (SpeechRecognition, isAutoRestart = false) => {
-    if (isSubmittingRef.current || aiIsSpeaking) return;
-
-    if (!isAutoRestart) {
-      finalTranscriptHistoryRef.current = '';
-      currentSessionFinalRef.current = '';
-    }
+  const startRecording = (SpeechRecognition, force = false) => {
+    if (isSubmittingRef.current || (aiIsSpeaking && !force) || isTextMode) return;
 
     if (recognitionRef.current) {
       try { recognitionRef.current.abort(); } catch (e) { }
@@ -1392,7 +1404,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       rec.lang = 'en-US';
 
       rec.onstart = () => {
-        console.log("[STT] Speech Recognition active, autoRestart:", isAutoRestart);
+        console.log("[STT] Speech Recognition active");
         setIsRecording(true);
         isRecordingRef.current = true;
         setVoiceUsed(true);
@@ -1408,14 +1420,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
             interimTranscript += event.results[i][0].transcript;
           }
         }
-        currentSessionFinalRef.current = localFinalTranscript;
-
-        const currentSessionText = (localFinalTranscript + interimTranscript).trim();
-        const history = finalTranscriptHistoryRef.current;
-        const text = history 
-          ? (history + " " + currentSessionText).trim() 
-          : currentSessionText;
-
+        const text = (localFinalTranscript + interimTranscript).trim();
         console.log("[STT Live Text]:", text);
         setEnglishText(text);
         currentTextRef.current = text;
@@ -1443,27 +1448,28 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
         if (e.error === 'aborted') {
           return;
         }
+        
+        if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+          showToast("Microphone permission denied. Please click the Lock icon in your browser address bar to allow microphone access.");
+        } else if (e.error === 'audio-capture') {
+          showToast("Microphone not found. Please connect a microphone and try again.");
+        } else {
+          showToast(`Microphone error: ${e.error}. Please try toggling the microphone button.`);
+        }
+        
         setIsRecording(false);
         isRecordingRef.current = false;
       };
 
       rec.onend = () => {
         console.log("[STT End]");
-        // Save the current session's final transcript to the history
-        if (currentSessionFinalRef.current) {
-          finalTranscriptHistoryRef.current = (finalTranscriptHistoryRef.current + " " + currentSessionFinalRef.current).trim();
-          currentSessionFinalRef.current = '';
-        }
-
-        // Auto-restart if candidate is still in recording mode and AI is not speaking
-        if (isRecordingRef.current && !isSubmittingRef.current && !aiIsSpeaking) {
-          try {
-            startRecording(SpeechRecognition, true);
-          } catch (err) {
-            console.warn("STT auto-restart error:", err);
-            setIsRecording(false);
-            isRecordingRef.current = false;
-          }
+        // Auto-restart with fresh SpeechRecognition instance and small timeout to prevent browser crash/InvalidStateError
+        if (isRecordingRef.current && !isSubmittingRef.current && !aiIsSpeaking && !isTextMode && !userDeactivatedMic) {
+          setTimeout(() => {
+            if (isRecordingRef.current && !isSubmittingRef.current && !aiIsSpeaking && !isTextMode && !userDeactivatedMic) {
+              startRecording(SpeechRecognition);
+            }
+          }, 300);
         } else {
           setIsRecording(false);
           isRecordingRef.current = false;
@@ -1475,6 +1481,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       rec.start();
     } catch (e) {
       console.error("[STT Exception]:", e);
+      showToast(`Failed to start microphone: ${e.message || e}`);
       setIsRecording(false);
       isRecordingRef.current = false;
     }
@@ -1527,20 +1534,20 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     }
   }, [activeTab]);
 
-  // Auto-start microphone recording when in active English interview and AI is not speaking
+  // Auto-start English interview if NOT_STARTED and eligible
   useEffect(() => {
-    if (activeTab === 'english' && englishInterview && englishInterview.status === 'IN_PROGRESS' && !aiIsSpeaking && !isRecording && !isSubmittingRef.current && !englishLoading && !aiTyping && !autoSubmitting) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        const timer = setTimeout(() => {
-          if (!isRecordingRef.current && !isSubmittingRef.current && !aiIsSpeaking) {
-            startRecording(SpeechRecognition);
-          }
-        }, 500);
-        return () => clearTimeout(timer);
-      }
+    if (activeTab === 'english' && englishInterview && englishInterview.status === 'NOT_STARTED' && englishInterview.is_eligible && !startingEnglishRef.current && !englishLoading) {
+      handleStartEnglish();
     }
-  }, [activeTab, englishInterview?.status, aiIsSpeaking, isRecording, englishLoading, aiTyping, autoSubmitting]);
+  }, [activeTab, englishInterview, englishLoading]);
+
+  // Scroll chat history to the bottom when dialogue history updates
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [englishInterview?.conversations?.length, aiTyping, englishLoading]);
+
 
 
   const [assignments, setAssignments] = useState([]);
@@ -1636,7 +1643,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     setTimeout(() => {
       if (resultGridRef.current) {
         resultGridRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        try { resultGridRef.current.focus({ preventScroll: false }); } catch (e) {}
+        try { resultGridRef.current.focus({ preventScroll: false }); } catch (e) { }
       }
     }, 150);
   };
@@ -1662,7 +1669,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
   const handleEditorDidMount = (editor, monaco) => {
     if (sqlCompletionProviderRef.current) {
-      try { sqlCompletionProviderRef.current.dispose(); } catch (_e) {}
+      try { sqlCompletionProviderRef.current.dispose(); } catch (_e) { }
     }
 
     sqlCompletionProviderRef.current = monaco.languages.registerCompletionItemProvider('sql', {
@@ -1688,7 +1695,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
         // Check if user is typing after a dot: e.g. "HumanResources." or "HumanResources.Employee." or "Employee."
         const match = textUntilPosition.match(/([a-zA-Z0-9_]+)\.(?:([a-zA-Z0-9_]+)\.)?$/);
-        
+
         if (match) {
           const part1 = match[1]; // e.g. "HumanResources" or "Employee"
           const part2 = match[2]; // e.g. "Employee" if typing "HumanResources.Employee."
@@ -1744,7 +1751,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
           // Case 1: Typing freely -> suggest available schemas (HumanResources, Person, Sales, Production, Purchasing, dbo, etc.), tables, and SQL keywords
           const schemasSet = new Set(Object.values(schemaMap).map(t => t.schema));
           ['HumanResources', 'Person', 'Sales', 'Production', 'Purchasing', 'dbo'].forEach(s => schemasSet.add(s));
-          
+
           schemasSet.forEach(s => {
             suggestions.push({
               label: s,
@@ -2075,7 +2082,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
         if (!match || match.status === 'COMPLETED') {
           try {
             localStorage.removeItem(`recruitai_active_exam_${activeAssignment.id}`);
-          } catch (e) {}
+          } catch (e) { }
           setActiveAssignment(null);
           setExamState(null);
           setActiveTab('dashboard');
@@ -2084,7 +2091,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       } else {
         try {
           localStorage.removeItem(`recruitai_active_exam_${activeAssignment.id}`);
-        } catch (e) {}
+        } catch (e) { }
         setActiveAssignment(null);
         setExamState(null);
         setActiveTab('dashboard');
@@ -3343,7 +3350,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
               {/* TOP HEADER BAR: Assessment Title, Topic, Timer, Progress & Top-Right Submit Button */}
               <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-2xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-4">
-                
+
                 {/* Title & Phase/Topic */}
                 <div className="flex items-center gap-3">
                   <span className="px-3 py-1 rounded-xl text-[11px] font-black uppercase tracking-wider bg-dash-primary-purple text-white shadow-xs">
@@ -3705,14 +3712,15 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
         {activeTab === 'english' && (
           <div className="w-full flex-1 flex flex-col gap-6 animate-fade-in select-text">
-            {englishLoading && !englishInterview && (
-              <div className="flex flex-col items-center justify-center py-20 gap-4">
+            {((englishLoading && !englishInterview) || (englishInterview && englishInterview.status === 'NOT_STARTED' && englishInterview.is_eligible)) && (
+              <div className="flex flex-col items-center justify-center py-20 gap-4 mt-12 animate-pulse">
                 <Loader2 className="animate-spin text-dash-primary-purple" size={40} />
-                <p className="text-sm font-semibold text-dash-light-purple">Initializing English Assessment...</p>
+                <p className="text-sm font-semibold text-dash-light-purple">Starting English Voice Interview...</p>
+                <p className="text-xs text-dash-light-purple/75">AI Interviewer is preparing your first question...</p>
               </div>
             )}
 
-            {englishInterview && (englishInterview.status === 'NOT_STARTED' || !englishInterview.status) && (
+            {englishInterview && (englishInterview.status === 'NOT_STARTED' || !englishInterview.status) && !englishInterview.is_eligible && (
               <div className="w-full flex justify-center items-center py-6">
                 <div className="w-full max-w-2xl bg-dash-white-card border border-dash-border-gray/50 rounded-[28px] p-8 sm:p-10 shadow-[0_4px_25px_rgba(87,82,170,0.02)] text-center flex flex-col items-center gap-6">
                   <div className="w-16 h-16 rounded-2xl bg-dash-primary-purple/10 flex items-center justify-center text-dash-primary-purple">
@@ -3734,15 +3742,13 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                       <button
                         type="button"
                         onClick={() => setAiVoiceGender('female')}
-                        className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer flex items-center gap-3.5 ${
-                          aiVoiceGender === 'female'
-                            ? 'border-dash-primary-purple bg-dash-primary-purple/10 shadow-sm ring-2 ring-dash-primary-purple/20'
-                            : 'border-dash-border-gray/50 bg-slate-50/50 hover:border-dash-primary-purple/50'
-                        }`}
+                        className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer flex items-center gap-3.5 ${aiVoiceGender === 'female'
+                          ? 'border-dash-primary-purple bg-dash-primary-purple/10 shadow-sm ring-2 ring-dash-primary-purple/20'
+                          : 'border-dash-border-gray/50 bg-slate-50/50 hover:border-dash-primary-purple/50'
+                          }`}
                       >
-                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-xl shrink-0 ${
-                          aiVoiceGender === 'female' ? 'bg-dash-primary-purple text-white' : 'bg-slate-200 text-slate-700'
-                        }`}>
+                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-xl shrink-0 ${aiVoiceGender === 'female' ? 'bg-dash-primary-purple text-white' : 'bg-slate-200 text-slate-700'
+                          }`}>
                           👩‍💼
                         </div>
                         <div className="flex-1 min-w-0">
@@ -3757,15 +3763,13 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                       <button
                         type="button"
                         onClick={() => setAiVoiceGender('male')}
-                        className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer flex items-center gap-3.5 ${
-                          aiVoiceGender === 'male'
-                            ? 'border-dash-primary-purple bg-dash-primary-purple/10 shadow-sm ring-2 ring-dash-primary-purple/20'
-                            : 'border-dash-border-gray/50 bg-slate-50/50 hover:border-dash-primary-purple/50'
-                        }`}
+                        className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer flex items-center gap-3.5 ${aiVoiceGender === 'male'
+                          ? 'border-dash-primary-purple bg-dash-primary-purple/10 shadow-sm ring-2 ring-dash-primary-purple/20'
+                          : 'border-dash-border-gray/50 bg-slate-50/50 hover:border-dash-primary-purple/50'
+                          }`}
                       >
-                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-xl shrink-0 ${
-                          aiVoiceGender === 'male' ? 'bg-dash-primary-purple text-white' : 'bg-slate-200 text-slate-700'
-                        }`}>
+                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-xl shrink-0 ${aiVoiceGender === 'male' ? 'bg-dash-primary-purple text-white' : 'bg-slate-200 text-slate-700'
+                          }`}>
                           👨‍💼
                         </div>
                         <div className="flex-1 min-w-0">
@@ -3812,8 +3816,8 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                         }}
                         onClick={() => englishFileInputRef.current && englishFileInputRef.current.click()}
                         className={`w-full py-7 border-2 border-dashed rounded-[20px] transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${englishDragOver
-                            ? 'border-dash-primary-purple bg-dash-primary-purple/5 scale-[0.99]'
-                            : 'border-dash-border-gray hover:border-dash-primary-purple hover:bg-dash-light-blue-bg/40'
+                          ? 'border-dash-primary-purple bg-dash-primary-purple/5 scale-[0.99]'
+                          : 'border-dash-border-gray hover:border-dash-primary-purple hover:bg-dash-light-blue-bg/40'
                           }`}
                       >
                         <input
@@ -3904,9 +3908,9 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                     {/* Progress Bar & Warning Counter */}
                     <div className="flex items-center gap-4 flex-1 max-w-md mx-4">
                       <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-dash-primary-purple transition-all duration-500" 
-                          style={{ width: `${Math.min(100, Math.round(((currentQNum + 1) / 8) * 100))}%` }} 
+                        <div
+                          className="h-full bg-dash-primary-purple transition-all duration-500"
+                          style={{ width: `${Math.min(100, Math.round(((currentQNum + 1) / 8) * 100))}%` }}
                         />
                       </div>
                       <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 shrink-0">
@@ -3928,11 +3932,14 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                   </div>
 
                   {/* VOICE CALL INTERVIEW ROOM CONTAINER */}
-                  <div className="w-full flex flex-col items-center justify-between bg-gradient-to-b from-[#1c133a] to-[#0a0614] border border-[#2d1b54]/40 rounded-[32px] p-6 sm:p-10 shadow-[0_10px_35px_rgba(45,27,84,0.3)] min-h-[520px] text-center gap-8 relative overflow-hidden select-none">
+                  <div className="w-full flex flex-col bg-gradient-to-b from-[#1c133a] to-[#0a0614] border border-[#2d1b54]/40 rounded-[32px] p-6 sm:p-8 shadow-[0_10px_35px_rgba(45,27,84,0.3)] min-h-[520px] relative overflow-hidden select-none gap-6">
 
-                    {/* Interactive Waveform / Avatar center */}
-                    <div className="flex flex-col items-center gap-5 my-auto relative z-10 w-full">
-                      <div className="relative w-44 h-44 flex items-center justify-center rounded-full bg-white/5 border border-white/10 shadow-[0_0_50px_rgba(139,92,246,0.15)]">
+                    {/* Two-Column Interview Layout */}
+                    <div className="flex flex-col lg:flex-row gap-6 flex-1 z-10 relative">
+
+                      {/* LEFT COLUMN: Avatar, Mic Button, Status */}
+                      <div className="flex flex-col items-center justify-start gap-5 lg:w-64 shrink-0">
+                        <div className="relative w-40 h-40 flex items-center justify-center rounded-full bg-white/5 border border-white/10 shadow-[0_0_50px_rgba(139,92,246,0.15)] shrink-0">
 
                         {/* Pulse wave rings based on state */}
                         {isRecording && (
@@ -3960,131 +3967,223 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
                         {/* Inner Avatar Box */}
                         <div className={`w-28 h-28 rounded-full flex items-center justify-center text-white shadow-2xl relative z-10 transition-all duration-500 ${isRecording
-                            ? 'bg-emerald-600 shadow-emerald-500/30 border-2 border-emerald-400/40'
-                            : aiIsSpeaking
-                              ? 'bg-violet-600 shadow-violet-500/30 border-2 border-violet-400/40'
-                              : autoSubmitting || aiTyping || englishLoading
-                                ? 'bg-amber-600 shadow-amber-500/30 border-2 border-amber-400/40'
-                                : 'bg-[#231b42] border border-[#40356c]'
+                          ? 'bg-emerald-600 shadow-emerald-500/30 border-2 border-emerald-400/40'
+                          : aiIsSpeaking
+                            ? 'bg-violet-600 shadow-violet-500/30 border-2 border-violet-400/40'
+                            : autoSubmitting || aiTyping || englishLoading
+                              ? 'bg-amber-600 shadow-amber-500/30 border-2 border-amber-400/40'
+                              : 'bg-[#231b42] border border-[#40356c]'
                           }`}>
                           <Volume2 size={40} className={isRecording ? "animate-pulse" : aiIsSpeaking ? "animate-bounce" : ""} />
                         </div>
                       </div>
 
-                      {/* Speech status label */}
-                      <div className="bg-white/5 border border-white/10 rounded-full px-5 py-1.5 text-xs font-bold text-white shadow-sm flex items-center gap-2">
-                        <span className={`w-2 h-2 rounded-full ${isRecording
-                            ? 'bg-emerald-500 animate-ping'
-                            : aiIsSpeaking
-                              ? 'bg-violet-500 animate-pulse'
-                              : autoSubmitting || aiTyping || englishLoading
-                                ? 'bg-amber-400 animate-ping'
-                                : 'bg-slate-400'
+                        {/* Microphone Toggle Button */}
+                        <button
+                          type="button"
+                          onClick={toggleRecording}
+                          disabled={isTextMode}
+                          className={`w-full px-4 py-2.5 rounded-full flex items-center justify-center gap-2 font-bold text-xs uppercase tracking-wider transition-all duration-300 shadow-md border ${
+                            isTextMode
+                              ? 'bg-slate-800 border-slate-700/50 text-slate-500 cursor-not-allowed opacity-50'
+                              : isRecording
+                                ? 'bg-emerald-600 hover:bg-emerald-700 border-emerald-500 text-white animate-pulse'
+                                : 'bg-white/10 hover:bg-white/20 border-white/20 text-white cursor-pointer'
+                          }`}
+                        >
+                          {isRecording ? <Mic size={13} /> : <MicOff size={13} className="opacity-75" />}
+                          {isRecording ? 'Mic: ON' : 'Mic: OFF'}
+                        </button>
+
+                        {/* Speech status pill */}
+                        <div className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-[10px] font-semibold text-white flex items-center gap-2">
+                          <span className={`w-2 h-2 rounded-full shrink-0 ${
+                            isRecording
+                              ? 'bg-emerald-500 animate-ping'
+                              : aiIsSpeaking
+                                ? 'bg-violet-500 animate-pulse'
+                                : autoSubmitting || aiTyping || englishLoading
+                                  ? 'bg-amber-400 animate-ping'
+                                  : 'bg-slate-400'
                           }`} />
-                        <span>
-                          {isRecording
-                            ? '🎙️ Candidate Speaking — Real-time Voice-to-Text Active...'
-                            : aiIsSpeaking
-                              ? `🔊 ${interviewerName} is asking a question...`
-                              : autoSubmitting
-                                ? '⏳ 5s silence detected — Proceeding to next question...'
-                                : aiTyping || englishLoading
-                                  ? `💭 ${interviewerName} is thinking...`
-                                  : `${interviewerName} is ready`}
-                        </span>
+                          <span className="leading-tight">
+                            {isRecording
+                              ? 'You are speaking...'
+                              : aiIsSpeaking
+                                ? `${interviewerName} is speaking...`
+                                : autoSubmitting
+                                  ? 'Auto-submitting...'
+                                  : aiTyping || englishLoading
+                                    ? `${interviewerName} is thinking...`
+                                    : `${interviewerName} is ready`}
+                          </span>
+                        </div>
+
+                        {/* Mute AI Voice */}
+                        <button
+                          type="button"
+                          onClick={toggleMute}
+                          className={`w-full px-4 py-2.5 rounded-full flex items-center justify-center gap-2 font-bold text-xs uppercase tracking-wider transition-all duration-300 shadow-md border ${
+                            isMuted
+                              ? 'bg-amber-600 border-amber-600 text-white hover:bg-amber-700'
+                              : 'bg-white/10 border-white/20 text-white hover:bg-white/20'
+                          }`}
+                          title={isMuted ? `Unmute ${interviewerName}'s Voice` : `Mute ${interviewerName}'s Voice`}
+                        >
+                          {isMuted ? <VolumeX size={13} /> : <Volume2 size={13} />}
+                          {isMuted ? 'AI: Muted' : 'AI: Audible'}
+                        </button>
                       </div>
-                    </div>
 
-                    {/* Question Text Box */}
-                    <div className="w-full max-w-2xl bg-white/5 border border-white/10 rounded-2xl p-5 shadow-inner text-center z-10">
-                      <p className="text-white font-plus-jakarta font-extrabold text-base leading-relaxed">
-                        "{activeQuestionText}"
-                      </p>
-                    </div>
+                      {/* RIGHT COLUMN: Chat history + Response box */}
+                      <div className="flex-1 flex flex-col gap-4 min-w-0">
 
-                    {/* Candidate Live Response (Speech-to-Text) Container */}
-                    <div className="w-full max-w-2xl z-10 flex flex-col gap-2">
-                      <div className="bg-white/10 border border-white/20 rounded-2xl p-4 text-left shadow-lg backdrop-blur-md transition-all">
-                        <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2">
-                          <div className="flex items-center gap-2">
-                            <span className={`w-2.5 h-2.5 rounded-full ${isRecording ? 'bg-emerald-400 animate-ping' : 'bg-slate-400'}`} />
-                            <span className="text-[11px] font-extrabold text-white uppercase tracking-wider">
-                              {isRecording ? '🎙️ Live Voice-to-Text (Auto)' : '📝 Spoken Response'}
+                        {/* Chat Dialogue History Box */}
+                        <div
+                          ref={chatContainerRef}
+                          className="flex-1 bg-black/40 border border-white/10 rounded-2xl p-4 flex flex-col gap-3 min-h-[180px] max-h-[280px] overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent text-left"
+                        >
+                          {getChatMessages().map((msg, idx) => (
+                            <div key={idx} className="flex flex-col gap-1 w-full">
+                              <div className={`flex gap-2 items-start max-w-[88%] ${msg.type === 'ai' ? 'self-start' : 'self-end flex-row-reverse'}`}>
+                                <div className={`w-6 h-6 rounded-lg flex items-center justify-center font-black text-[8px] shrink-0 border ${
+                                  msg.type === 'ai'
+                                    ? 'bg-violet-500/20 border-violet-500/30 text-violet-300'
+                                    : 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
+                                }`}>
+                                  {msg.type === 'ai' ? 'AI' : 'YOU'}
+                                </div>
+                                <div className={`rounded-2xl px-3 py-2 text-xs font-medium leading-relaxed border ${
+                                  msg.type === 'ai'
+                                    ? 'bg-[#29204a]/80 text-violet-100 border-violet-500/15'
+                                    : 'bg-[#0f2a1e]/80 text-emerald-100 border-emerald-500/15'
+                                }`}>
+                                  {msg.text}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+
+                          {/* Thinking indicator */}
+                          {(aiTyping || englishLoading || autoSubmitting) && (
+                            <div className="flex gap-2 items-start max-w-[88%] self-start">
+                              <div className="w-6 h-6 rounded-lg bg-violet-500/20 border border-violet-500/30 flex items-center justify-center font-black text-[8px] text-violet-300 shrink-0">
+                                AI
+                              </div>
+                              <div className="bg-[#29204a]/80 rounded-2xl px-3 py-2.5 border border-violet-500/15 flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                                <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                                <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Candidate Response Input Box */}
+                        <div className="bg-white/10 border border-white/20 rounded-2xl p-4 text-left shadow-lg backdrop-blur-md">
+                          <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-3">
+                            <div className="flex items-center gap-2">
+                              <span className={`w-2 h-2 rounded-full ${isRecording ? 'bg-emerald-400 animate-ping' : 'bg-slate-400'}`} />
+                              <span className="text-[10px] font-extrabold text-white uppercase tracking-wider">
+                                {isTextMode ? '📝 Your Response (Text)' : isRecording ? '🎙️ Live Voice Input' : '📝 Your Response'}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-emerald-300 font-bold italic">
+                              {englishText ? `${englishText.trim().split(/\s+/).filter(Boolean).length} words` : isRecording ? 'Listening...' : ''}
                             </span>
                           </div>
-                          <span className="text-[10px] text-emerald-300 font-extrabold italic">
-                            {englishText ? `${englishText.trim().split(/\s+/).filter(Boolean).length} words spoken` : isRecording ? 'Listening for your voice...' : ''}
-                          </span>
-                        </div>
 
-                        <textarea
-                          value={englishText}
-                          readOnly={true}
-                          placeholder={
-                            isRecording
-                              ? "Start speaking naturally into your microphone... your voice will be transcribed into text here in real time."
-                              : aiIsSpeaking
-                                ? `Listening to ${interviewerName}... your microphone will activate automatically when ${interviewerName} finishes asking.`
-                                : "Waiting for interview turn..."
-                          }
-                          rows={3}
-                          className="w-full bg-black/40 text-white font-sans text-xs font-semibold p-3 rounded-xl border border-white/10 focus:outline-none resize-none shadow-inner leading-relaxed placeholder:text-slate-400 placeholder:italic select-none cursor-default"
-                        />
+                          <textarea
+                            value={englishText}
+                            onChange={(e) => {
+                              if (isTextMode) {
+                                setEnglishText(e.target.value);
+                                currentTextRef.current = e.target.value;
+                              }
+                            }}
+                            readOnly={!isTextMode}
+                            placeholder={
+                              isTextMode
+                                ? "Type your response here..."
+                                : isRecording
+                                  ? "Speak clearly — your voice is being transcribed in real time..."
+                                  : aiIsSpeaking
+                                    ? `${interviewerName} is speaking. Your mic will activate automatically...`
+                                    : "Waiting for your turn..."
+                            }
+                            rows={3}
+                            className={`w-full bg-black/40 text-white font-sans text-xs font-medium p-3 rounded-xl border border-white/10 focus:outline-none resize-none shadow-inner leading-relaxed placeholder:text-slate-500 placeholder:italic ${
+                              isTextMode ? 'cursor-text select-text focus:border-white/30' : 'select-none cursor-default'
+                            }`}
+                          />
 
-                        <div className="flex items-center justify-between mt-2 pt-1 text-[10px] text-slate-300 font-medium">
-                          <span>
-                            {isRecording && englishText
-                              ? '✨ Speech is transcribed live word by word. 5 seconds of silence will automatically submit your response.'
-                              : isRecording
-                                ? '🎙️ Microphone active. Speak clearly into your microphone.'
-                                : autoSubmitting
-                                  ? '⏳ 5s silence detected — Auto-submitting response...'
-                                  : '🤖 Voice-driven interview — Typing is disabled.'}
-                          </span>
+                          <div className="flex items-center justify-between mt-2.5 gap-3">
+                            <span className="text-[10px] text-slate-400 font-medium leading-snug">
+                              {isTextMode
+                                ? '📝 Text Mode — type and click Submit'
+                                : isRecording && englishText
+                                  ? '✨ Transcribing live — 5s silence will auto-submit'
+                                  : isRecording
+                                    ? '🎙️ Mic active — speak clearly'
+                                    : autoSubmitting
+                                      ? '⏳ Auto-submitting...'
+                                      : '🤖 Voice-driven — enable mic to speak'}
+                            </span>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsTextMode(prev => {
+                                    const newVal = !prev;
+                                    if (newVal) stopRecording();
+                                    return newVal;
+                                  });
+                                }}
+                                className="px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-[10px] flex items-center gap-1 transition-all cursor-pointer border border-white/10"
+                              >
+                                {isTextMode ? '🎙️ Voice' : '📝 Type'}
+                              </button>
+
+                              {englishText && englishText.trim().length > 0 && !isSubmittingRef.current && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRespondEnglish(englishText)}
+                                  className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-[10px] flex items-center gap-1.5 transition-all cursor-pointer shadow-sm animate-fade-in"
+                                >
+                                  <Send size={10} />
+                                  Submit
+                                </button>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
 
-                    {/* Audio room control bar */}
-                    <div className="w-full max-w-2xl flex items-center justify-between border-t border-white/10 pt-6 z-10 gap-4 mt-auto">
+                    {/* Bottom Control Bar */}
+                    <div className="w-full flex items-center justify-between border-t border-white/10 pt-5 z-10 gap-4">
                       {/* Remaining Time */}
                       <div className="flex flex-col text-left">
                         <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">Remaining Time</span>
                         <span className="font-mono text-sm font-extrabold text-red-400">{formatTime(englishTimeLeft)}</span>
                       </div>
 
-                      {/* Main Call controls */}
-                      <div className="flex items-center gap-3">
-                        {/* Mute button */}
-                        <button
-                          type="button"
-                          onClick={toggleMute}
-                          className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all duration-200 cursor-pointer shadow-md ${isMuted
-                              ? 'bg-amber-600 border-amber-600 text-white hover:bg-amber-700'
-                              : 'bg-white/10 border-white/10 text-white hover:bg-white/20'
-                            }`}
-                          title={isMuted ? `Unmute ${interviewerName}'s Voice` : `Mute ${interviewerName}'s Voice`}
-                        >
-                          {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
-                        </button>
-
-                        {/* Conclude Interview */}
-                        <ActionButton
-                          onClick={handleCompleteEnglish}
-                          isLoading={englishLoading}
-                          loadingText="Generating Report..."
-                          disabled={aiTyping || conversations.length < 3}
-                          className="px-5 h-12 rounded-full bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-md"
-                          title="Finish conversation and generate report"
-                        >
-                          Conclude Interview
-                        </ActionButton>
-                      </div>
+                      {/* Conclude Interview */}
+                      <ActionButton
+                        onClick={handleCompleteEnglish}
+                        isLoading={englishLoading}
+                        loadingText="Generating Report..."
+                        disabled={aiTyping || conversations.length < 3}
+                        className="px-5 h-10 rounded-full bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-md"
+                        title="Finish conversation and generate report"
+                      >
+                        Conclude Interview
+                      </ActionButton>
 
                       {/* Conversation Turns info */}
                       <div className="flex flex-col text-right">
                         <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">Turns</span>
-                        <span className="text-sm font-extrabold text-white">{currentQNum} turns</span>
+                        <span className="text-sm font-extrabold text-white">{currentQNum} / 8</span>
                       </div>
                     </div>
 
@@ -4113,17 +4212,13 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                     <p className="text-[10px] text-dash-light-purple italic mt-2">You can safely navigate away or wait for updates from your recruiter.</p>
                   </div>
 
-                  {/* Retry English Assessment Button */}
-                  <ActionButton
-                    onClick={handleRetryEnglish}
-                    isLoading={englishLoading}
-                    loadingText="Resetting Assessment..."
-                    icon={RotateCcw}
-                    iconSize={14}
-                    className="px-8 py-3.5 rounded-xl bg-dash-primary-purple text-white font-bold text-xs hover:bg-dash-dark-purple shadow-md justify-center w-full"
-                  >
-                    Retry English Assessment
-                  </ActionButton>
+                  {/* One-attempt lock notice — no retry button */}
+                  <div className="flex w-full items-center justify-center gap-2.5 bg-amber-50 border border-amber-200/70 rounded-xl px-5 py-3 mt-2">
+                    <ShieldAlert size={15} className="text-amber-600 shrink-0" />
+                    <p className="text-xs font-bold text-amber-700">
+                      This assessment has been permanently submitted. Multiple attempts are not permitted.
+                    </p>
+                  </div>
                 </div>
               </div>
             )}
