@@ -1265,6 +1265,13 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
   const speakQuestion = (text) => {
     userDeactivatedMicRef.current = false;
     setUserDeactivatedMic(false);
+
+    // Clear live text box so candidate speech does not appear while AI is speaking
+    setEnglishText('');
+    currentTextRef.current = '';
+    finalTranscriptHistoryRef.current = '';
+    currentSessionFinalRef.current = '';
+
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       window.speechSynthesis.cancel();
@@ -1448,6 +1455,9 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       };
 
       rec.onresult = (event) => {
+        // Guard: Do not process speech while AI is speaking, submitting, or thinking
+        if (aiIsSpeaking || isSubmittingRef.current || englishLoading || aiTyping) return;
+
         let localFinalTranscript = '';
         let interimTranscript = '';
         for (let i = 0; i < event.results.length; ++i) {
@@ -1584,12 +1594,16 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     }
   }, [activeTab]);
 
-  // Auto-start English interview if NOT_STARTED and eligible
+  // Auto-redirect to English Assessment after Technical Assessment completion
   useEffect(() => {
-    if (activeTab === 'english' && englishInterview && englishInterview.status === 'NOT_STARTED' && englishInterview.is_eligible && !startingEnglishRef.current && !englishLoading) {
-      handleStartEnglish();
+    if (activeTab === 'technical' && activeAssignment && examState?.submitted) {
+      const redirectTimer = setTimeout(() => {
+        setActiveTab('english');
+        setActiveAssignment(null);
+      }, 3000);
+      return () => clearTimeout(redirectTimer);
     }
-  }, [activeTab, englishInterview, englishLoading]);
+  }, [activeTab, activeAssignment, examState?.submitted]);
 
   // Scroll chat history to the bottom when dialogue history updates
   useEffect(() => {
@@ -3329,6 +3343,10 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                 <p className="text-sm text-dash-light-purple font-semibold mt-3 max-w-md mx-auto leading-relaxed">
                   Thank you for taking the assessment. Your response has been securely saved and submitted to your recruiter.
                 </p>
+                <p className="text-xs text-dash-primary-purple font-extrabold mt-3 animate-pulse flex items-center justify-center gap-2">
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>Redirecting to English Communication Assessment in 3 seconds...</span>
+                </p>
               </div>
 
               {examSecurity?.autoSubmittedDueToViolations && (
@@ -3337,12 +3355,15 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                 </div>
               )}
 
-              <button
-                onClick={() => setActiveAssignment(null)}
-                className="px-8 py-3 rounded-xl bg-dash-primary-purple text-dash-white-card font-bold text-sm hover:bg-dash-dark-purple transition-all duration-200 shadow-md cursor-pointer border-0"
-              >
-                Return to Assessment List
-              </button>
+              <div className="flex flex-wrap gap-3 justify-center">
+                <button
+                  onClick={() => { setActiveTab('english'); setActiveAssignment(null); }}
+                  className="px-6 py-3 rounded-xl bg-dash-primary-purple text-dash-white-card font-bold text-xs hover:bg-dash-dark-purple transition-all duration-200 shadow-md cursor-pointer border-0 flex items-center gap-2"
+                >
+                  <span>Proceed to English Assessment Now</span>
+                  <ChevronRight size={14} />
+                </button>
+              </div>
             </div>
           </div>
         )}
