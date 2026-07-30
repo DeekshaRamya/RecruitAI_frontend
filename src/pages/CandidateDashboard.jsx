@@ -1002,6 +1002,8 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
   const currentTextRef = useRef('');
   const isSubmittingRef = useRef(false);
   const isRecordingRef = useRef(false);
+  const finalTranscriptHistoryRef = useRef('');
+  const currentSessionFinalRef = useRef('');
   const [isStartingTechnical, setIsStartingTechnical] = useState(false);
   const startingTechRef = useRef(false);
   const startingEnglishRef = useRef(false);
@@ -1355,8 +1357,13 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     }
   };
 
-  const startRecording = (SpeechRecognition) => {
+  const startRecording = (SpeechRecognition, isAutoRestart = false) => {
     if (isSubmittingRef.current || aiIsSpeaking) return;
+
+    if (!isAutoRestart) {
+      finalTranscriptHistoryRef.current = '';
+      currentSessionFinalRef.current = '';
+    }
 
     if (recognitionRef.current) {
       try { recognitionRef.current.abort(); } catch (e) { }
@@ -1370,7 +1377,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       rec.lang = 'en-US';
 
       rec.onstart = () => {
-        console.log("[STT] Speech Recognition active");
+        console.log("[STT] Speech Recognition active, autoRestart:", isAutoRestart);
         setIsRecording(true);
         isRecordingRef.current = true;
         setVoiceUsed(true);
@@ -1386,7 +1393,14 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
             interimTranscript += event.results[i][0].transcript;
           }
         }
-        const text = (localFinalTranscript + interimTranscript).trim();
+        currentSessionFinalRef.current = localFinalTranscript;
+
+        const currentSessionText = (localFinalTranscript + interimTranscript).trim();
+        const history = finalTranscriptHistoryRef.current;
+        const text = history 
+          ? (history + " " + currentSessionText).trim() 
+          : currentSessionText;
+
         console.log("[STT Live Text]:", text);
         setEnglishText(text);
         currentTextRef.current = text;
@@ -1420,10 +1434,16 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
       rec.onend = () => {
         console.log("[STT End]");
+        // Save the current session's final transcript to the history
+        if (currentSessionFinalRef.current) {
+          finalTranscriptHistoryRef.current = (finalTranscriptHistoryRef.current + " " + currentSessionFinalRef.current).trim();
+          currentSessionFinalRef.current = '';
+        }
+
         // Auto-restart if candidate is still in recording mode and AI is not speaking
         if (isRecordingRef.current && !isSubmittingRef.current && !aiIsSpeaking) {
           try {
-            rec.start();
+            startRecording(SpeechRecognition, true);
           } catch (err) {
             console.warn("STT auto-restart error:", err);
             setIsRecording(false);
