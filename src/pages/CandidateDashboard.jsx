@@ -1064,6 +1064,17 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       return;
     }
 
+    // Require resume analysis before starting English assessment
+    const hasResume = candidate && ((candidate.resume && candidate.resume > 0) || candidate.resume_url || candidate.resume_path);
+    if (!hasResume) {
+      showToast("Please upload and analyze your resume first! The AI generates personalized interview questions from your resume.");
+      startingEnglishRef.current = false;
+      if (englishFileInputRef.current) {
+        englishFileInputRef.current.click();
+      }
+      return;
+    }
+
     try {
       setEnglishLoading(true);
       setAiTyping(true);
@@ -1594,17 +1605,6 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     }
   }, [activeTab]);
 
-  // Auto-redirect to English Assessment after Technical Assessment completion
-  useEffect(() => {
-    if (activeTab === 'technical' && activeAssignment && examState?.submitted) {
-      const redirectTimer = setTimeout(() => {
-        setActiveTab('english');
-        setActiveAssignment(null);
-      }, 3000);
-      return () => clearTimeout(redirectTimer);
-    }
-  }, [activeTab, activeAssignment, examState?.submitted]);
-
   // Scroll chat history to the bottom when dialogue history updates
   useEffect(() => {
     if (chatContainerRef.current) {
@@ -1730,6 +1730,17 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       fetchLiveSchema();
     }
   }, [activeTab, activeAssignment]);
+
+  // Auto-redirect to English Assessment after Technical Assessment completion
+  useEffect(() => {
+    if (activeTab === 'technical' && activeAssignment && examState?.submitted) {
+      const redirectTimer = setTimeout(() => {
+        setActiveTab('english');
+        setActiveAssignment(null);
+      }, 3000);
+      return () => clearTimeout(redirectTimer);
+    }
+  }, [activeTab, activeAssignment, examState?.submitted]);
 
   const handleEditorDidMount = (editor, monaco) => {
     if (sqlCompletionProviderRef.current) {
@@ -3783,15 +3794,14 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
         {activeTab === 'english' && (
           <div className="w-full flex-1 flex flex-col gap-6 animate-fade-in select-text">
-            {((englishLoading && !englishInterview) || (englishInterview && englishInterview.status === 'NOT_STARTED' && englishInterview.is_eligible)) && (
-              <div className="flex flex-col items-center justify-center py-20 gap-4 mt-12 animate-pulse">
+            {englishLoading && !englishInterview && (
+              <div className="flex flex-col items-center justify-center py-20 gap-4">
                 <Loader2 className="animate-spin text-dash-primary-purple" size={40} />
-                <p className="text-sm font-semibold text-dash-light-purple">Starting English Voice Interview...</p>
-                <p className="text-xs text-dash-light-purple/75">AI Interviewer is preparing your first question...</p>
+                <p className="text-sm font-semibold text-dash-light-purple">Initializing English Assessment...</p>
               </div>
             )}
 
-            {englishInterview && (englishInterview.status === 'NOT_STARTED' || !englishInterview.status) && !englishInterview.is_eligible && (
+            {englishInterview && (englishInterview.status === 'NOT_STARTED' || !englishInterview.status) && (
               <div className="w-full flex justify-center items-center py-6">
                 <div className="w-full max-w-2xl bg-dash-white-card border border-dash-border-gray/50 rounded-[28px] p-8 sm:p-10 shadow-[0_4px_25px_rgba(87,82,170,0.02)] text-center flex flex-col items-center gap-6">
                   <div className="w-16 h-16 rounded-2xl bg-dash-primary-purple/10 flex items-center justify-center text-dash-primary-purple">
@@ -3873,6 +3883,37 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                     </div>
                   ) : (
                     <div className="flex flex-col gap-4 w-full">
+                      {/* Resume Analysis Badge if already analyzed */}
+                      {candidate && ((candidate.resume && candidate.resume > 0) || candidate.resume_url || candidate.resume_path) ? (
+                        <div className="w-full bg-emerald-50 border border-emerald-200/80 rounded-2xl p-4 flex items-center justify-between gap-3 text-left">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 shrink-0">
+                              <CheckCircle2 size={22} />
+                            </div>
+                            <div>
+                              <p className="text-xs font-black text-emerald-800">Resume Analyzed & Verified</p>
+                              <p className="text-[10px] text-emerald-600 font-bold mt-0.5">
+                                AI has parsed your skills & experience to generate personalized interview questions.
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => englishFileInputRef.current && englishFileInputRef.current.click()}
+                            className="text-[10px] font-extrabold text-dash-primary-purple underline hover:text-dash-dark-purple cursor-pointer shrink-0"
+                          >
+                            Update Resume
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="w-full bg-amber-50 border border-amber-200/80 rounded-2xl p-3.5 text-left flex items-center gap-2.5">
+                          <ShieldAlert size={16} className="text-amber-600 shrink-0" />
+                          <p className="text-[11px] font-bold text-amber-800 leading-snug">
+                            <strong>Step 1 (Mandatory):</strong> Upload your Resume PDF below. The AI will analyze your resume to customize your interview questions.
+                          </p>
+                        </div>
+                      )}
+
                       {/* Drag & Drop Zone */}
                       <div
                         onDragOver={(e) => { e.preventDefault(); setEnglishDragOver(true); }}
@@ -3886,7 +3927,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                           }
                         }}
                         onClick={() => englishFileInputRef.current && englishFileInputRef.current.click()}
-                        className={`w-full py-7 border-2 border-dashed rounded-[20px] transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${englishDragOver
+                        className={`w-full py-6 border-2 border-dashed rounded-[20px] transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${englishDragOver
                           ? 'border-dash-primary-purple bg-dash-primary-purple/5 scale-[0.99]'
                           : 'border-dash-border-gray hover:border-dash-primary-purple hover:bg-dash-light-blue-bg/40'
                           }`}
@@ -3904,28 +3945,29 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                           className="hidden"
                         />
                         <UploadCloud size={24} className="text-dash-light-purple animate-pulse" />
-                        <span className="text-xs font-extrabold text-dash-dark-purple">Upload Resume to Start HR Interview</span>
-                        <span className="text-[10px] text-slate-400 font-bold">Drag & Drop Resume PDF or click to browse (max 5MB)</span>
+                        <span className="text-xs font-extrabold text-dash-dark-purple">
+                          {candidate && candidate.resume ? 'Re-upload / Update Resume PDF' : 'Upload Resume PDF to Analyze & Start Interview'}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-bold">Drag & Drop PDF file here or click to browse (max 5MB)</span>
                       </div>
 
                       {englishUploadError && (
                         <p className="text-[10px] font-bold text-red-500">{englishUploadError}</p>
                       )}
 
-                      {/* If candidate already has a resume on file, let them start directly */}
-                      {candidate && candidate.resume && candidate.resume > 0 && (
-                        <div className="flex flex-col items-center gap-2 mt-2">
-                          <span className="text-[10px] text-slate-400 font-bold">— OR —</span>
+                      {/* Start AI Voice Interview button */}
+                      {englishInterview.is_eligible !== false && (
+                        <div className="flex flex-col items-center gap-2 mt-1 w-full">
                           <ActionButton
                             onClick={handleStartEnglish}
                             isLoading={englishLoading}
-                            loadingText="Starting Voice Interview..."
+                            loadingText="Analyzing Resume & Starting Interview..."
                             disabled={englishLoading || startingEnglishRef.current}
                             icon={Play}
                             iconSize={13}
-                            className="px-8 py-3.5 rounded-xl bg-dash-primary-purple text-white font-bold text-xs hover:bg-dash-dark-purple shadow-md justify-center w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="px-8 py-3.5 rounded-xl bg-dash-primary-purple text-white font-bold text-xs hover:bg-dash-dark-purple shadow-md justify-center w-full disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-all hover:scale-[1.01]"
                           >
-                            Start Voice Interview with Previously Uploaded Resume
+                            {candidate && candidate.resume ? 'Start AI Voice Interview (Based on Analyzed Resume)' : 'Upload Resume & Start AI Voice Interview'}
                           </ActionButton>
                         </div>
                       )}
