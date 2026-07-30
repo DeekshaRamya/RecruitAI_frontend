@@ -1039,6 +1039,12 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       setEnglishLoading(true);
       const res = await api.get('/api/english-assessment/current');
       setEnglishInterview(res.data);
+      if (res.data && res.data.resume_filename) {
+        setCandidate(prev => ({
+          ...prev,
+          resume_filename: res.data.resume_filename
+        }));
+      }
       if (res.data && res.data.status === 'IN_PROGRESS') {
         // Calculate remaining time
         const startTime = new Date(res.data.start_time).getTime();
@@ -1227,11 +1233,13 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
         },
       });
 
-      showToast('Resume uploaded successfully!');
+      showToast('Resume uploaded and analyzed successfully!');
 
       setCandidate(prev => ({
         ...prev,
         resume: response.data.resume_score || 85,
+        resume_filename: response.data.resume_filename || file.name,
+        resume_analysis: response.data.resume_analysis || [],
         name: response.data.full_name || response.data.name || prev.name
       }));
 
@@ -3883,34 +3891,53 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                     </div>
                   ) : (
                     <div className="flex flex-col gap-4 w-full">
-                      {/* Resume Analysis Badge if already analyzed */}
-                      {candidate && ((candidate.resume && candidate.resume > 0) || candidate.resume_url || candidate.resume_path) ? (
-                        <div className="w-full bg-emerald-50 border border-emerald-200/80 rounded-2xl p-4 flex items-center justify-between gap-3 text-left">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 shrink-0">
-                              <CheckCircle2 size={22} />
+                      {/* Resume Analysis Badge & Detail Summary */}
+                      {candidate && (candidate.resume_filename || (candidate.resume && candidate.resume > 0) || candidate.resume_url || candidate.resume_path) ? (
+                        <div className="w-full bg-emerald-50/90 border border-emerald-200 rounded-2xl p-4 text-left shadow-sm space-y-2.5">
+                          <div className="flex items-center justify-between gap-3 border-b border-emerald-200/60 pb-2.5">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-xl bg-emerald-500/15 flex items-center justify-center text-emerald-700 shrink-0 font-extrabold text-sm">
+                                📄
+                              </div>
+                              <div>
+                                <p className="text-xs font-black text-emerald-900 flex items-center gap-1.5">
+                                  <span>Resume Analyzed: {candidate.resume_filename || 'Uploaded Resume.pdf'}</span>
+                                  <span className="bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded-full text-[9px] font-black uppercase">Verified</span>
+                                </p>
+                                <p className="text-[10px] text-emerald-700 font-bold mt-0.5">
+                                  Resume Match Score: {candidate.resume || 85}% • Skills & Experience extracted by AI
+                                </p>
+                              </div>
                             </div>
-                            <div>
-                              <p className="text-xs font-black text-emerald-800">Resume Analyzed & Verified</p>
-                              <p className="text-[10px] text-emerald-600 font-bold mt-0.5">
-                                AI has parsed your skills & experience to generate personalized interview questions.
-                              </p>
-                            </div>
+                            <button
+                              type="button"
+                              onClick={() => englishFileInputRef.current && englishFileInputRef.current.click()}
+                              className="text-[10px] font-extrabold text-dash-primary-purple hover:underline cursor-pointer shrink-0"
+                            >
+                              Re-upload PDF
+                            </button>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => englishFileInputRef.current && englishFileInputRef.current.click()}
-                            className="text-[10px] font-extrabold text-dash-primary-purple underline hover:text-dash-dark-purple cursor-pointer shrink-0"
-                          >
-                            Update Resume
-                          </button>
+
+                          <div className="text-[11px] text-slate-700 space-y-1">
+                            <p className="font-extrabold text-dash-primary-purple uppercase tracking-wider text-[10px] flex items-center gap-1">
+                              <span>🤖 AI Question Tailoring Protocol:</span>
+                            </p>
+                            <p className="text-[11px] leading-relaxed text-slate-600 font-medium">
+                              The AI HR interviewer has thoroughly analyzed your resume context. All 8 interview questions will be customized based on your background, technical skills, and project experience.
+                            </p>
+                          </div>
                         </div>
                       ) : (
-                        <div className="w-full bg-amber-50 border border-amber-200/80 rounded-2xl p-3.5 text-left flex items-center gap-2.5">
-                          <ShieldAlert size={16} className="text-amber-600 shrink-0" />
-                          <p className="text-[11px] font-bold text-amber-800 leading-snug">
-                            <strong>Step 1 (Mandatory):</strong> Upload your Resume PDF below. The AI will analyze your resume to customize your interview questions.
-                          </p>
+                        <div className="w-full bg-amber-50 border border-amber-200 rounded-2xl p-4 text-left flex items-center gap-3">
+                          <ShieldAlert size={18} className="text-amber-600 shrink-0" />
+                          <div>
+                            <p className="text-xs font-black text-amber-900">
+                              Mandatory Step 1: Upload Your Resume PDF
+                            </p>
+                            <p className="text-[10px] text-amber-700 font-bold mt-0.5">
+                              The AI will parse and analyze your resume to generate personalized interview questions based on your background.
+                            </p>
+                          </div>
                         </div>
                       )}
 
