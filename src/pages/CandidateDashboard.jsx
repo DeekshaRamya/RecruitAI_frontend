@@ -3643,11 +3643,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                 </div>
               </div>
 
-<<<<<<< HEAD
               {/* CODING LAYOUT: Top Horizontal Navigator */}
-=======
-              {/* HORIZONTAL QUESTION NUMBER NAVIGATION BAR (Clean Single Line Alignment) */}
->>>>>>> c631e3334eaecd7caa6f657d2c1a456c5cc54222
               {isCoding && (
                 <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-2xl px-4 py-2.5 shadow-2xs flex flex-wrap lg:flex-nowrap items-center justify-between gap-3 overflow-x-auto dashboard-scrollbar">
                   <div className="flex items-center gap-3 overflow-x-auto py-0.5 dashboard-scrollbar flex-1">
@@ -3656,7 +3652,6 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                       <span>Navigator:</span>
                     </span>
 
-<<<<<<< HEAD
                     {mcqNavItems.length > 0 && (
                       <div className="flex items-center gap-2 shrink-0">
                         <span className="text-[9px] font-black text-purple-700 bg-purple-100 px-2 py-1 rounded-md uppercase tracking-wider shrink-0">MCQ Questions ({mcqNavItems.length})</span>
@@ -3683,7 +3678,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                                         : 'bg-slate-100 border-slate-200/80 text-slate-600 hover:bg-slate-200/70'
                                 }`}
                               >
-                                {idx + 1}
+                                <span>{idx + 1}</span>
                                 {qFlagged ? (
                                   <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-amber-500 text-white rounded-full flex items-center justify-center text-[7px] font-black shadow-xs">
                                     <Flag size={7} className="fill-white" />
@@ -3693,27 +3688,6 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                                     <Check size={8} strokeWidth={3} />
                                   </span>
                                 ) : null}
-=======
-                    {totalMcqs > 0 && (
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-[9px] font-black text-purple-700 bg-purple-100 px-2 py-1 rounded-md uppercase tracking-wider shrink-0">Phase 1 (MCQ)</span>
-                        <div className="flex items-center gap-1.5">
-                          {mcqQuestions.map((q, idx) => {
-                            const isCurrent = idx === currentIdx;
-                            const isVisited = Boolean(examState.visitedQuestions?.[idx]);
-                            return (
-                              <button
-                                key={idx}
-                                onClick={() => setExamState(prev => ({ ...prev, currentQuestionIndex: idx }))}
-                                className={`w-8 h-8 rounded-lg font-extrabold text-xs flex items-center justify-center cursor-pointer border transition-all duration-200 shrink-0 ${isCurrent
-                                  ? 'bg-dash-primary-purple text-white border-dash-primary-purple shadow-sm scale-105'
-                                  : isVisited
-                                    ? 'bg-dash-success-green/10 text-dash-success-green border-[#22c55e]/30 hover:bg-dash-success-green/20'
-                                    : 'bg-slate-100 border-slate-200/80 text-slate-600 hover:bg-slate-200/70'
-                                  }`}
-                              >
-                                {idx + 1}
->>>>>>> c631e3334eaecd7caa6f657d2c1a456c5cc54222
                               </button>
                             );
                           })}
@@ -3721,7 +3695,6 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                       </div>
                     )}
 
-<<<<<<< HEAD
                     {mcqNavItems.length > 0 && codingNavItems.length > 0 && (
                       <div className="h-4 w-px bg-slate-200 shrink-0 mx-1" />
                     )}
@@ -3752,7 +3725,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                                         : 'bg-slate-100 border-slate-200/80 text-slate-600 hover:bg-slate-200/70'
                                 }`}
                               >
-                                {idx + 1}
+                                <span>{idx + 1}</span>
                                 {qFlagged ? (
                                   <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-amber-500 text-white rounded-full flex items-center justify-center text-[7px] font-black shadow-xs">
                                     <Flag size={7} className="fill-white" />
@@ -3762,32 +3735,6 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                                     <Check size={8} strokeWidth={3} />
                                   </span>
                                 ) : null}
-=======
-                    {totalMcqs > 0 && totalScenarios > 0 && (
-                      <div className="h-4 w-px bg-slate-200 shrink-0 mx-1" />
-                    )}
-
-                    {totalScenarios > 0 && (
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-[9px] font-black text-indigo-700 bg-indigo-100 px-2 py-1 rounded-md uppercase tracking-wider shrink-0">Phase 2 (Coding)</span>
-                        <div className="flex items-center gap-1.5">
-                          {scenarioQuestions.map((q, sIdx) => {
-                            const realIdx = totalMcqs + sIdx;
-                            const isCurrent = realIdx === currentIdx;
-                            const isVisited = Boolean(examState.visitedQuestions?.[realIdx]);
-                            return (
-                              <button
-                                key={realIdx}
-                                onClick={() => setExamState(prev => ({ ...prev, currentQuestionIndex: realIdx }))}
-                                className={`w-8 h-8 rounded-lg font-extrabold text-xs flex items-center justify-center cursor-pointer border transition-all duration-200 shrink-0 ${isCurrent
-                                  ? 'bg-dash-primary-purple text-white border-dash-primary-purple shadow-sm scale-105'
-                                  : isVisited
-                                    ? 'bg-dash-success-green/10 text-dash-success-green border-[#22c55e]/30 hover:bg-dash-success-green/20'
-                                    : 'bg-slate-100 border-slate-200/80 text-slate-600 hover:bg-slate-200/70'
-                                  }`}
-                              >
-                                {realIdx + 1}
->>>>>>> c631e3334eaecd7caa6f657d2c1a456c5cc54222
                               </button>
                             );
                           })}
@@ -3796,23 +3743,14 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                     )}
                   </div>
 
-<<<<<<< HEAD
                   <span className="text-[10px] font-extrabold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg border border-indigo-200/60 shrink-0 uppercase tracking-wider ml-auto flex items-center gap-1.5">
                     <Code size={12} />
                     <span>{isSql ? 'SQL QUERY STUDIO' : 'PYTHON COMPILER STUDIO'}</span>
-=======
-                  <span className="text-[10px] font-extrabold text-dash-primary-purple bg-purple-50 px-2.5 py-1 rounded-lg border border-purple-200/50 shrink-0 uppercase tracking-wider ml-auto">
-                    {isSql ? 'SQL QUERY' : (isCoding ? 'PYTHON CODING' : 'MCQ')}
->>>>>>> c631e3334eaecd7caa6f657d2c1a456c5cc54222
                   </span>
                 </div>
               )}
 
-<<<<<<< HEAD
               {/* MAIN CONTENT AREA: Dynamic switching between MCQ and Coding */}
-=======
-              {/* TWO-COLUMN MAIN CONTENT LAYOUT */}
->>>>>>> c631e3334eaecd7caa6f657d2c1a456c5cc54222
               {isCoding ? (
                 /* CODING / COMPILER LAYOUT: Majority Width Editor + Left Question Card */
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start w-full">
@@ -3870,7 +3808,6 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                   </div>
                 </div>
               ) : (
-<<<<<<< HEAD
                 /* MCQ LAYOUT: Fixed Sticky Left Vertical Sidebar Navigator (22% Width) + Single Large Main Assessment Card (78% Width) */
                 <div className="flex flex-col lg:flex-row gap-5 items-start w-full">
 
@@ -4218,143 +4155,9 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                         </button>
                       )}
                     </div>
-
                   </div>
-
-=======
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start w-full">
-                  {/* Left Column (3/12 width): Question Number Panel */}
-                  <div className="lg:col-span-3 w-full bg-dash-white-card border border-dash-border-gray/50 rounded-2xl p-5 shadow-sm flex flex-col gap-4">
-                    <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-                      <ListOrdered size={16} className="text-dash-primary-purple" />
-                      <h4 className="font-outfit font-extrabold text-xs text-dash-dark-purple uppercase tracking-wider">
-                        Navigator
-                      </h4>
-                    </div>
-
-                    <div className="flex flex-col gap-4 overflow-y-auto max-h-[450px] dashboard-scrollbar">
-                      {totalMcqs > 0 && (
-                        <div className="flex flex-col gap-2">
-                          <span className="text-[9px] font-black text-purple-700 bg-purple-100 px-2 py-1 rounded-md uppercase tracking-wider block text-center">
-                            Phase 1 (MCQ)
-                          </span>
-                          <div className="flex flex-wrap gap-1.5 justify-center lg:justify-start">
-                            {mcqQuestions.map((q, idx) => {
-                              const isCurrent = idx === currentIdx;
-                              const isVisited = Boolean(examState.visitedQuestions?.[idx]);
-                              return (
-                                <button
-                                  key={idx}
-                                  onClick={() => setExamState(prev => ({ ...prev, currentQuestionIndex: idx }))}
-                                  className={`w-8 h-8 rounded-lg font-extrabold text-xs flex items-center justify-center cursor-pointer border transition-all duration-200 ${isCurrent
-                                    ? 'bg-dash-primary-purple text-white border-dash-primary-purple shadow-sm scale-105'
-                                    : isVisited
-                                      ? 'bg-dash-success-green/10 text-dash-success-green border-[#22c55e]/30 hover:bg-dash-success-green/20'
-                                      : 'bg-slate-100 border-slate-200/80 text-slate-600 hover:bg-slate-200/70'
-                                    }`}
-                                >
-                                  {idx + 1}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      {totalScenarios > 0 && (
-                        <div className="flex flex-col gap-2 border-t border-slate-100 pt-3">
-                          <span className="text-[9px] font-black text-indigo-700 bg-indigo-100 px-2 py-1 rounded-md uppercase tracking-wider block text-center">
-                            Phase 2 (Coding)
-                          </span>
-                          <div className="flex flex-wrap gap-1.5 justify-center lg:justify-start">
-                            {scenarioQuestions.map((q, sIdx) => {
-                              const realIdx = totalMcqs + sIdx;
-                              const isCurrent = realIdx === currentIdx;
-                              const isVisited = Boolean(examState.visitedQuestions?.[realIdx]);
-                              return (
-                                <button
-                                  key={realIdx}
-                                  onClick={() => setExamState(prev => ({ ...prev, currentQuestionIndex: realIdx }))}
-                                  className={`w-8 h-8 rounded-lg font-extrabold text-xs flex items-center justify-center cursor-pointer border transition-all duration-200 ${isCurrent
-                                    ? 'bg-dash-primary-purple text-white border-dash-primary-purple shadow-sm scale-105'
-                                    : isVisited
-                                      ? 'bg-dash-success-green/10 text-dash-success-green border-[#22c55e]/30 hover:bg-dash-success-green/20'
-                                      : 'bg-slate-100 border-slate-200/80 text-slate-600 hover:bg-slate-200/70'
-                                    }`}
-                                >
-                                  {realIdx + 1}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Right Column (9/12 width): Question Editing/Writing Panel */}
-                  <div className="lg:col-span-9 bg-dash-white-card border border-dash-border-gray/50 rounded-2xl p-5 sm:p-6 shadow-sm flex flex-col gap-4 w-full">
-                    {question.scenario && (
-                      <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-2xl p-3.5">
-                        <h5 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Scenario Context:</h5>
-                        <p className="text-xs sm:text-sm font-semibold text-slate-800 leading-relaxed whitespace-pre-line">
-                          {question.scenario}
-                        </p>
-                      </div>
-                    )}
-
-                    <div>
-                      <h3 className="font-plus-jakarta font-extrabold text-xl sm:text-2xl text-dash-dark-purple leading-snug">
-                        {question.question}
-                      </h3>
-                    </div>
-
-                    {question.options && question.options.length > 0 ? (
-                      <div className="flex flex-col gap-2 mt-1">
-                        {question.options.map((option, optIdx) => {
-                          const isSelected = examState.answers[currentIdx] === option;
-                          return (
-                            <button
-                              key={optIdx}
-                              onClick={() => setExamState(prev => ({
-                                ...prev,
-                                answers: { ...prev.answers, [currentIdx]: option }
-                              }))}
-                              className={`w-full text-left px-4 py-2.5 rounded-xl border font-semibold text-sm transition-all duration-200 cursor-pointer flex items-center justify-between group ${isSelected
-                                ? 'bg-dash-primary-purple/10 border-dash-primary-purple text-dash-dark-purple shadow-2xs font-bold'
-                                : 'bg-dash-soft-pink/60 border-dash-border-gray/40 text-slate-700 hover:bg-dash-border-gray/60 hover:text-dash-dark-purple'
-                                }`}
-                            >
-                              <span className="flex-1 pr-3 leading-snug">{option}</span>
-                              <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-all ${isSelected
-                                ? 'border-dash-primary-purple bg-dash-primary-purple text-white'
-                                : 'border-slate-300 group-hover:border-dash-primary-purple'
-                                }`}>
-                                {isSelected && <Check size={10} strokeWidth={3} />}
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="flex flex-col gap-3 mt-1">
-                        <textarea
-                          value={examState.answers[currentIdx] || ''}
-                          onChange={(e) => setExamState(prev => ({
-                            ...prev,
-                            answers: { ...prev.answers, [currentIdx]: e.target.value }
-                          }))}
-                          placeholder="Write your code or answer explanation here..."
-                          rows={6}
-                          className="w-full p-3.5 rounded-2xl border border-dash-border-gray/50 bg-[#fafafa] font-mono text-sm focus:outline-none focus:ring-2 focus:ring-dash-primary-purple/40 focus:border-dash-primary-purple transition-all resize-y"
-                        />
-                      </div>
-                    )}
-                  </div>
->>>>>>> c631e3334eaecd7caa6f657d2c1a456c5cc54222
                 </div>
               )}
-
             </div>
           );
         })()}
