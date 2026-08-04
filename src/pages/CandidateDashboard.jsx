@@ -673,7 +673,7 @@ const SqlStudioEditor = React.memo(({ isSql, currentIdx, answerValue, onAnswerCh
               iconSize={13}
               className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[11px] uppercase tracking-wider shadow-xs transition-all flex items-center gap-1 border-none cursor-pointer"
             >
-              {isSql ? 'Execute Query' : 'Run Script'}
+              {isSql ? 'Execute Query' : 'Run Python Code'}
             </ActionButton>
           )}
           <button
@@ -918,7 +918,11 @@ const QueryResultGrid = React.memo(({ isSql, consoleTab, setConsoleTab, sqlQuery
             {!syntaxError && !runtimeError && !consoleOutput && !sqlQueryResult && !isExecuting && (
               <div className="flex-1 flex items-center justify-center p-4 border border-dashed border-zinc-800/80 rounded-xl bg-zinc-950/40 text-center">
                 <span className="text-zinc-500 font-sans italic text-xs">
-                  Click <strong className="text-emerald-400 font-semibold">Execute Query</strong> below or in the studio toolbar to execute T-SQL against the AdventureWorks database and display live results here.
+                  {isSql ? (
+                    <>Click <strong className="text-emerald-400 font-semibold">Execute Query</strong> in the studio toolbar to execute T-SQL against the AdventureWorks database and display live results here.</>
+                  ) : (
+                    <>Click <strong className="text-emerald-400 font-semibold">Run Python Code</strong> in the studio toolbar to execute Python code and display output here.</>
+                  )}
                 </span>
               </div>
             )}
@@ -996,6 +1000,19 @@ const getSqlDefaultStarter = (q) => {
   return `-- Write your T-SQL query here against the live AdventureWorks database\nSELECT * FROM ${tableName};`;
 };
 
+const getPythonStarter = (q) => {
+  if (!q) return "# Write your Python solution here\n";
+  const sig = q.functionSignature || q.function_signature || "solution(data)";
+  const match = String(sig).match(/^([a-zA-Z0-9_]+)\s*\(([^)]*)\)/);
+  const funcName = match ? match[1] : "solution";
+  const params = match ? match[2] : "data";
+  const paramList = params.split(',').map(p => p.trim()).filter(Boolean);
+  const argReads = paramList.length > 0 ? paramList.map(p => `    ${p} = input().strip()`).join('\n') : "    data = input().strip()";
+  const argNames = paramList.length > 0 ? paramList.join(', ') : "data";
+
+  return `def ${funcName}(${params}):\n    # Write your solution here\n    pass\n\nif __name__ == "__main__":\n${argReads}\n    result = ${funcName}(${argNames})\n    print(result)`;
+};
+
 const isQuestionAnswered = (q, idx, answers, executionOutputs = {}) => {
   if (!q || answers === undefined || answers === null) return false;
   const ans = answers[idx];
@@ -1019,10 +1036,9 @@ const isQuestionAnswered = (q, idx, answers, executionOutputs = {}) => {
     return isExecutedSuccess && trimmedAns.length > 0 && !isStarter && !isDefaultStarter;
   }
 
-  // Default starter templates for Python/coding
-  const starter = q.starterCode || q.starter_code || q.codeTemplate || q.exampleCode || '';
+  // Check against dynamic starter code
+  const starter = q.starterCode || q.starter_code || q.codeTemplate || q.exampleCode || getPythonStarter(q);
   if (starter && trimmedAns === String(starter).trim()) return false;
-  if (trimmedAns === 'def solution():\n    pass\n\nif __name__ == "__main__":\n    solution()') return false;
 
   return trimmedAns.length > 0;
 };
@@ -1037,9 +1053,8 @@ const isAnswerFilled = (q, ans) => {
     return trimmedAns.length > 0;
   }
 
-  const starter = q.starterCode || q.starter_code || q.codeTemplate || q.exampleCode || '';
+  const starter = q.starterCode || q.starter_code || q.codeTemplate || q.exampleCode || getPythonStarter(q);
   if (starter && trimmedAns === String(starter).trim()) return false;
-  if (trimmedAns === 'def solution():\n    pass\n\nif __name__ == "__main__":\n    solution()') return false;
 
   const defaultSqlStarter = getSqlDefaultStarter(q).trim();
   if (trimmedAns === '-- Write your SQL query here' || trimmedAns === defaultSqlStarter || (trimmedAns.includes('Write your T-SQL query here') && trimmedAns.startsWith('-- Write your T-SQL query here'))) {
@@ -1687,16 +1702,18 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
   const [consoleTab, setConsoleTab] = useState('output');
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [isSubmittingManual, setIsSubmittingManual] = useState(false);
-  const [examState, setExamState] = useState({
+  const DEFAULT_EXAM_STATE = {
     currentQuestionIndex: 0,
     answers: {},
     executionOutputs: {},
     visitedQuestions: { 0: true },
     timeLeft: 0,
     submitted: false
-  });
+  };
 
-  const prevQuestionIndexRef = useRef(examState.currentQuestionIndex);
+  const [examState, setExamState] = useState(DEFAULT_EXAM_STATE);
+
+  const prevQuestionIndexRef = useRef(examState?.currentQuestionIndex ?? 0);
   const sqlCompletionProviderRef = useRef(null);
   const liveSchemaRef = useRef(null);
   const resultGridRef = useRef(null);
@@ -1865,7 +1882,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
   // Sync compiler output state and starter code when navigating between questions
   useEffect(() => {
-    const currentIdx = examState.currentQuestionIndex;
+    const currentIdx = examState?.currentQuestionIndex ?? 0;
     const prevIdx = prevQuestionIndexRef.current;
 
     if (prevIdx !== undefined && prevIdx !== null && prevIdx !== currentIdx) {
@@ -1881,16 +1898,16 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
         consoleTab
       };
       setExamState(prev => ({
-        ...prev,
+        ...(prev || DEFAULT_EXAM_STATE),
         executionOutputs: {
-          ...(prev.executionOutputs || {}),
+          ...((prev || DEFAULT_EXAM_STATE).executionOutputs || {}),
           [prevIdx]: currentOutputs
         }
       }));
     }
 
     // Load execution outputs for the new question (if any exist)
-    const savedOutputs = examState.executionOutputs?.[currentIdx];
+    const savedOutputs = examState?.executionOutputs?.[currentIdx];
     if (savedOutputs) {
       setConsoleOutput(savedOutputs.consoleOutput || '');
       setRuntimeError(savedOutputs.runtimeError || '');
@@ -1916,7 +1933,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     const asm = activeAssignment?.assessment || activeAssignment || {};
     const questions = asm.questions || [];
     const question = questions[currentIdx];
-    if (question && (examState.answers[currentIdx] === undefined || examState.answers[currentIdx] === null)) {
+    if (question && (examState?.answers?.[currentIdx] === undefined || examState?.answers?.[currentIdx] === null)) {
       const typeUpper = (question.type || question.question_type || '').toUpperCase();
       const qHasOpts = question && Array.isArray(question.options) && question.options.length > 0;
       const isMcq = typeUpper === 'MCQ' || qHasOpts;
@@ -1933,7 +1950,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
           if (isSql) {
             starter = getSqlDefaultStarter(question);
           } else if (isCoding) {
-            starter = `def solution():\n    pass\n\nif __name__ == "__main__":\n    solution()`;
+            starter = getPythonStarter(question);
           } else {
             starter = '';
           }
@@ -1941,37 +1958,37 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       }
 
       setExamState(prev => ({
-        ...prev,
+        ...(prev || DEFAULT_EXAM_STATE),
         answers: {
-          ...prev.answers,
+          ...((prev || DEFAULT_EXAM_STATE).answers || {}),
           [currentIdx]: starter
         }
       }));
     }
 
     prevQuestionIndexRef.current = currentIdx;
-  }, [examState.currentQuestionIndex, activeAssignment]);
+  }, [examState?.currentQuestionIndex, activeAssignment]);
 
   // Automatically mark current question as visited as soon as candidate opens or navigates to it
   useEffect(() => {
-    if (activeAssignment && !examState.submitted && activeTab === 'technical' && examState.currentQuestionIndex !== undefined && examState.currentQuestionIndex !== null) {
+    if (activeAssignment && !examState?.submitted && activeTab === 'technical' && examState?.currentQuestionIndex !== undefined && examState?.currentQuestionIndex !== null) {
       const idx = examState.currentQuestionIndex;
       setExamState(prev => {
-        if (prev.visitedQuestions && prev.visitedQuestions[idx]) {
+        if (prev?.visitedQuestions && prev.visitedQuestions[idx]) {
           return prev;
         }
         return {
-          ...prev,
+          ...(prev || DEFAULT_EXAM_STATE),
           visitedQuestions: {
-            ...(prev.visitedQuestions || {}),
+            ...((prev || DEFAULT_EXAM_STATE).visitedQuestions || {}),
             [idx]: true
           }
         };
       });
     }
-  }, [examState.currentQuestionIndex, activeAssignment, examState.submitted, activeTab]);
+  }, [examState?.currentQuestionIndex, activeAssignment, examState?.submitted, activeTab]);
 
-  const isExamActive = !!(activeAssignment && !examState.submitted && activeTab === 'technical');
+  const isExamActive = !!(activeAssignment && !examState?.submitted && activeTab === 'technical');
 
   const parseDuration = (durStr) => {
     if (typeof durStr === 'number') return durStr;
@@ -1995,8 +2012,8 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
   const examSecurity = useExamSecurity({
     active: isExamActive,
     assignmentId: activeAssignment?.id || activeAssignment?.assignmentId,
-    questionNumber: (examState.currentQuestionIndex || 0) + 1,
-    remainingTime: formatTime(examState.timeLeft),
+    questionNumber: ((examState?.currentQuestionIndex ?? 0) + 1),
+    remainingTime: formatTime(examState?.timeLeft || 0),
     maxViolations: 3,
     maxWarnings: 3,
     gracePeriodSeconds: 15,
@@ -2154,7 +2171,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
             localStorage.removeItem(`recruitai_active_exam_${activeAssignment.id}`);
           } catch (e) {}
           setActiveAssignment(null);
-          setExamState(null);
+          setExamState(DEFAULT_EXAM_STATE);
           setActiveTab('dashboard');
           showToast("Assessment session is no longer active.");
         }
@@ -2163,7 +2180,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
           localStorage.removeItem(`recruitai_active_exam_${activeAssignment.id}`);
         } catch (e) {}
         setActiveAssignment(null);
-        setExamState(null);
+        setExamState(DEFAULT_EXAM_STATE);
         setActiveTab('dashboard');
         showToast("Assessment session is no longer active.");
       }
@@ -2223,7 +2240,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
           } else if (isSql) {
             initialAnswers[idx] = getSqlDefaultStarter(q);
           } else if (isCoding) {
-            initialAnswers[idx] = `def solution():\n    pass\n\nif __name__ == "__main__":\n    solution()`;
+            initialAnswers[idx] = getPythonStarter(q);
           } else {
             initialAnswers[idx] = '';
           }
@@ -2316,7 +2333,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
       const durationSeconds = parseDuration(asm.duration || "30") * 60;
       const timeTaken = Math.max(0, durationSeconds - (examState.timeLeft || 0));
-      const isAuto = securityMetadata?.autoSubmitted === true;
+      const isAuto = securityMetadata?.autoSubmitted === true || (examState.timeLeft !== undefined && examState.timeLeft <= 0);
 
       const payload = {
         assignmentId: targetId,
@@ -2346,7 +2363,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
               localStorage.removeItem(`recruitai_active_exam_${targetId}`);
             } catch (_e) { }
             setActiveAssignment(null);
-            setExamState(null);
+            setExamState(DEFAULT_EXAM_STATE);
             setActiveTab('dashboard');
           }
         })
@@ -2361,8 +2378,9 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
   };
 
   useEffect(() => {
-    if (examState.executionOutputs && examState.executionOutputs[examState.currentQuestionIndex]) {
-      const saved = examState.executionOutputs[examState.currentQuestionIndex];
+    const currentIdx = examState?.currentQuestionIndex ?? 0;
+    if (examState?.executionOutputs && examState.executionOutputs[currentIdx]) {
+      const saved = examState.executionOutputs[currentIdx];
       setConsoleOutput(saved.consoleOutput || '');
       setRuntimeError(saved.runtimeError || '');
       setSyntaxError(saved.syntaxError || '');
@@ -2378,7 +2396,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       setExecutionStatus('');
       setSqlQueryResult(null);
     }
-  }, [examState.currentQuestionIndex]);
+  }, [examState?.currentQuestionIndex]);
 
   const handleRunCode = async (currentCode, currentQuestion) => {
     if (!currentCode) return;
@@ -2571,21 +2589,42 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     }
 
     try {
-      const payload = {
-        code: currentCode,
-        async: false,
-        function_name: funcName,
-        inputs: parsedInputs,
-        input: typeof customInput === 'string' ? customInput : ''
+      const visibleTC = currentQuestion?.visibleTestCase || (currentQuestion?.visibleTestCases && currentQuestion.visibleTestCases[0]) || {
+        input: currentQuestion?.sampleInput || currentQuestion?.exampleInput || '',
+        expectedOutput: currentQuestion?.sampleOutput || currentQuestion?.exampleOutput || ''
       };
 
-      const res = await api.post('/run-python', payload);
+      const hiddenTCs = Array.isArray(currentQuestion?.hiddenTestCases) ? currentQuestion.hiddenTestCases : [];
+
+      const visibleList = [
+        {
+          input: String(visibleTC.input || ''),
+          expectedOutput: String(visibleTC.expectedOutput || '')
+        }
+      ];
+
+      const hiddenList = hiddenTCs.map(htc => ({
+        input: String(htc.input || ''),
+        expectedOutput: String(htc.expectedOutput || '')
+      }));
+
+      const allTestCases = [...visibleList, ...hiddenList];
+
+      const payload = {
+        code: currentCode,
+        visibleTestCases: visibleList,
+        hiddenTestCases: hiddenList,
+        testCases: allTestCases,
+        input: String(visibleTC.input || '')
+      };
+
+      const res = await api.post('/api/assessment/run-code', payload);
       const data = res.data;
-      const outText = data.output || data.stdout || '';
-      const rErr = data.runtime_error || '';
+      const outText = data.stdout || data.output || '';
+      const rErr = data.stderr || data.runtime_error || '';
       const sErr = data.syntax_error || '';
-      const exTime = data.execution_time || 0;
-      const exStat = data.status || 'Success';
+      const exTime = data.executionTime || data.execution_time || 0;
+      const exStat = data.status || (data.allPassed ? 'Success' : 'Test Cases Failed');
 
       setConsoleOutput(outText);
       setRuntimeError(rErr);
@@ -2679,7 +2718,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       const template = starter || (isSql
         ? getSqlDefaultStarter(q)
         : isCoding
-          ? `def solution():\n    pass\n\nif __name__ == "__main__":\n    solution()`
+          ? getPythonStarter(q)
           : '');
 
       setExamState(prev => ({
@@ -3375,10 +3414,10 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
           </div>
         )}
 
-        {activeTab === 'technical' && activeAssignment && !examState.submitted && (() => {
+        {activeTab === 'technical' && activeAssignment && !examState?.submitted && (() => {
           const asm = activeAssignment?.assessment || activeAssignment || {};
           const questions = asm.questions || [];
-          const currentIdx = examState.currentQuestionIndex;
+          const currentIdx = examState?.currentQuestionIndex ?? 0;
           const question = questions[currentIdx];
 
           if (!question) {
@@ -3511,11 +3550,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                 </div>
               </div>
 
-<<<<<<< HEAD
               {/* CODING LAYOUT: Top Horizontal Navigator */}
-=======
-              {/* HORIZONTAL QUESTION NUMBER NAVIGATION BAR (Clean Single Line Alignment) */}
->>>>>>> c631e3334eaecd7caa6f657d2c1a456c5cc54222
               {isCoding && (
                 <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-2xl px-4 py-2.5 shadow-2xs flex flex-wrap lg:flex-nowrap items-center justify-between gap-3 overflow-x-auto dashboard-scrollbar">
                   <div className="flex items-center gap-3 overflow-x-auto py-0.5 dashboard-scrollbar flex-1">
@@ -3524,7 +3559,6 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                       <span>Navigator:</span>
                     </span>
 
-<<<<<<< HEAD
                     {mcqNavItems.length > 0 && (
                       <div className="flex items-center gap-2 shrink-0">
                         <span className="text-[9px] font-black text-purple-700 bg-purple-100 px-2 py-1 rounded-md uppercase tracking-wider shrink-0">MCQ Questions ({mcqNavItems.length})</span>
@@ -3561,27 +3595,6 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                                     <Check size={8} strokeWidth={3} />
                                   </span>
                                 ) : null}
-=======
-                    {totalMcqs > 0 && (
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-[9px] font-black text-purple-700 bg-purple-100 px-2 py-1 rounded-md uppercase tracking-wider shrink-0">Phase 1 (MCQ)</span>
-                        <div className="flex items-center gap-1.5">
-                          {mcqQuestions.map((q, idx) => {
-                            const isCurrent = idx === currentIdx;
-                            const isVisited = Boolean(examState.visitedQuestions?.[idx]);
-                            return (
-                              <button
-                                key={idx}
-                                onClick={() => setExamState(prev => ({ ...prev, currentQuestionIndex: idx }))}
-                                className={`w-8 h-8 rounded-lg font-extrabold text-xs flex items-center justify-center cursor-pointer border transition-all duration-200 shrink-0 ${isCurrent
-                                  ? 'bg-dash-primary-purple text-white border-dash-primary-purple shadow-sm scale-105'
-                                  : isVisited
-                                    ? 'bg-dash-success-green/10 text-dash-success-green border-[#22c55e]/30 hover:bg-dash-success-green/20'
-                                    : 'bg-slate-100 border-slate-200/80 text-slate-600 hover:bg-slate-200/70'
-                                  }`}
-                              >
-                                {idx + 1}
->>>>>>> c631e3334eaecd7caa6f657d2c1a456c5cc54222
                               </button>
                             );
                           })}
@@ -3589,7 +3602,6 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                       </div>
                     )}
 
-<<<<<<< HEAD
                     {mcqNavItems.length > 0 && codingNavItems.length > 0 && (
                       <div className="h-4 w-px bg-slate-200 shrink-0 mx-1" />
                     )}
@@ -3630,32 +3642,6 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                                     <Check size={8} strokeWidth={3} />
                                   </span>
                                 ) : null}
-=======
-                    {totalMcqs > 0 && totalScenarios > 0 && (
-                      <div className="h-4 w-px bg-slate-200 shrink-0 mx-1" />
-                    )}
-
-                    {totalScenarios > 0 && (
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-[9px] font-black text-indigo-700 bg-indigo-100 px-2 py-1 rounded-md uppercase tracking-wider shrink-0">Phase 2 (Coding)</span>
-                        <div className="flex items-center gap-1.5">
-                          {scenarioQuestions.map((q, sIdx) => {
-                            const realIdx = totalMcqs + sIdx;
-                            const isCurrent = realIdx === currentIdx;
-                            const isVisited = Boolean(examState.visitedQuestions?.[realIdx]);
-                            return (
-                              <button
-                                key={realIdx}
-                                onClick={() => setExamState(prev => ({ ...prev, currentQuestionIndex: realIdx }))}
-                                className={`w-8 h-8 rounded-lg font-extrabold text-xs flex items-center justify-center cursor-pointer border transition-all duration-200 shrink-0 ${isCurrent
-                                  ? 'bg-dash-primary-purple text-white border-dash-primary-purple shadow-sm scale-105'
-                                  : isVisited
-                                    ? 'bg-dash-success-green/10 text-dash-success-green border-[#22c55e]/30 hover:bg-dash-success-green/20'
-                                    : 'bg-slate-100 border-slate-200/80 text-slate-600 hover:bg-slate-200/70'
-                                  }`}
-                              >
-                                {realIdx + 1}
->>>>>>> c631e3334eaecd7caa6f657d2c1a456c5cc54222
                               </button>
                             );
                           })}
@@ -3664,23 +3650,14 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                     )}
                   </div>
 
-<<<<<<< HEAD
                   <span className="text-[10px] font-extrabold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg border border-indigo-200/60 shrink-0 uppercase tracking-wider ml-auto flex items-center gap-1.5">
                     <Code size={12} />
                     <span>{isSql ? 'SQL QUERY STUDIO' : 'PYTHON COMPILER STUDIO'}</span>
-=======
-                  <span className="text-[10px] font-extrabold text-dash-primary-purple bg-purple-50 px-2.5 py-1 rounded-lg border border-purple-200/50 shrink-0 uppercase tracking-wider ml-auto">
-                    {isSql ? 'SQL QUERY' : (isCoding ? 'PYTHON CODING' : 'MCQ')}
->>>>>>> c631e3334eaecd7caa6f657d2c1a456c5cc54222
                   </span>
                 </div>
               )}
 
-<<<<<<< HEAD
               {/* MAIN CONTENT AREA: Dynamic switching between MCQ and Coding */}
-=======
-              {/* TWO-COLUMN MAIN CONTENT LAYOUT */}
->>>>>>> c631e3334eaecd7caa6f657d2c1a456c5cc54222
               {isCoding ? (
                 /* CODING / COMPILER LAYOUT: Majority Width Editor + Left Question Card */
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start w-full">
@@ -3738,7 +3715,6 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                   </div>
                 </div>
               ) : (
-<<<<<<< HEAD
                 /* MCQ LAYOUT: Fixed Sticky Left Vertical Sidebar Navigator (22% Width) + Single Large Main Assessment Card (78% Width) */
                 <div className="flex flex-col lg:flex-row gap-5 items-start w-full">
 
@@ -3959,7 +3935,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
                       {/* Question Text - Full Width for Maximum Readability */}
                       <div className="w-full">
-                        <h3 className="font-plus-jakarta font-extrabold text-lg sm:text-xl text-dash-dark-purple leading-relaxed">
+                        <h3 className="font-plus-jakarta font-extrabold text-lg sm:text-xl text-[#1e1b4b] leading-relaxed">
                           {question.question}
                         </h3>
                       </div>
@@ -4088,138 +4064,6 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                     </div>
 
                   </div>
-
-=======
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start w-full">
-                  {/* Left Column (3/12 width): Question Number Panel */}
-                  <div className="lg:col-span-3 w-full bg-dash-white-card border border-dash-border-gray/50 rounded-2xl p-5 shadow-sm flex flex-col gap-4">
-                    <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-                      <ListOrdered size={16} className="text-dash-primary-purple" />
-                      <h4 className="font-outfit font-extrabold text-xs text-dash-dark-purple uppercase tracking-wider">
-                        Navigator
-                      </h4>
-                    </div>
-
-                    <div className="flex flex-col gap-4 overflow-y-auto max-h-[450px] dashboard-scrollbar">
-                      {totalMcqs > 0 && (
-                        <div className="flex flex-col gap-2">
-                          <span className="text-[9px] font-black text-purple-700 bg-purple-100 px-2 py-1 rounded-md uppercase tracking-wider block text-center">
-                            Phase 1 (MCQ)
-                          </span>
-                          <div className="flex flex-wrap gap-1.5 justify-center lg:justify-start">
-                            {mcqQuestions.map((q, idx) => {
-                              const isCurrent = idx === currentIdx;
-                              const isVisited = Boolean(examState.visitedQuestions?.[idx]);
-                              return (
-                                <button
-                                  key={idx}
-                                  onClick={() => setExamState(prev => ({ ...prev, currentQuestionIndex: idx }))}
-                                  className={`w-8 h-8 rounded-lg font-extrabold text-xs flex items-center justify-center cursor-pointer border transition-all duration-200 ${isCurrent
-                                    ? 'bg-dash-primary-purple text-white border-dash-primary-purple shadow-sm scale-105'
-                                    : isVisited
-                                      ? 'bg-dash-success-green/10 text-dash-success-green border-[#22c55e]/30 hover:bg-dash-success-green/20'
-                                      : 'bg-slate-100 border-slate-200/80 text-slate-600 hover:bg-slate-200/70'
-                                    }`}
-                                >
-                                  {idx + 1}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      {totalScenarios > 0 && (
-                        <div className="flex flex-col gap-2 border-t border-slate-100 pt-3">
-                          <span className="text-[9px] font-black text-indigo-700 bg-indigo-100 px-2 py-1 rounded-md uppercase tracking-wider block text-center">
-                            Phase 2 (Coding)
-                          </span>
-                          <div className="flex flex-wrap gap-1.5 justify-center lg:justify-start">
-                            {scenarioQuestions.map((q, sIdx) => {
-                              const realIdx = totalMcqs + sIdx;
-                              const isCurrent = realIdx === currentIdx;
-                              const isVisited = Boolean(examState.visitedQuestions?.[realIdx]);
-                              return (
-                                <button
-                                  key={realIdx}
-                                  onClick={() => setExamState(prev => ({ ...prev, currentQuestionIndex: realIdx }))}
-                                  className={`w-8 h-8 rounded-lg font-extrabold text-xs flex items-center justify-center cursor-pointer border transition-all duration-200 ${isCurrent
-                                    ? 'bg-dash-primary-purple text-white border-dash-primary-purple shadow-sm scale-105'
-                                    : isVisited
-                                      ? 'bg-dash-success-green/10 text-dash-success-green border-[#22c55e]/30 hover:bg-dash-success-green/20'
-                                      : 'bg-slate-100 border-slate-200/80 text-slate-600 hover:bg-slate-200/70'
-                                    }`}
-                                >
-                                  {realIdx + 1}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Right Column (9/12 width): Question Editing/Writing Panel */}
-                  <div className="lg:col-span-9 bg-dash-white-card border border-dash-border-gray/50 rounded-2xl p-5 sm:p-6 shadow-sm flex flex-col gap-4 w-full">
-                    {question.scenario && (
-                      <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-2xl p-3.5">
-                        <h5 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Scenario Context:</h5>
-                        <p className="text-xs sm:text-sm font-semibold text-slate-800 leading-relaxed whitespace-pre-line">
-                          {question.scenario}
-                        </p>
-                      </div>
-                    )}
-
-                    <div>
-                      <h3 className="font-plus-jakarta font-extrabold text-xl sm:text-2xl text-dash-dark-purple leading-snug">
-                        {question.question}
-                      </h3>
-                    </div>
-
-                    {question.options && question.options.length > 0 ? (
-                      <div className="flex flex-col gap-2 mt-1">
-                        {question.options.map((option, optIdx) => {
-                          const isSelected = examState.answers[currentIdx] === option;
-                          return (
-                            <button
-                              key={optIdx}
-                              onClick={() => setExamState(prev => ({
-                                ...prev,
-                                answers: { ...prev.answers, [currentIdx]: option }
-                              }))}
-                              className={`w-full text-left px-4 py-2.5 rounded-xl border font-semibold text-sm transition-all duration-200 cursor-pointer flex items-center justify-between group ${isSelected
-                                ? 'bg-dash-primary-purple/10 border-dash-primary-purple text-dash-dark-purple shadow-2xs font-bold'
-                                : 'bg-dash-soft-pink/60 border-dash-border-gray/40 text-slate-700 hover:bg-dash-border-gray/60 hover:text-dash-dark-purple'
-                                }`}
-                            >
-                              <span className="flex-1 pr-3 leading-snug">{option}</span>
-                              <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-all ${isSelected
-                                ? 'border-dash-primary-purple bg-dash-primary-purple text-white'
-                                : 'border-slate-300 group-hover:border-dash-primary-purple'
-                                }`}>
-                                {isSelected && <Check size={10} strokeWidth={3} />}
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="flex flex-col gap-3 mt-1">
-                        <textarea
-                          value={examState.answers[currentIdx] || ''}
-                          onChange={(e) => setExamState(prev => ({
-                            ...prev,
-                            answers: { ...prev.answers, [currentIdx]: e.target.value }
-                          }))}
-                          placeholder="Write your code or answer explanation here..."
-                          rows={6}
-                          className="w-full p-3.5 rounded-2xl border border-dash-border-gray/50 bg-[#fafafa] font-mono text-sm focus:outline-none focus:ring-2 focus:ring-dash-primary-purple/40 focus:border-dash-primary-purple transition-all resize-y"
-                        />
-                      </div>
-                    )}
-                  </div>
->>>>>>> c631e3334eaecd7caa6f657d2c1a456c5cc54222
                 </div>
               )}
 
