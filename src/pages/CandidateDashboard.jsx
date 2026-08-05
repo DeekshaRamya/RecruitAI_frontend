@@ -42,7 +42,8 @@ import {
   Lock,
   ListOrdered,
   Flag,
-  HelpCircle
+  HelpCircle,
+  Edit3
 } from 'lucide-react';
 
 const MAX_QUESTIONS = 8;
@@ -643,7 +644,79 @@ const QuestionCard = React.memo(({
   );
 });
 
-const SqlStudioEditor = React.memo(({ isSql, currentIdx, answerValue, onAnswerChange, isFullscreen, onReset, onToggleFullscreen, onRunCode, isExecuting }) => {
+const getSqlDefaultStarter = (q) => {
+  return "-- Write your SQL query here";
+};
+
+const getPythonStarter = (q) => {
+  if (!q) {
+    return `def solution(prices):\n    pass`;
+  }
+
+  // 1. Check for exact "def <func_name>(<params>):" pattern in starterCode, functionSignature, question, or problemStatement
+  const fullText = `${q.starterCode || ''}\n${q.starter_code || ''}\n${q.functionSignature || ''}\n${q.function_signature || ''}\n${q.question || ''}\n${q.problemStatement || ''}`;
+  const sigMatch = fullText.match(/def\s+([a-zA-Z0-9_]+)\s*\(([^)]*)\)/);
+
+  if (sigMatch) {
+    const fnName = sigMatch[1];
+    const params = sigMatch[2].trim();
+    return `def ${fnName}(${params}):\n    pass`;
+  }
+
+  // Fallback signature matching question parameters
+  const funcName = q.functionName || "solution";
+  let paramsStr = "prices";
+  
+  const probText = `${q.problemStatement || ''} ${q.question || ''} ${q.inputFormat || ''}`.toLowerCase();
+  if (probText.includes("recharge") && probText.includes("fee")) {
+    paramsStr = "recharge_amount, service_fee";
+  } else if (probText.includes("price") && probText.includes("tax")) {
+    paramsStr = "price, tax";
+  } else if (probText.includes("prices") || probText.includes("revenue")) {
+    paramsStr = "prices";
+  } else if (probText.includes("numbers") || probText.includes("arr")) {
+    paramsStr = "numbers";
+  }
+
+  return `def ${funcName}(${paramsStr}):\n    pass`;
+};
+
+const getDynamicStarterForQuestion = (q) => {
+  if (!q) return "";
+
+  const typeUpper = String(q.type || q.question_type || '').toUpperCase().trim();
+  const subjLower = String(q.subject || q.topic || q.language || '').toLowerCase().trim();
+  const qHasOpts = Array.isArray(q.options) && q.options.length > 0;
+
+  if (typeUpper === 'MCQ' || qHasOpts || subjLower.includes('aptitude') || typeUpper.includes('APTITUDE')) {
+    return '';
+  }
+
+  // 1. Explicit Python check takes priority
+  if (subjLower.includes('python') || subjLower.includes('coding') || typeUpper.includes('PYTHON') || typeUpper.includes('CODING')) {
+    return getPythonStarter(q);
+  }
+
+  // 2. Explicit SQL check
+  if (subjLower.includes('sql') || typeUpper.includes('SQL')) {
+    return getSqlDefaultStarter(q);
+  }
+
+  // 3. Fallback based on question metadata
+  if (q.starterCode && String(q.starterCode).includes('def ')) {
+    return getPythonStarter(q);
+  }
+  if (q.starterCode && String(q.starterCode).includes('-- Write your SQL')) {
+    return getSqlDefaultStarter(q);
+  }
+
+  return getPythonStarter(q);
+};
+
+const SqlStudioEditor = React.memo(({ isSql, currentIdx, answerValue, onAnswerChange, isFullscreen, onReset, onToggleFullscreen, onRunCode, isExecuting, question }) => {
+  const fallbackTemplate = getDynamicStarterForQuestion(question);
+  const displayValue = (answerValue !== undefined && answerValue !== null && String(answerValue).trim() !== '') ? answerValue : fallbackTemplate;
+
   return (
     <div className="flex flex-col shrink-0 w-full shadow-lg rounded-xl overflow-hidden border border-zinc-800">
       <div className="flex flex-wrap items-center justify-between px-3.5 py-2 bg-[#171717] border-b border-zinc-800 gap-2 shrink-0">
@@ -702,7 +775,7 @@ const SqlStudioEditor = React.memo(({ isSql, currentIdx, answerValue, onAnswerCh
           height="100%"
           defaultLanguage={isSql ? "sql" : "python"}
           language={isSql ? "sql" : "python"}
-          value={answerValue || ''}
+          value={displayValue}
           onChange={(val) => onAnswerChange(val || '')}
           theme="vs-dark"
           options={{
@@ -992,26 +1065,7 @@ const sortQuestionsForCandidate = (rawQuestions) => {
   return sorted;
 };
 
-const getSqlDefaultStarter = (q) => {
-  if (!q) return "-- Write your T-SQL query here against the live AdventureWorks database\nSELECT * FROM HumanResources.Employee;";
-  const schemaText = Array.isArray(q.databaseSchema) ? q.databaseSchema.join(" ") : String(q.databaseSchema || "");
-  const tableMatch = schemaText.match(/(?:CREATE\s+TABLE|--\s*(?:Table|Schema)\s*(?:table)?)\s+([a-zA-Z0-9_.\-\[\]]+)/i) || schemaText.match(/([a-zA-Z0-9_]+\.[a-zA-Z0-9_]+)/);
-  const tableName = tableMatch ? tableMatch[1] : "HumanResources.Employee";
-  return `-- Write your T-SQL query here against the live AdventureWorks database\nSELECT * FROM ${tableName};`;
-};
 
-const getPythonStarter = (q) => {
-  if (!q) return "# Write your Python solution here\n";
-  const sig = q.functionSignature || q.function_signature || "solution(data)";
-  const match = String(sig).match(/^([a-zA-Z0-9_]+)\s*\(([^)]*)\)/);
-  const funcName = match ? match[1] : "solution";
-  const params = match ? match[2] : "data";
-  const paramList = params.split(',').map(p => p.trim()).filter(Boolean);
-  const argReads = paramList.length > 0 ? paramList.map(p => `    ${p} = input().strip()`).join('\n') : "    data = input().strip()";
-  const argNames = paramList.length > 0 ? paramList.join(', ') : "data";
-
-  return `def ${funcName}(${params}):\n    # Write your solution here\n    pass\n\nif __name__ == "__main__":\n${argReads}\n    result = ${funcName}(${argNames})\n    print(result)`;
-};
 
 const isQuestionAnswered = (q, idx, answers, executionOutputs = {}) => {
   if (!q || answers === undefined || answers === null) return false;
@@ -1023,8 +1077,12 @@ const isQuestionAnswered = (q, idx, answers, executionOutputs = {}) => {
     return String(ans).trim() !== '';
   }
 
-  const isSql = (q.subject || q.language || '').toLowerCase().includes('sql') || (q.question || '').toUpperCase().includes('SELECT') || (q.type || '').toUpperCase().includes('SQL');
   const trimmedAns = String(ans).trim();
+  if ((q.subject || '').toLowerCase() === 'aptitude') {
+    return trimmedAns.length > 0;
+  }
+
+  const isSql = (q.subject || q.language || '').toLowerCase().includes('sql') || (q.question || '').toUpperCase().includes('SELECT') || (q.type || '').toUpperCase().includes('SQL');
 
   if (isSql) {
     const execOut = executionOutputs ? executionOutputs[idx] : null;
@@ -1050,6 +1108,10 @@ const isAnswerFilled = (q, ans) => {
 
   const isMcq = (q.type || q.question_type || '').toUpperCase() === 'MCQ' || (Array.isArray(q.options) && q.options.length > 0);
   if (isMcq) {
+    return trimmedAns.length > 0;
+  }
+
+  if ((q.subject || '').toLowerCase() === 'aptitude') {
     return trimmedAns.length > 0;
   }
 
@@ -1933,37 +1995,25 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     const asm = activeAssignment?.assessment || activeAssignment || {};
     const questions = asm.questions || [];
     const question = questions[currentIdx];
-    if (question && (examState?.answers?.[currentIdx] === undefined || examState?.answers?.[currentIdx] === null)) {
+    if (question) {
       const typeUpper = (question.type || question.question_type || '').toUpperCase();
       const qHasOpts = question && Array.isArray(question.options) && question.options.length > 0;
       const isMcq = typeUpper === 'MCQ' || qHasOpts;
+      const isAptitude = (question.subject || '').toUpperCase() === 'APTITUDE';
 
-      let starter = '';
-      if (!isMcq) {
-        const isSql = (question.type === 'SCENARIO' || question.type === 'SCENARIO_CODING' || question.type === 'CODING') &&
-          (question.subject || question.language || '').toLowerCase().includes('sql');
-        const isCoding = question.type === 'CODING' || question.type === 'PYTHON_CODING' ||
-          (question.subject || '').toLowerCase().includes('python');
-
-        starter = question.starterCode || question.starter_code || question.codeTemplate || question.exampleCode || null;
-        if (!starter) {
-          if (isSql) {
-            starter = getSqlDefaultStarter(question);
-          } else if (isCoding) {
-            starter = getPythonStarter(question);
-          } else {
-            starter = '';
-          }
+      if (!isMcq && !isAptitude) {
+        const existingAns = examState?.answers?.[currentIdx];
+        if (existingAns === undefined || existingAns === null || String(existingAns).trim() === '') {
+          const starter = getDynamicStarterForQuestion(question);
+          setExamState(prev => ({
+            ...(prev || DEFAULT_EXAM_STATE),
+            answers: {
+              ...((prev || DEFAULT_EXAM_STATE).answers || {}),
+              [currentIdx]: starter
+            }
+          }));
         }
       }
-
-      setExamState(prev => ({
-        ...(prev || DEFAULT_EXAM_STATE),
-        answers: {
-          ...((prev || DEFAULT_EXAM_STATE).answers || {}),
-          [currentIdx]: starter
-        }
-      }));
     }
 
     prevQuestionIndexRef.current = currentIdx;
@@ -2227,23 +2277,12 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
         const typeUpper = (q.type || q.question_type || '').toUpperCase();
         const qHasOpts = q && Array.isArray(q.options) && q.options.length > 0;
         const isMcq = typeUpper === 'MCQ' || qHasOpts;
+        const isAptitude = (q.subject || '').toUpperCase() === 'APTITUDE';
 
-        if (isMcq) {
+        if (isMcq || isAptitude) {
           initialAnswers[idx] = '';
         } else {
-          const isCoding = q.type === 'CODING' || q.type === 'PYTHON_CODING' || (q.subject || '').toLowerCase().includes('python');
-          const isSql = (q.type === 'SCENARIO' || q.type === 'SCENARIO_CODING' || q.type === 'CODING') && (q.subject || q.language || '').toLowerCase().includes('sql');
-          const starter = q.starterCode || q.starter_code || q.codeTemplate || q.exampleCode;
-
-          if (starter) {
-            initialAnswers[idx] = starter;
-          } else if (isSql) {
-            initialAnswers[idx] = getSqlDefaultStarter(q);
-          } else if (isCoding) {
-            initialAnswers[idx] = getPythonStarter(q);
-          } else {
-            initialAnswers[idx] = '';
-          }
+          initialAnswers[idx] = getDynamicStarterForQuestion(q);
         }
       });
 
@@ -2712,14 +2751,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       const asm = activeAssignment?.assessment || activeAssignment || {};
       const questions = asm.questions || [];
       const q = questions[currentIdx];
-      const isSql = q && (q.type === 'SCENARIO' || q.type === 'SCENARIO_CODING' || q.type === 'CODING') && (q.subject || q.language || '').toLowerCase().includes('sql');
-      const isCoding = q && (q.type === 'CODING' || q.type === 'PYTHON_CODING' || (q.subject || '').toLowerCase().includes('python'));
-      const starter = q?.starterCode || q?.starter_code || q?.codeTemplate || q?.exampleCode;
-      const template = starter || (isSql
-        ? getSqlDefaultStarter(q)
-        : isCoding
-          ? getPythonStarter(q)
-          : '');
+      const template = getDynamicStarterForQuestion(q);
 
       setExamState(prev => ({
         ...prev,
@@ -3458,15 +3490,30 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
           const answeredCount = questions.filter((q, idx) => isAnswerFilled(q, examState.answers[idx])).length;
           const overallProgressPercent = questions.length > 0 ? Math.round((answeredCount / questions.length) * 100) : 0;
 
+          const qSubject = (question?.subject || question?.topic || question?.language || '').toLowerCase().trim();
+          const qType = String(question?.type || question?.question_type || '').toUpperCase().trim();
           const hasOptions = question && Array.isArray(question.options) && question.options.length > 0;
-          const isSql = !hasOptions && question ? (((question.type === 'SCENARIO' || question.type === 'SCENARIO_CODING' || question.type === 'CODING') && (question.subject || question.language || '').toLowerCase() === 'sql') || (question.question || '').toUpperCase().includes('SELECT')) : false;
-          const isCoding = !hasOptions && (isSql || (question && (
-            question.type === 'CODING' ||
-            question.type === 'PYTHON_CODING' ||
-            question.type === 'SCENARIO_CODING' ||
-            (question.subject || question.language || '').toLowerCase().includes('python') ||
-            (question.subject || question.language || '').toLowerCase().includes('sql')
-          )));
+
+          // Strict Subject Classification (No cross-contamination)
+          const isSql = !hasOptions && question ? (
+            qSubject.includes('sql') ||
+            qType === 'SQL_CODING' ||
+            ((qType === 'CODING' || qType === 'SCENARIO_CODING' || qType === 'SCENARIO') && qSubject.includes('sql')) ||
+            (question.question || '').toUpperCase().includes('SELECT ')
+          ) : false;
+
+          const isPython = !hasOptions && !isSql && question ? (
+            qSubject.includes('python') ||
+            qType === 'PYTHON_CODING' ||
+            qType === 'CODING' ||
+            qType === 'SCENARIO_CODING' ||
+            ((qType === 'SCENARIO') && qSubject.includes('python'))
+          ) : false;
+
+          const isAptitudeScenario = !hasOptions && !isSql && !isPython;
+
+          // Code/Query Studio is displayed only for SQL and Python questions
+          const isCoding = !hasOptions && (isSql || isPython);
 
           const hasPrev = currentIdx > 0;
           const hasNext = currentIdx < questions.length - 1;
@@ -3476,6 +3523,15 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
           const unansweredCount = questions.length - answeredCount;
 
           const goToQuestion = (targetIdx) => {
+            // Reset execution outputs on question navigation to prevent state leakage
+            setConsoleOutput('');
+            setSqlQueryResult(null);
+            setSyntaxError(null);
+            setRuntimeError(null);
+            setExecutionStatus(null);
+            setExecutionTime(null);
+            setCustomInput('');
+            setConsoleTab('results');
             setExamState(prev => ({
               ...prev,
               currentQuestionIndex: targetIdx,
@@ -3684,6 +3740,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                     <SqlStudioEditor
                       isSql={isSql}
                       currentIdx={currentIdx}
+                      question={question}
                       answerValue={examState.answers[currentIdx]}
                       onAnswerChange={(val) => setExamState(prev => ({
                         ...prev,
@@ -3692,7 +3749,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                       isFullscreen={isFullscreen}
                       onReset={handleResetCode}
                       onToggleFullscreen={() => setIsFullscreen(!isFullscreen)}
-                      onRunCode={() => handleRunCode(examState.answers[currentIdx], question)}
+                      onRunCode={() => handleRunCode(examState.answers[currentIdx] || getDynamicStarterForQuestion(question), question)}
                       isExecuting={isExecuting}
                     />
 
@@ -3940,85 +3997,130 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                         </h3>
                       </div>
 
-                      {/* Options Header / Selection Clear Bar */}
-                      <div className="flex items-center justify-between border-t border-b border-slate-100/80 py-2.5 mt-1 w-full">
-                        <span className="text-xs font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                          <CheckCircle2 size={15} className="text-dash-primary-purple" />
-                          <span>Select your answer option:</span>
-                        </span>
+                      {/* Options Header / Selection Clear Bar (ONLY FOR MCQ QUESTIONS) */}
+                      {question.options && Array.isArray(question.options) && question.options.length > 0 ? (
+                        <>
+                          <div className="flex items-center justify-between border-t border-b border-slate-100/80 py-2.5 mt-1 w-full">
+                            <span className="text-xs font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                              <CheckCircle2 size={15} className="text-dash-primary-purple" />
+                              <span>Select your answer option:</span>
+                            </span>
 
-                        {examState.answers[currentIdx] && (
-                          <button
-                            type="button"
-                            onClick={() => setExamState(prev => ({
-                              ...prev,
-                              answers: { ...prev.answers, [currentIdx]: '' }
-                            }))}
-                            className="text-[11px] font-extrabold text-slate-400 hover:text-red-500 flex items-center gap-1 bg-transparent border-0 cursor-pointer transition-colors"
-                          >
-                            <RotateCcw size={12} />
-                            <span>Clear Selection</span>
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Answer Options - Displayed Directly Beneath Question */}
-                      {question.options && question.options.length > 0 ? (
-                        <div className="grid grid-cols-1 gap-3.5 w-full">
-                          {question.options.map((option, optIdx) => {
-                            const optionLetter = String.fromCharCode(65 + optIdx);
-                            const isSelected = examState.answers[currentIdx] === option;
-
-                            return (
+                            {examState.answers[currentIdx] && (
                               <button
-                                key={optIdx}
                                 type="button"
                                 onClick={() => setExamState(prev => ({
                                   ...prev,
-                                  answers: { ...prev.answers, [currentIdx]: option }
+                                  answers: { ...prev.answers, [currentIdx]: '' }
                                 }))}
-                                className={`w-full text-left p-4.5 rounded-2xl border font-semibold text-sm transition-all duration-200 cursor-pointer flex items-start gap-4 group shadow-2xs ${
-                                  isSelected
-                                    ? 'bg-dash-primary-purple/10 border-2 border-dash-primary-purple text-dash-dark-purple shadow-sm font-bold scale-[1.003]'
-                                    : 'bg-white border-dash-border-gray/60 text-slate-700 hover:border-dash-primary-purple/40 hover:bg-dash-soft-pink/30 hover:shadow-xs'
-                                }`}
+                                className="text-[11px] font-extrabold text-slate-400 hover:text-red-500 flex items-center gap-1 bg-transparent border-0 cursor-pointer transition-colors"
                               >
-                                {/* Option Letter Badge */}
-                                <div className={`w-7 h-7 rounded-xl font-extrabold text-xs flex items-center justify-center shrink-0 transition-all ${
-                                  isSelected
-                                    ? 'bg-dash-primary-purple text-white shadow-xs'
-                                    : 'bg-slate-100 text-slate-600 border border-slate-200 group-hover:bg-dash-primary-purple/20 group-hover:text-dash-primary-purple'
-                                }`}>
-                                  {optionLetter}
-                                </div>
-
-                                {/* Option Content */}
-                                <span className="flex-1 pt-0.5 leading-relaxed font-sans text-slate-800">{option}</span>
-
-                                {/* Selection Radio Circle */}
-                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all ${
-                                  isSelected
-                                    ? 'border-dash-primary-purple bg-dash-primary-purple text-white shadow-2xs'
-                                    : 'border-slate-300 group-hover:border-dash-primary-purple'
-                                }`}>
-                                  {isSelected && <Check size={12} strokeWidth={3} />}
-                                </div>
+                                <RotateCcw size={12} />
+                                <span>Clear Selection</span>
                               </button>
-                            );
-                          })}
-                        </div>
+                            )}
+                          </div>
+
+                          {/* Answer Options - Displayed Directly Beneath Question */}
+                          <div className="grid grid-cols-1 gap-3.5 w-full">
+                            {question.options.map((option, optIdx) => {
+                              const optionLetter = String.fromCharCode(65 + optIdx);
+                              const isSelected = examState.answers[currentIdx] === option;
+
+                              return (
+                                <button
+                                  key={optIdx}
+                                  type="button"
+                                  onClick={() => setExamState(prev => ({
+                                    ...prev,
+                                    answers: { ...prev.answers, [currentIdx]: option }
+                                  }))}
+                                  className={`w-full text-left p-4.5 rounded-2xl border font-semibold text-sm transition-all duration-200 cursor-pointer flex items-start gap-4 group shadow-2xs ${
+                                    isSelected
+                                      ? 'bg-dash-primary-purple/10 border-2 border-dash-primary-purple text-dash-dark-purple shadow-sm font-bold scale-[1.003]'
+                                      : 'bg-white border-dash-border-gray/60 text-slate-700 hover:border-dash-primary-purple/40 hover:bg-dash-soft-pink/30 hover:shadow-xs'
+                                  }`}
+                                >
+                                  {/* Option Letter Badge */}
+                                  <div className={`w-7 h-7 rounded-xl font-extrabold text-xs flex items-center justify-center shrink-0 transition-all ${
+                                    isSelected
+                                      ? 'bg-dash-primary-purple text-white shadow-xs'
+                                      : 'bg-slate-100 text-slate-600 border border-slate-200 group-hover:bg-dash-primary-purple/20 group-hover:text-dash-primary-purple'
+                                  }`}>
+                                    {optionLetter}
+                                  </div>
+
+                                  {/* Option Content */}
+                                  <span className="flex-1 pt-0.5 leading-relaxed font-sans text-slate-800">{option}</span>
+
+                                  {/* Selection Radio Circle */}
+                                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all ${
+                                    isSelected
+                                      ? 'border-dash-primary-purple bg-dash-primary-purple text-white shadow-2xs'
+                                      : 'border-slate-300 group-hover:border-dash-primary-purple'
+                                  }`}>
+                                    {isSelected && <Check size={12} strokeWidth={3} />}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </>
                       ) : (
-                        <div className="w-full">
-                          <textarea
-                            value={examState.answers[currentIdx] || ''}
-                            onChange={(e) => setExamState(prev => ({
-                              ...prev,
-                              answers: { ...prev.answers, [currentIdx]: e.target.value }
-                            }))}
-                            placeholder="Write your explanation or text answer here..."
-                            rows={6}
-                            className="w-full p-4 rounded-2xl border border-dash-border-gray/60 bg-[#fafafa] font-mono text-sm focus:outline-none focus:ring-2 focus:ring-dash-primary-purple/40 focus:border-dash-primary-purple transition-all resize-y"
-                          />
+                        <div className="w-full flex flex-col gap-3">
+                          {/* Output Format Guidelines Box */}
+                          {question.outputFormat && (
+                            <div className="bg-indigo-50/70 border border-indigo-200/80 rounded-2xl p-4 w-full text-slate-700 text-xs sm:text-sm shadow-2xs">
+                              <h6 className="font-extrabold uppercase tracking-wider text-indigo-900 mb-1.5 flex items-center gap-1.5 text-[11px]">
+                                <FileText size={14} className="text-indigo-600" />
+                                <span>Output Format Guidelines:</span>
+                              </h6>
+                              <p className="font-semibold whitespace-pre-line text-indigo-950/90 leading-relaxed text-xs">
+                                {question.outputFormat}
+                              </p>
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                              <Edit3 size={14} className="text-dash-primary-purple" />
+                              <span>Type Your Answer:</span>
+                            </span>
+                            {question.answerType && (
+                              <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-200/60 px-2.5 py-1 rounded-full">
+                                Format: {question.answerType === 'NUMBER' ? 'Numeric (Integer / Decimal)' : 'Text'}
+                              </span>
+                            )}
+                          </div>
+                          <div className="relative w-full">
+                            <input
+                              type="text"
+                              inputMode={question.answerType === 'NUMBER' ? 'decimal' : 'text'}
+                              value={examState.answers[currentIdx] || ''}
+                              onChange={(e) => setExamState(prev => ({
+                                ...prev,
+                                answers: { ...prev.answers, [currentIdx]: e.target.value }
+                              }))}
+                              placeholder={question.placeholder || "Enter your answer"}
+                              className="w-full px-5 py-4 rounded-2xl border-2 border-slate-200 focus:border-dash-primary-purple bg-white text-slate-800 font-semibold text-base focus:outline-none focus:ring-4 focus:ring-dash-primary-purple/10 transition-all shadow-xs"
+                            />
+                            {examState.answers[currentIdx] && (
+                              <button
+                                type="button"
+                                onClick={() => setExamState(prev => ({
+                                  ...prev,
+                                  answers: { ...prev.answers, [currentIdx]: '' }
+                                }))}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer border-0"
+                                title="Clear answer"
+                              >
+                                <X size={16} />
+                              </button>
+                            )}
+                          </div>
+                          <span className="text-[11px] font-semibold text-slate-400 italic">
+                            Please type your answer into the input field above.
+                          </span>
                         </div>
                       )}
 
