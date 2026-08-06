@@ -814,7 +814,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
       const currentTopic = topicsList[i];
 
       setGenerationProgress(prev => {
-        const updatedTopics = prev.topics.map((t, idx) => 
+        const updatedTopics = prev.topics.map((t, idx) =>
           idx === i ? { ...t, status: 'generating' } : t
         );
         const percent = Math.round((i / topicsList.length) * 100);
@@ -822,9 +822,9 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
           ...prev,
           topics: updatedTopics,
           currentTopicName: currentTopic,
-          statusMessage: i === 0 
-            ? `Generating ${currentTopic} Questions...` 
-            : `${topicsList[i-1]} Completed. Generating ${currentTopic}...`,
+          statusMessage: i === 0
+            ? `Generating ${currentTopic} Questions...`
+            : `${topicsList[i - 1]} Completed. Generating ${currentTopic}...`,
           overallPercent: percent
         };
       });
@@ -871,12 +871,12 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
 
           allQuestions = [...allQuestions, ...topicQs];
           const indexedQuestions = allQuestions.map((q, idx) => ({ ...q, id: idx + 1 }));
-          
+
           setGeneratedQuestions(indexedQuestions);
           completedCount++;
 
           setGenerationProgress(prev => {
-            const updatedTopics = prev.topics.map((t, idx) => 
+            const updatedTopics = prev.topics.map((t, idx) =>
               idx === i ? { ...t, status: 'completed', count: topicQs.length } : t
             );
             const nextTopic = topicsList[i + 1];
@@ -886,8 +886,8 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
               topics: updatedTopics,
               completedTopicsCount: completedCount,
               overallPercent: percent,
-              statusMessage: nextTopic 
-                ? `${currentTopic} Completed (${topicQs.length} Qs). Generating ${nextTopic}...` 
+              statusMessage: nextTopic
+                ? `${currentTopic} Completed (${topicQs.length} Qs). Generating ${nextTopic}...`
                 : `${currentTopic} Completed (${topicQs.length} Qs). Generation complete.`
             };
           });
@@ -900,7 +900,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
         showToast(`Warning: Failed to generate questions for ${currentTopic}. Continuing remaining topics...`);
 
         setGenerationProgress(prev => {
-          const updatedTopics = prev.topics.map((t, idx) => 
+          const updatedTopics = prev.topics.map((t, idx) =>
             idx === i ? { ...t, status: 'failed', error: errMsg } : t
           );
           const percent = Math.round(((i + 1) / topicsList.length) * 100);
@@ -1539,12 +1539,12 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
                         // Find candidate's assignment
                         const candAssignment = Array.isArray(assignments)
                           ? assignments.find((a) =>
-                              a.candidate_id === candidate.id ||
-                              a.candidateId === candidate.id ||
-                              a.candidate?.id === candidate.id ||
-                              (a.candidateEmail && candidate.email && a.candidateEmail.toLowerCase() === candidate.email.toLowerCase()) ||
-                              (a.candidate?.email && candidate.email && a.candidate.email.toLowerCase() === candidate.email.toLowerCase())
-                            )
+                            a.candidate_id === candidate.id ||
+                            a.candidateId === candidate.id ||
+                            a.candidate?.id === candidate.id ||
+                            (a.candidateEmail && candidate.email && a.candidateEmail.toLowerCase() === candidate.email.toLowerCase()) ||
+                            (a.candidate?.email && candidate.email && a.candidate.email.toLowerCase() === candidate.email.toLowerCase())
+                          )
                           : null;
 
                         // Assessment Name
@@ -1563,10 +1563,10 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
                           candidate.date;
                         const assignedDateDisplay = rawAssignedDate
                           ? new Date(rawAssignedDate).toLocaleDateString(undefined, {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric'
-                            })
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                          })
                           : 'N/A';
 
                         return (
@@ -1673,11 +1673,10 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
                       <button
                         key={page}
                         onClick={() => setCandidatePage(page)}
-                        className={`w-7.5 h-7.5 rounded-lg flex items-center justify-center font-bold text-xs border transition-colors cursor-pointer ${
-                          candidatePage === page
+                        className={`w-7.5 h-7.5 rounded-lg flex items-center justify-center font-bold text-xs border transition-colors cursor-pointer ${candidatePage === page
                             ? 'bg-dash-primary-purple border-dash-primary-purple text-dash-white-card'
                             : 'bg-dash-white-card border-dash-border-gray text-dash-dark-purple hover:bg-dash-soft-pink'
-                        }`}
+                          }`}
                       >
                         {page}
                       </button>
@@ -1762,11 +1761,10 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
                         key={subj.id}
                         type="button"
                         onClick={() => toggleSubject(subj.id)}
-                        className={`p-4 rounded-2xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between gap-3 ${
-                          isSelected
+                        className={`p-4 rounded-2xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between gap-3 ${isSelected
                             ? 'bg-dash-primary-purple/10 border-dash-primary-purple shadow-sm ring-1 ring-dash-primary-purple'
                             : 'bg-dash-white-card border-dash-border-gray/70 hover:border-dash-primary-purple/40 hover:bg-dash-soft-pink'
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center justify-between w-full">
                           <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${isSelected ? 'bg-dash-primary-purple text-white' : 'bg-slate-100 text-slate-600'}`}>
@@ -1775,7 +1773,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
                           <input
                             type="checkbox"
                             checked={isSelected}
-                            onChange={() => {}}
+                            onChange={() => { }}
                             className="w-4 h-4 rounded text-dash-primary-purple focus:ring-dash-primary-purple cursor-pointer"
                           />
                         </div>
@@ -1796,11 +1794,10 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
                     <PieChart size={18} className="text-dash-primary-purple" />
                     <span>Question Type Distribution</span>
                   </h3>
-                  <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border ${
-                    isQuestionDistValid
+                  <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border ${isQuestionDistValid
                       ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                       : 'bg-red-50 text-red-600 border-red-200'
-                  }`}>
+                    }`}>
                     Total: {questionDist.mcq + questionDist.scenario}% {isQuestionDistValid ? '✓' : '⚠️ Must equal 100%'}
                   </span>
                 </div>
@@ -1851,11 +1848,10 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
                     <SlidersHorizontal size={18} className="text-dash-primary-purple" />
                     <span>Difficulty Distribution</span>
                   </h3>
-                  <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border ${
-                    isDifficultyDistValid
+                  <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border ${isDifficultyDistValid
                       ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                       : 'bg-red-50 text-red-600 border-red-200'
-                  }`}>
+                    }`}>
                     Total: {difficultyDist.easy + difficultyDist.medium + difficultyDist.hard}% {isDifficultyDistValid ? '✓' : '⚠️ Must equal 100%'}
                   </span>
                 </div>
@@ -2272,6 +2268,28 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
                   return `${m}m ${s}s`;
                 };
 
+                const rawSummary = rep.summary || '';
+                let cleanSummary = rawSummary;
+                let cefr = rep.recommended_english_level || null;
+                let ss = rep.sentence_structure_score || null;
+                let tc = rep.technical_communication_score || null;
+                let lu = rep.listening_understanding_score || null;
+                let rr = rep.response_relevance_score || null;
+
+                const cefrMatch = rawSummary.match(/\[CEFR:\s*([^\]]+)\]/i);
+                const ssMatch = rawSummary.match(/\[Sentence Structure:\s*(\d+)\]/i);
+                const tcMatch = rawSummary.match(/\[Technical Communication:\s*(\d+)\]/i);
+                const luMatch = rawSummary.match(/\[Listening & Understanding:\s*(\d+)\]/i);
+                const rrMatch = rawSummary.match(/\[Response Relevance:\s*(\d+)\]/i);
+
+                if (cefrMatch) cefr = cefrMatch[1];
+                if (ssMatch) ss = parseInt(ssMatch[1], 10);
+                if (tcMatch) tc = parseInt(tcMatch[1], 10);
+                if (luMatch) lu = parseInt(luMatch[1], 10);
+                if (rrMatch) rr = parseInt(rrMatch[1], 10);
+
+                cleanSummary = rawSummary.replace(/\[(CEFR|Sentence Structure|Technical Communication|Listening & Understanding|Response Relevance):\s*[^\]]+\]\s*/gi, '').trim();
+
                 return (
                   <div className="flex flex-col gap-6">
                     {/* Header */}
@@ -2293,11 +2311,16 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
 
                     {/* Stats & Overview Row */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-stretch">
-                      
+
                       {/* Overall Level Card */}
                       <div className="md:col-span-1 bg-dash-soft-pink border border-dash-border-gray/40 rounded-2xl p-5 flex flex-col justify-center items-center text-center">
                         <span className="text-[9px] font-extrabold text-dash-light-purple uppercase tracking-wider mb-1">Overall English Level</span>
                         <span className="font-plus-jakarta font-extrabold text-xl text-dash-primary-purple leading-tight">{rep.overall_level}</span>
+                        {cefr && (
+                          <span className="text-[11px] font-extrabold text-dash-primary-purple mt-2 bg-dash-primary-purple/10 px-2.5 py-0.5 rounded-full border border-dash-primary-purple/20">
+                            CEFR: {cefr}
+                          </span>
+                        )}
                         <span className="text-[9px] font-extrabold text-dash-success-green bg-dash-success-green/10 border border-dash-success-green/20 px-3 py-1 rounded-full uppercase mt-3.5 tracking-wider">
                           {rep.recommendation || 'Recommended'}
                         </span>
@@ -2317,7 +2340,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
                         </div>
                         <div className="text-xs font-semibold text-slate-700 leading-relaxed mt-1">
                           <span className="block font-bold text-dash-primary-purple uppercase tracking-wider text-[9px] mb-1">AI HR Review summary:</span>
-                          <p>{rep.summary}</p>
+                          <p>{cleanSummary}</p>
                         </div>
                       </div>
 
@@ -2325,7 +2348,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
 
                     {/* Scores & Observation Bullets Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch border-t border-dash-border-gray/25 pt-5">
-                      
+
                       {/* Scores Breakdown */}
                       <div className="flex flex-col gap-4">
                         <h4 className="text-xs font-bold text-dash-dark-purple tracking-wider uppercase border-b border-dash-border-gray/10 pb-1.5">Linguistic Competence</h4>
@@ -2334,8 +2357,12 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
                             { name: 'Communication', val: rep.communication_score },
                             { name: 'Grammar Accuracy', val: rep.grammar_score },
                             { name: 'Vocabulary range', val: rep.vocabulary_score },
-                            { name: 'Confidence Estimation', val: rep.confidence_score },
+                            { name: 'Sentence Structure', val: ss },
                             { name: 'Oral Fluency', val: rep.fluency_score },
+                            { name: 'Listening & Understanding', val: lu },
+                            { name: 'Response Relevance', val: rr },
+                            { name: 'Technical Communication', val: tc },
+                            { name: 'Confidence Estimation', val: rep.confidence_score },
                             { name: 'Professional Etiquette', val: rep.professionalism_score },
                             { name: 'Pronunciation (Speech)', val: rep.pronunciation_score }
                           ].map((item, idx) => {
@@ -2799,7 +2826,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
                       }
 
                       showToast(`Successfully assigned to ${successCount} candidates. ${failedCount > 0 ? `Failed: ${failedCount}.` : ''}`);
-                      
+
                       // Refresh saved assessments
                       try {
                         const assessmentsRes = await api.get('/api/assessment');
@@ -2809,7 +2836,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
                       } catch (err) {
                         console.error(err);
                       }
-                      
+
                       setAssigningAssessment(null);
                       setAssigningGroup(null);
                     } else {
@@ -2894,10 +2921,10 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
                               const query = assignSearch.toLowerCase();
                               return nameStr.includes(query) || emailStr.includes(query);
                             }).length === 0 && (
-                              <div className="p-3 text-center text-xs font-semibold text-dash-light-purple">
-                                No candidates found.
-                              </div>
-                            )}
+                                <div className="p-3 text-center text-xs font-semibold text-dash-light-purple">
+                                  No candidates found.
+                                </div>
+                              )}
                           </motion.div>
                         </>
                       )}
@@ -3078,7 +3105,7 @@ const ProgressiveGenerationBanner = ({ generationProgress }) => {
 
       {/* Progress Bar */}
       <div className="w-full bg-slate-800/80 h-2.5 rounded-full overflow-hidden mb-4 border border-white/5">
-        <div 
+        <div
           className="h-full bg-gradient-to-r from-purple-500 via-indigo-400 to-emerald-400 rounded-full transition-all duration-500 shadow-[0_0_12px_rgba(168,85,247,0.5)]"
           style={{ width: `${overallPercent}%` }}
         />
@@ -3092,23 +3119,22 @@ const ProgressiveGenerationBanner = ({ generationProgress }) => {
           const isFailed = t.status === 'failed';
 
           return (
-            <div 
+            <div
               key={idx}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold transition-all ${
-                isDone 
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold transition-all ${isDone
                   ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-sm'
                   : isGenerating
                     ? 'bg-purple-500/25 text-purple-200 border border-purple-400/50 animate-pulse shadow-md'
                     : isFailed
                       ? 'bg-red-500/20 text-red-300 border border-red-500/30'
                       : 'bg-slate-800/60 text-slate-400 border border-slate-700/50'
-              }`}
+                }`}
             >
               {isDone && <CheckCircle size={13} className="text-emerald-400" />}
               {isGenerating && <Loader2 size={13} className="animate-spin text-purple-300" />}
               {isFailed && <AlertCircle size={13} className="text-red-400" />}
               {!isDone && !isGenerating && !isFailed && <Clock size={13} className="text-slate-400" />}
-              
+
               <span>{t.name}</span>
               {isDone && <span className="text-[10px] opacity-85">✓ ({t.count} Qs)</span>}
               {isGenerating && <span className="text-[10px] opacity-90">⏳ Generating...</span>}
@@ -3492,643 +3518,643 @@ const QuestionPreviewHub = ({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch w-full">
-      {/* LEFT PANEL: QUESTION LIST POOL */}
-      <div className="lg:col-span-4 bg-dash-white-card border border-dash-border-gray rounded-[24px] p-5 shadow-[0_4px_20px_rgba(87,82,170,0.02)] flex flex-col gap-4 min-h-[450px] lg:h-[720px]">
-        <div className="flex items-center justify-between border-b border-dash-border-gray/25 pb-3">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-dash-primary-purple animate-pulse" />
-            <h3 className="font-outfit font-extrabold text-sm text-dash-dark-purple uppercase tracking-wider">
-              Question Pool
-            </h3>
+        {/* LEFT PANEL: QUESTION LIST POOL */}
+        <div className="lg:col-span-4 bg-dash-white-card border border-dash-border-gray rounded-[24px] p-5 shadow-[0_4px_20px_rgba(87,82,170,0.02)] flex flex-col gap-4 min-h-[450px] lg:h-[720px]">
+          <div className="flex items-center justify-between border-b border-dash-border-gray/25 pb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-dash-primary-purple animate-pulse" />
+              <h3 className="font-outfit font-extrabold text-sm text-dash-dark-purple uppercase tracking-wider">
+                Question Pool
+              </h3>
+            </div>
+            <span className="text-xs font-bold text-dash-primary-purple bg-dash-primary-purple/10 px-2.5 py-0.5 rounded-full border border-dash-primary-purple/10">
+              {generatedQuestions.length} Questions
+            </span>
           </div>
-          <span className="text-xs font-bold text-dash-primary-purple bg-dash-primary-purple/10 px-2.5 py-0.5 rounded-full border border-dash-primary-purple/10">
-            {generatedQuestions.length} Questions
-          </span>
-        </div>
 
-        {/* Search Question Bar */}
-        <div className="relative group">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-dash-light-purple transition-colors duration-300 group-focus-within:text-dash-primary-purple" size={14} />
-          <input
-            type="text"
-            placeholder="Search question pool..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 pl-9 pr-4 text-xs font-semibold text-dash-dark-purple placeholder-dash-light-purple/60 focus:outline-none focus:border-dash-primary-purple focus:ring-2 focus:ring-dash-primary-purple/5 transition-all"
-          />
-          {searchQuery && (
-            <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-dash-light-purple hover:text-dash-dark-purple">
-              <X size={12} />
-            </button>
-          )}
-        </div>
+          {/* Search Question Bar */}
+          <div className="relative group">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-dash-light-purple transition-colors duration-300 group-focus-within:text-dash-primary-purple" size={14} />
+            <input
+              type="text"
+              placeholder="Search question pool..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 pl-9 pr-4 text-xs font-semibold text-dash-dark-purple placeholder-dash-light-purple/60 focus:outline-none focus:border-dash-primary-purple focus:ring-2 focus:ring-dash-primary-purple/5 transition-all"
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-dash-light-purple hover:text-dash-dark-purple">
+                <X size={12} />
+              </button>
+            )}
+          </div>
 
-        {/* Question List container */}
-        <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 dashboard-scrollbar">
-          {filteredQuestions.map((q) => {
-            const isSelected = q.id === selectedId;
-            const actualIndex = generatedQuestions.findIndex(item => item.id === q.id) + 1;
-            const isCoding = q.type?.includes('CODING') || q.type === 'SCENARIO_CODING' || q.type === 'SCENARIO';
+          {/* Question List container */}
+          <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 dashboard-scrollbar">
+            {filteredQuestions.map((q) => {
+              const isSelected = q.id === selectedId;
+              const actualIndex = generatedQuestions.findIndex(item => item.id === q.id) + 1;
+              const isCoding = q.type?.includes('CODING') || q.type === 'SCENARIO_CODING' || q.type === 'SCENARIO';
 
-            let diffColor = 'text-green-600 bg-green-50 border-green-200/50';
-            if (q.difficulty === 'Medium') diffColor = 'text-amber-600 bg-amber-50 border-amber-200/50';
-            else if (q.difficulty === 'Hard') diffColor = 'text-rose-600 bg-rose-50 border-rose-200/50';
+              let diffColor = 'text-green-600 bg-green-50 border-green-200/50';
+              if (q.difficulty === 'Medium') diffColor = 'text-amber-600 bg-amber-50 border-amber-200/50';
+              else if (q.difficulty === 'Hard') diffColor = 'text-rose-600 bg-rose-50 border-rose-200/50';
 
-            return (
-              <div
-                key={q.id}
-                onClick={() => setSelectedId(q.id)}
-                className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all duration-300 group ${isSelected
+              return (
+                <div
+                  key={q.id}
+                  onClick={() => setSelectedId(q.id)}
+                  className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all duration-300 group ${isSelected
                     ? 'border-dash-primary-purple bg-dash-soft-pink shadow-[0_4px_12px_rgba(87,82,170,0.06)]'
                     : 'border-dash-border-gray/60 bg-dash-white-card hover:bg-dash-soft-pink/50 hover:border-dash-primary-purple/30'
-                  }`}
-              >
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <span className={`text-[10px] font-extrabold font-outfit uppercase tracking-wider ${isSelected ? 'text-dash-primary-purple' : 'text-dash-light-purple'}`}>
-                    Question #{actualIndex} ({q.type || (isCoding ? 'Scenario' : 'MCQ')})
-                  </span>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md border ${diffColor}`}>
-                      {q.difficulty || 'Medium'}
+                    }`}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <span className={`text-[10px] font-extrabold font-outfit uppercase tracking-wider ${isSelected ? 'text-dash-primary-purple' : 'text-dash-light-purple'}`}>
+                      Question #{actualIndex} ({q.type || (isCoding ? 'Scenario' : 'MCQ')})
                     </span>
-                    <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-dash-primary-purple/10 text-dash-primary-purple">
-                      {q.marks || (q.type === 'MCQ' ? 1 : 10)} M
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md border ${diffColor}`}>
+                        {q.difficulty || 'Medium'}
+                      </span>
+                      <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-dash-primary-purple/10 text-dash-primary-purple">
+                        {q.marks || (q.type === 'MCQ' ? 1 : 10)} M
+                      </span>
+                    </div>
+                  </div>
+
+                  <h4 className={`text-xs font-bold leading-snug line-clamp-2 ${isSelected ? 'text-dash-dark-purple' : 'text-dash-dark-purple/80 group-hover:text-dash-primary-purple'} transition-colors`}>
+                    {q.question || q.problemStatement}
+                  </h4>
+
+                  <div className="flex items-center gap-2 mt-3 text-[10px] font-bold text-dash-light-purple">
+                    <span className="px-1.5 py-0.5 rounded bg-dash-light-blue-bg border border-dash-border-gray/30 text-dash-dark-purple/70">
+                      {q.subject}
+                    </span>
+                    <span className="truncate">
+                      {q.topic}
                     </span>
                   </div>
                 </div>
+              );
+            })}
 
-                <h4 className={`text-xs font-bold leading-snug line-clamp-2 ${isSelected ? 'text-dash-dark-purple' : 'text-dash-dark-purple/80 group-hover:text-dash-primary-purple'} transition-colors`}>
-                  {q.question || q.problemStatement}
-                </h4>
-
-                <div className="flex items-center gap-2 mt-3 text-[10px] font-bold text-dash-light-purple">
-                  <span className="px-1.5 py-0.5 rounded bg-dash-light-blue-bg border border-dash-border-gray/30 text-dash-dark-purple/70">
-                    {q.subject}
-                  </span>
-                  <span className="truncate">
-                    {q.topic}
-                  </span>
-                </div>
+            {filteredQuestions.length === 0 && (
+              <div className="py-12 text-center text-xs text-dash-light-purple font-medium flex flex-col items-center justify-center gap-2">
+                <HelpCircle size={28} className="text-dash-light-purple/60" />
+                <span>No questions found matching criteria.</span>
               </div>
-            );
-          })}
-
-          {filteredQuestions.length === 0 && (
-            <div className="py-12 text-center text-xs text-dash-light-purple font-medium flex flex-col items-center justify-center gap-2">
-              <HelpCircle size={28} className="text-dash-light-purple/60" />
-              <span>No questions found matching criteria.</span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* RIGHT PANEL: QUESTION PREVIEW CARD & EDIT INTERFACE */}
-      <div className="lg:col-span-8 bg-dash-white-card border border-dash-border-gray rounded-[24px] p-6 shadow-[0_4px_20px_rgba(87,82,170,0.02)] flex flex-col min-h-[500px] lg:h-[720px] overflow-y-auto">
-        {!selectedQuestion ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-            <div className="w-16 h-16 rounded-full bg-dash-light-blue-bg flex items-center justify-center text-dash-primary-purple mb-4">
-              <Sparkles size={32} className="animate-pulse" />
-            </div>
-            <h3 className="font-plus-jakarta font-extrabold text-base text-dash-dark-purple">
-              No Question Selected
-            </h3>
-            <p className="text-xs text-dash-light-purple font-medium mt-1.5 max-w-xs">
-              Select a question from the pool on the left to preview and customize it.
-            </p>
+            )}
           </div>
-        ) : isEditing ? (
-          /* EDIT MODE FORM */
-          <form onSubmit={handleSaveChanges} className="flex-1 flex flex-col justify-between gap-5">
-            <div className="space-y-4">
-              {/* Edit Header */}
-              <div className="flex items-center justify-between border-b border-dash-border-gray/25 pb-3">
-                <div>
-                  <span className="text-[10px] text-dash-primary-purple font-extrabold tracking-wider uppercase">Editing Mode</span>
-                  <h3 className="font-outfit font-bold text-base text-dash-dark-purple mt-0.5">
-                    Customize Question #{generatedQuestions.findIndex(q => q.id === selectedId) + 1}
-                  </h3>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsEditing(false)}
-                    className="px-3.5 py-1.5 rounded-xl border border-dash-border-gray text-xs font-bold text-dash-dark-purple hover:bg-dash-soft-pink transition-colors cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-3.5 py-1.5 rounded-xl bg-dash-primary-purple text-dash-white-card text-xs font-bold hover:bg-dash-dark-purple transition-colors cursor-pointer shadow-sm"
-                  >
-                    Save Changes
-                  </button>
-                </div>
-              </div>
+        </div>
 
-              {/* Form inputs grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Category (Subject)</label>
-                  <input
-                    type="text"
-                    value={editForm.subject}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, subject: e.target.value }))}
-                    className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Topic</label>
-                  <input
-                    type="text"
-                    value={editForm.topic}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, topic: e.target.value }))}
-                    className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Question Type</label>
-                  <select
-                    value={editForm.type}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, type: e.target.value }))}
-                    className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-bold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple"
-                  >
-                    <option value="MCQ">Multiple Choice (MCQ)</option>
-                    <option value="SCENARIO">Scenario Q&A (Text)</option>
-                    <option value="PYTHON_CODING">Python Coding (Sandbox)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Difficulty</label>
-                  <select
-                    value={editForm.difficulty}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, difficulty: e.target.value }))}
-                    className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-bold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple"
-                  >
-                    <option value="Easy">Easy</option>
-                    <option value="Medium">Medium</option>
-                    <option value="Hard">Hard</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Estimated Time</label>
-                  <input
-                    type="text"
-                    value={editForm.estimatedTime}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, estimatedTime: e.target.value }))}
-                    className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
-                    placeholder="e.g. 15 Minutes"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Marks</label>
-                  <input
-                    type="number"
-                    value={editForm.marks}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, marks: parseInt(e.target.value, 10) || 0 }))}
-                    className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
-                    min="1"
-                    max="100"
-                  />
-                </div>
+        {/* RIGHT PANEL: QUESTION PREVIEW CARD & EDIT INTERFACE */}
+        <div className="lg:col-span-8 bg-dash-white-card border border-dash-border-gray rounded-[24px] p-6 shadow-[0_4px_20px_rgba(87,82,170,0.02)] flex flex-col min-h-[500px] lg:h-[720px] overflow-y-auto">
+          {!selectedQuestion ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
+              <div className="w-16 h-16 rounded-full bg-dash-light-blue-bg flex items-center justify-center text-dash-primary-purple mb-4">
+                <Sparkles size={32} className="animate-pulse" />
               </div>
-
-              {/* Problem statement / Question block */}
-              <div>
-                <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Problem Statement / Question Context</label>
-                <textarea
-                  rows="3"
-                  value={editForm.problemStatement}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, problemStatement: e.target.value, question: e.target.value }))}
-                  className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10 resize-y"
-                  required
-                />
-              </div>
-
-              {/* Conditional options for MCQ vs Coding */}
-              {editForm.type === 'MCQ' ? (
-                /* MCQ EDIT FIELDS */
-                <div className="space-y-4">
+              <h3 className="font-plus-jakarta font-extrabold text-base text-dash-dark-purple">
+                No Question Selected
+              </h3>
+              <p className="text-xs text-dash-light-purple font-medium mt-1.5 max-w-xs">
+                Select a question from the pool on the left to preview and customize it.
+              </p>
+            </div>
+          ) : isEditing ? (
+            /* EDIT MODE FORM */
+            <form onSubmit={handleSaveChanges} className="flex-1 flex flex-col justify-between gap-5">
+              <div className="space-y-4">
+                {/* Edit Header */}
+                <div className="flex items-center justify-between border-b border-dash-border-gray/25 pb-3">
                   <div>
-                    <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Options (comma-separated list)</label>
-                    <input
-                      type="text"
-                      value={editForm.options}
-                      onChange={(e) => setEditForm(prev => ({ ...prev, options: e.target.value }))}
-                      className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
-                      placeholder="yield, return, async, lambda"
-                    />
+                    <span className="text-[10px] text-dash-primary-purple font-extrabold tracking-wider uppercase">Editing Mode</span>
+                    <h3 className="font-outfit font-bold text-base text-dash-dark-purple mt-0.5">
+                      Customize Question #{generatedQuestions.findIndex(q => q.id === selectedId) + 1}
+                    </h3>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditing(false)}
+                      className="px-3.5 py-1.5 rounded-xl border border-dash-border-gray text-xs font-bold text-dash-dark-purple hover:bg-dash-soft-pink transition-colors cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-3.5 py-1.5 rounded-xl bg-dash-primary-purple text-dash-white-card text-xs font-bold hover:bg-dash-dark-purple transition-colors cursor-pointer shadow-sm"
+                    >
+                      Save Changes
+                    </button>
+                  </div>
+                </div>
+
+                {/* Form inputs grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Correct Answer</label>
+                    <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Category (Subject)</label>
                     <input
                       type="text"
-                      value={editForm.correctAnswer}
-                      onChange={(e) => setEditForm(prev => ({ ...prev, correctAnswer: e.target.value }))}
+                      value={editForm.subject}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, subject: e.target.value }))}
                       className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
                       required
                     />
                   </div>
-                </div>
-              ) : editForm.type === 'PYTHON_CODING' ? (
-                /* PYTHON CODING EDIT FIELDS */
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Input Format</label>
-                      <input
-                        type="text"
-                        value={editForm.inputFormat}
-                        onChange={(e) => setEditForm(prev => ({ ...prev, inputFormat: e.target.value }))}
-                        className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
-                        placeholder="e.g. A single string of characters"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Output Format</label>
-                      <input
-                        type="text"
-                        value={editForm.outputFormat}
-                        onChange={(e) => setEditForm(prev => ({ ...prev, outputFormat: e.target.value }))}
-                        className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
-                        placeholder="e.g. Print True or False"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Sample Input</label>
-                      <textarea
-                        rows="2"
-                        value={editForm.sampleInput}
-                        onChange={(e) => setEditForm(prev => ({ ...prev, sampleInput: e.target.value }))}
-                        className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10 resize-y"
-                        placeholder="madam"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Sample Output</label>
-                      <textarea
-                        rows="2"
-                        value={editForm.sampleOutput}
-                        onChange={(e) => setEditForm(prev => ({ ...prev, sampleOutput: e.target.value }))}
-                        className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10 resize-y"
-                        placeholder="True"
-                      />
-                    </div>
-                  </div>
                   <div>
-                    <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Constraints (comma-separated list)</label>
+                    <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Topic</label>
                     <input
                       type="text"
-                      value={editForm.constraints}
-                      onChange={(e) => setEditForm(prev => ({ ...prev, constraints: e.target.value }))}
+                      value={editForm.topic}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, topic: e.target.value }))}
                       className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
-                      placeholder="e.g. Length <= 1000, ASCII only"
+                      required
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Expected Correct Code Solution</label>
-                    <textarea
-                      rows="4"
-                      value={editForm.expectedAnswer}
-                      onChange={(e) => setEditForm(prev => ({ ...prev, expectedAnswer: e.target.value, correctAnswer: e.target.value }))}
-                      className="w-full bg-[#1e1e1e] border border-zinc-800 rounded-xl py-2.5 px-4 text-xs font-mono text-zinc-100 focus:outline-none focus:border-dash-primary-purple transition-all resize-y"
-                      placeholder="def solution(): ..."
-                    />
-                  </div>
-                </div>
-              ) : (
-                /* DEFAULTS TO SCENARIO EDIT FIELDS */
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Example Input</label>
-                      <input
-                        type="text"
-                        value={editForm.exampleInput}
-                        onChange={(e) => setEditForm(prev => ({ ...prev, exampleInput: e.target.value }))}
-                        className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
-                        placeholder="e.g. madam"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Example Output</label>
-                      <input
-                        type="text"
-                        value={editForm.exampleOutput}
-                        onChange={(e) => setEditForm(prev => ({ ...prev, exampleOutput: e.target.value }))}
-                        className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
-                        placeholder="e.g. True"
-                      />
-                    </div>
+                    <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Question Type</label>
+                    <select
+                      value={editForm.type}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, type: e.target.value }))}
+                      className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-bold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple"
+                    >
+                      <option value="MCQ">Multiple Choice (MCQ)</option>
+                      <option value="SCENARIO">Scenario Q&A (Text)</option>
+                      <option value="PYTHON_CODING">Python Coding (Sandbox)</option>
+                    </select>
                   </div>
                   <div>
-                    <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Constraints (comma-separated list)</label>
+                    <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Difficulty</label>
+                    <select
+                      value={editForm.difficulty}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, difficulty: e.target.value }))}
+                      className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-bold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple"
+                    >
+                      <option value="Easy">Easy</option>
+                      <option value="Medium">Medium</option>
+                      <option value="Hard">Hard</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Estimated Time</label>
                     <input
                       type="text"
-                      value={editForm.constraints}
-                      onChange={(e) => setEditForm(prev => ({ ...prev, constraints: e.target.value }))}
+                      value={editForm.estimatedTime}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, estimatedTime: e.target.value }))}
                       className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
-                      placeholder="e.g. Length <=1000, Ignore Case, Ignore Spaces"
+                      placeholder="e.g. 15 Minutes"
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Expected Answer (Code)</label>
-                    <textarea
-                      rows="3"
-                      value={editForm.expectedAnswer}
-                      onChange={(e) => setEditForm(prev => ({ ...prev, expectedAnswer: e.target.value }))}
-                      className="w-full bg-[#fafafc] border border-dash-border-gray rounded-xl py-2.5 px-4 text-xs font-mono text-[#0f172a] focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10 resize-y"
+                    <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Marks</label>
+                    <input
+                      type="number"
+                      value={editForm.marks}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, marks: parseInt(e.target.value, 10) || 0 }))}
+                      className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
+                      min="1"
+                      max="100"
                     />
                   </div>
                 </div>
-              )}
 
-              {/* Explanation */}
-              <div>
-                <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Explanation</label>
-                <textarea
-                  rows="2"
-                  value={editForm.explanation}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, explanation: e.target.value }))}
-                  className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10 resize-y"
-                />
-              </div>
-            </div>
-
-            {/* Bottom edit buttons */}
-            <div className="flex items-center gap-3 border-t border-dash-border-gray/25 pt-4 mt-2">
-              <button
-                type="button"
-                onClick={() => setIsEditing(false)}
-                className="flex-1 py-3 rounded-xl border border-dash-border-gray text-xs font-bold text-dash-dark-purple hover:bg-dash-soft-pink transition-colors cursor-pointer"
-              >
-                Discard Changes
-              </button>
-              <button
-                type="submit"
-                className="flex-1 py-3 rounded-xl bg-dash-primary-purple text-dash-white-card text-xs font-bold hover:bg-dash-dark-purple transition-colors cursor-pointer shadow-[0_4px_12px_rgba(87,82,170,0.15)]"
-              >
-                Save Question Changes
-              </button>
-            </div>
-          </form>
-        ) : (
-          /* HIGH-FIDELITY PREVIEW CARD VIEW */
-          <div className="flex-1 flex flex-col justify-between">
-            <div className="space-y-5.5 relative">
-              {/* Preview Header Row */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 border-b border-dash-border-gray/25 pb-3">
+                {/* Problem statement / Question block */}
                 <div>
-                  <span className="text-[10px] text-dash-primary-purple font-extrabold tracking-widest uppercase font-outfit">
-                    Question {generatedQuestions.findIndex(q => q.id === selectedId) + 1} of {generatedQuestions.length} ({selectedQuestion?.type || 'MCQ'})
-                  </span>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="font-outfit font-extrabold text-base text-dash-dark-purple">
-                      Previewing Question Details
+                  <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Problem Statement / Question Context</label>
+                  <textarea
+                    rows="3"
+                    value={editForm.problemStatement}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, problemStatement: e.target.value, question: e.target.value }))}
+                    className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10 resize-y"
+                    required
+                  />
+                </div>
+
+                {/* Conditional options for MCQ vs Coding */}
+                {editForm.type === 'MCQ' ? (
+                  /* MCQ EDIT FIELDS */
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Options (comma-separated list)</label>
+                      <input
+                        type="text"
+                        value={editForm.options}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, options: e.target.value }))}
+                        className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
+                        placeholder="yield, return, async, lambda"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Correct Answer</label>
+                      <input
+                        type="text"
+                        value={editForm.correctAnswer}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, correctAnswer: e.target.value }))}
+                        className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
+                        required
+                      />
+                    </div>
+                  </div>
+                ) : editForm.type === 'PYTHON_CODING' ? (
+                  /* PYTHON CODING EDIT FIELDS */
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Input Format</label>
+                        <input
+                          type="text"
+                          value={editForm.inputFormat}
+                          onChange={(e) => setEditForm(prev => ({ ...prev, inputFormat: e.target.value }))}
+                          className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
+                          placeholder="e.g. A single string of characters"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Output Format</label>
+                        <input
+                          type="text"
+                          value={editForm.outputFormat}
+                          onChange={(e) => setEditForm(prev => ({ ...prev, outputFormat: e.target.value }))}
+                          className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
+                          placeholder="e.g. Print True or False"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Sample Input</label>
+                        <textarea
+                          rows="2"
+                          value={editForm.sampleInput}
+                          onChange={(e) => setEditForm(prev => ({ ...prev, sampleInput: e.target.value }))}
+                          className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10 resize-y"
+                          placeholder="madam"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Sample Output</label>
+                        <textarea
+                          rows="2"
+                          value={editForm.sampleOutput}
+                          onChange={(e) => setEditForm(prev => ({ ...prev, sampleOutput: e.target.value }))}
+                          className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10 resize-y"
+                          placeholder="True"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Constraints (comma-separated list)</label>
+                      <input
+                        type="text"
+                        value={editForm.constraints}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, constraints: e.target.value }))}
+                        className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
+                        placeholder="e.g. Length <= 1000, ASCII only"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Expected Correct Code Solution</label>
+                      <textarea
+                        rows="4"
+                        value={editForm.expectedAnswer}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, expectedAnswer: e.target.value, correctAnswer: e.target.value }))}
+                        className="w-full bg-[#1e1e1e] border border-zinc-800 rounded-xl py-2.5 px-4 text-xs font-mono text-zinc-100 focus:outline-none focus:border-dash-primary-purple transition-all resize-y"
+                        placeholder="def solution(): ..."
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  /* DEFAULTS TO SCENARIO EDIT FIELDS */
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Example Input</label>
+                        <input
+                          type="text"
+                          value={editForm.exampleInput}
+                          onChange={(e) => setEditForm(prev => ({ ...prev, exampleInput: e.target.value }))}
+                          className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
+                          placeholder="e.g. madam"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Example Output</label>
+                        <input
+                          type="text"
+                          value={editForm.exampleOutput}
+                          onChange={(e) => setEditForm(prev => ({ ...prev, exampleOutput: e.target.value }))}
+                          className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
+                          placeholder="e.g. True"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Constraints (comma-separated list)</label>
+                      <input
+                        type="text"
+                        value={editForm.constraints}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, constraints: e.target.value }))}
+                        className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
+                        placeholder="e.g. Length <=1000, Ignore Case, Ignore Spaces"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Expected Answer (Code)</label>
+                      <textarea
+                        rows="3"
+                        value={editForm.expectedAnswer}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, expectedAnswer: e.target.value }))}
+                        className="w-full bg-[#fafafc] border border-dash-border-gray rounded-xl py-2.5 px-4 text-xs font-mono text-[#0f172a] focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10 resize-y"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Explanation */}
+                <div>
+                  <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Explanation</label>
+                  <textarea
+                    rows="2"
+                    value={editForm.explanation}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, explanation: e.target.value }))}
+                    className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10 resize-y"
+                  />
+                </div>
+              </div>
+
+              {/* Bottom edit buttons */}
+              <div className="flex items-center gap-3 border-t border-dash-border-gray/25 pt-4 mt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(false)}
+                  className="flex-1 py-3 rounded-xl border border-dash-border-gray text-xs font-bold text-dash-dark-purple hover:bg-dash-soft-pink transition-colors cursor-pointer"
+                >
+                  Discard Changes
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-3 rounded-xl bg-dash-primary-purple text-dash-white-card text-xs font-bold hover:bg-dash-dark-purple transition-colors cursor-pointer shadow-[0_4px_12px_rgba(87,82,170,0.15)]"
+                >
+                  Save Question Changes
+                </button>
+              </div>
+            </form>
+          ) : (
+            /* HIGH-FIDELITY PREVIEW CARD VIEW */
+            <div className="flex-1 flex flex-col justify-between">
+              <div className="space-y-5.5 relative">
+                {/* Preview Header Row */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 border-b border-dash-border-gray/25 pb-3">
+                  <div>
+                    <span className="text-[10px] text-dash-primary-purple font-extrabold tracking-widest uppercase font-outfit">
+                      Question {generatedQuestions.findIndex(q => q.id === selectedId) + 1} of {generatedQuestions.length} ({selectedQuestion?.type || 'MCQ'})
+                    </span>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="font-outfit font-extrabold text-base text-dash-dark-purple">
+                        Previewing Question Details
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-xs font-bold text-dash-light-purple">
+                    <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-dash-dark-purple/80 bg-dash-light-blue-bg border border-dash-border-gray/30 px-2.5 py-1 rounded-xl">
+                      <BookOpen size={12} className="text-dash-primary-purple" />
+                      {selectedQuestion?.subject}
+                    </span>
+                    <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-dash-dark-purple/80 bg-dash-light-blue-bg border border-dash-border-gray/30 px-2.5 py-1 rounded-xl">
+                      <Clock size={12} className="text-dash-primary-purple" />
+                      {selectedQuestion?.estimatedTime || '15 Minutes'}
                     </span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 text-xs font-bold text-dash-light-purple">
-                  <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-dash-dark-purple/80 bg-dash-light-blue-bg border border-dash-border-gray/30 px-2.5 py-1 rounded-xl">
-                    <BookOpen size={12} className="text-dash-primary-purple" />
-                    {selectedQuestion?.subject}
-                  </span>
-                  <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-dash-dark-purple/80 bg-dash-light-blue-bg border border-dash-border-gray/30 px-2.5 py-1 rounded-xl">
-                    <Clock size={12} className="text-dash-primary-purple" />
-                    {selectedQuestion?.estimatedTime || '15 Minutes'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Metadata Cards Grid */}
-              <div className="bg-dash-light-blue-bg/30 border border-dash-border-gray/40 rounded-2xl p-4.5 grid grid-cols-4 gap-4 items-center">
-                <div>
-                  <span className="text-[10px] font-bold text-dash-light-purple uppercase tracking-wider block mb-1">
-                    Question No
-                  </span>
-                  <span className="text-xs font-extrabold text-dash-dark-purple font-outfit">
-                    #{generatedQuestions.findIndex(q => q.id === selectedId) + 1}
-                  </span>
-                </div>
-
-                <div>
-                  <span className="text-[10px] font-bold text-dash-light-purple uppercase tracking-wider block mb-1">
-                    Question Type
-                  </span>
-                  <span className="text-xs font-extrabold text-dash-primary-purple font-outfit">
-                    {selectedQuestion?.type || 'MCQ'}
-                  </span>
-                </div>
-
-                <div>
-                  <span className="text-[10px] font-bold text-dash-light-purple uppercase tracking-wider block mb-1">
-                    Marks
-                  </span>
-                  <span className="text-xs font-extrabold text-dash-dark-purple font-outfit">
-                    {selectedQuestion?.marks || (selectedQuestion?.type === 'MCQ' ? 1 : 10)} Marks
-                  </span>
-                </div>
-
-                <div>
-                  <span className="text-[10px] font-bold text-dash-light-purple uppercase tracking-wider block mb-1">
-                    Est. Duration
-                  </span>
-                  <span className="text-xs font-extrabold text-dash-dark-purple font-outfit">
-                    {selectedQuestion?.estimatedTime || '5 Minutes'}
-                  </span>
-                </div>
-
-                <div className="col-span-4 pt-3.5 mt-1.5 border-t border-dash-border-gray/40 flex items-center justify-between">
-                  <span className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider">
-                    Difficulty Level
-                  </span>
-                  <div className="flex items-center gap-1 bg-dash-white-card border border-dash-border-gray/80 p-0.5 rounded-lg">
-                    {['Easy', 'Medium', 'Hard'].map((lvl) => {
-                      const isActive = selectedQuestion?.difficulty === lvl;
-                      let activeStyle = '';
-                      if (isActive) {
-                        if (lvl === 'Easy') activeStyle = 'bg-green-600 text-white shadow-sm';
-                        else if (lvl === 'Medium') activeStyle = 'bg-amber-500 text-white shadow-sm';
-                        else if (lvl === 'Hard') activeStyle = 'bg-rose-600 text-white shadow-sm';
-                      } else {
-                        activeStyle = 'text-dash-light-purple hover:bg-dash-soft-pink hover:text-dash-primary-purple';
-                      }
-
-                      return (
-                        <button
-                          key={lvl}
-                          type="button"
-                          onClick={() => handleDifficultyChange(selectedQuestion?.id, lvl)}
-                          className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all border-none cursor-pointer ${activeStyle}`}
-                        >
-                          {lvl}
-                        </button>
-                      );
-                    })}
+                {/* Metadata Cards Grid */}
+                <div className="bg-dash-light-blue-bg/30 border border-dash-border-gray/40 rounded-2xl p-4.5 grid grid-cols-4 gap-4 items-center">
+                  <div>
+                    <span className="text-[10px] font-bold text-dash-light-purple uppercase tracking-wider block mb-1">
+                      Question No
+                    </span>
+                    <span className="text-xs font-extrabold text-dash-dark-purple font-outfit">
+                      #{generatedQuestions.findIndex(q => q.id === selectedId) + 1}
+                    </span>
                   </div>
-                </div>
-              </div>
 
-              {/* Main Content Area */}
-              <div className="space-y-4.5">
-                {/* Problem Statement */}
-                <div className="space-y-1.5">
-                  <h4 className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
-                    Question / Problem Statement
-                  </h4>
-                  <p className="text-xs font-semibold text-dash-dark-purple leading-relaxed bg-dash-white-card border border-dash-border-gray/40 p-4 rounded-2xl shadow-[0_2px_8px_rgba(87,82,170,0.01)] select-text">
-                    {selectedQuestion?.problemStatement || selectedQuestion?.question || selectedQuestion?.scenario}
-                  </p>
-                </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-dash-light-purple uppercase tracking-wider block mb-1">
+                      Question Type
+                    </span>
+                    <span className="text-xs font-extrabold text-dash-primary-purple font-outfit">
+                      {selectedQuestion?.type || 'MCQ'}
+                    </span>
+                  </div>
 
-                {/* MCQ Options Display */}
-                {!(selectedQuestion?.type?.includes('CODING') || selectedQuestion?.type === 'SCENARIO_CODING' || selectedQuestion?.type === 'SCENARIO') && selectedQuestion?.options?.length > 0 && (
-                  <div className="space-y-2">
-                    <h4 className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
-                      Options & Correct Answer
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                      {selectedQuestion.options.map((opt, idx) => {
-                        const isCorrect = opt === selectedQuestion.correctAnswer;
-                        const label = ['A', 'B', 'C', 'D'][idx] || `${idx + 1}`;
+                  <div>
+                    <span className="text-[10px] font-bold text-dash-light-purple uppercase tracking-wider block mb-1">
+                      Marks
+                    </span>
+                    <span className="text-xs font-extrabold text-dash-dark-purple font-outfit">
+                      {selectedQuestion?.marks || (selectedQuestion?.type === 'MCQ' ? 1 : 10)} Marks
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] font-bold text-dash-light-purple uppercase tracking-wider block mb-1">
+                      Est. Duration
+                    </span>
+                    <span className="text-xs font-extrabold text-dash-dark-purple font-outfit">
+                      {selectedQuestion?.estimatedTime || '5 Minutes'}
+                    </span>
+                  </div>
+
+                  <div className="col-span-4 pt-3.5 mt-1.5 border-t border-dash-border-gray/40 flex items-center justify-between">
+                    <span className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider">
+                      Difficulty Level
+                    </span>
+                    <div className="flex items-center gap-1 bg-dash-white-card border border-dash-border-gray/80 p-0.5 rounded-lg">
+                      {['Easy', 'Medium', 'Hard'].map((lvl) => {
+                        const isActive = selectedQuestion?.difficulty === lvl;
+                        let activeStyle = '';
+                        if (isActive) {
+                          if (lvl === 'Easy') activeStyle = 'bg-green-600 text-white shadow-sm';
+                          else if (lvl === 'Medium') activeStyle = 'bg-amber-500 text-white shadow-sm';
+                          else if (lvl === 'Hard') activeStyle = 'bg-rose-600 text-white shadow-sm';
+                        } else {
+                          activeStyle = 'text-dash-light-purple hover:bg-dash-soft-pink hover:text-dash-primary-purple';
+                        }
+
                         return (
-                          <div
-                            key={idx}
-                            className={`p-3 rounded-xl border flex items-center gap-3 transition-all ${isCorrect
-                                ? 'border-green-500 bg-green-50/40 text-green-700 font-bold'
-                                : 'border-dash-border-gray/50 bg-dash-white-card/90 text-dash-dark-purple'
-                              }`}
+                          <button
+                            key={lvl}
+                            type="button"
+                            onClick={() => handleDifficultyChange(selectedQuestion?.id, lvl)}
+                            className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all border-none cursor-pointer ${activeStyle}`}
                           >
-                            {isCorrect ? (
-                              <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />
-                            ) : (
-                              <div className="w-4 h-4 rounded-full border border-dash-light-purple/60 shrink-0 flex items-center justify-center font-bold text-[9px] text-dash-light-purple">
-                                {label}
-                              </div>
-                            )}
-                            <span className="text-xs font-semibold leading-relaxed">
-                              {opt}
-                            </span>
-                          </div>
+                            {lvl}
+                          </button>
                         );
                       })}
                     </div>
                   </div>
-                )}
+                </div>
 
-                {/* Example Input / Output for Scenario/Coding */}
-                {(selectedQuestion?.exampleInput || selectedQuestion?.exampleOutput || selectedQuestion?.sampleInput || selectedQuestion?.sampleOutput) && (
-                  <div className="space-y-2">
+                {/* Main Content Area */}
+                <div className="space-y-4.5">
+                  {/* Problem Statement */}
+                  <div className="space-y-1.5">
                     <h4 className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
-                      Sample Input & Output
+                      Question / Problem Statement
                     </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <span className="text-[9px] font-bold text-dash-light-purple uppercase tracking-wider">Input</span>
-                        <div className="bg-[#fafafc] border border-dash-border-gray/50 rounded-xl p-3 font-mono text-[11px] text-dash-dark-purple flex items-center gap-2">
-                          <Terminal size={12} className="text-dash-light-purple shrink-0" />
-                          <span className="select-text whitespace-pre-wrap">{selectedQuestion?.exampleInput || selectedQuestion?.sampleInput || 'N/A'}</span>
-                        </div>
+                    <p className="text-xs font-semibold text-dash-dark-purple leading-relaxed bg-dash-white-card border border-dash-border-gray/40 p-4 rounded-2xl shadow-[0_2px_8px_rgba(87,82,170,0.01)] select-text">
+                      {selectedQuestion?.problemStatement || selectedQuestion?.question || selectedQuestion?.scenario}
+                    </p>
+                  </div>
+
+                  {/* MCQ Options Display */}
+                  {!(selectedQuestion?.type?.includes('CODING') || selectedQuestion?.type === 'SCENARIO_CODING' || selectedQuestion?.type === 'SCENARIO') && selectedQuestion?.options?.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
+                        Options & Correct Answer
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                        {selectedQuestion.options.map((opt, idx) => {
+                          const isCorrect = opt === selectedQuestion.correctAnswer;
+                          const label = ['A', 'B', 'C', 'D'][idx] || `${idx + 1}`;
+                          return (
+                            <div
+                              key={idx}
+                              className={`p-3 rounded-xl border flex items-center gap-3 transition-all ${isCorrect
+                                ? 'border-green-500 bg-green-50/40 text-green-700 font-bold'
+                                : 'border-dash-border-gray/50 bg-dash-white-card/90 text-dash-dark-purple'
+                                }`}
+                            >
+                              {isCorrect ? (
+                                <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />
+                              ) : (
+                                <div className="w-4 h-4 rounded-full border border-dash-light-purple/60 shrink-0 flex items-center justify-center font-bold text-[9px] text-dash-light-purple">
+                                  {label}
+                                </div>
+                              )}
+                              <span className="text-xs font-semibold leading-relaxed">
+                                {opt}
+                              </span>
+                            </div>
+                          );
+                        })}
                       </div>
-                      <div className="space-y-1">
-                        <span className="text-[9px] font-bold text-dash-light-purple uppercase tracking-wider">Output</span>
-                        <div className="bg-[#fafafc] border border-dash-border-gray/50 rounded-xl p-3 font-mono text-[11px] text-dash-dark-purple flex items-center gap-2">
-                          <Play size={12} className="text-dash-light-purple shrink-0" />
-                          <span className="select-text whitespace-pre-wrap">{selectedQuestion?.exampleOutput || selectedQuestion?.sampleOutput || 'N/A'}</span>
+                    </div>
+                  )}
+
+                  {/* Example Input / Output for Scenario/Coding */}
+                  {(selectedQuestion?.exampleInput || selectedQuestion?.exampleOutput || selectedQuestion?.sampleInput || selectedQuestion?.sampleOutput) && (
+                    <div className="space-y-2">
+                      <h4 className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
+                        Sample Input & Output
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <span className="text-[9px] font-bold text-dash-light-purple uppercase tracking-wider">Input</span>
+                          <div className="bg-[#fafafc] border border-dash-border-gray/50 rounded-xl p-3 font-mono text-[11px] text-dash-dark-purple flex items-center gap-2">
+                            <Terminal size={12} className="text-dash-light-purple shrink-0" />
+                            <span className="select-text whitespace-pre-wrap">{selectedQuestion?.exampleInput || selectedQuestion?.sampleInput || 'N/A'}</span>
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-[9px] font-bold text-dash-light-purple uppercase tracking-wider">Output</span>
+                          <div className="bg-[#fafafc] border border-dash-border-gray/50 rounded-xl p-3 font-mono text-[11px] text-dash-dark-purple flex items-center gap-2">
+                            <Play size={12} className="text-dash-light-purple shrink-0" />
+                            <span className="select-text whitespace-pre-wrap">{selectedQuestion?.exampleOutput || selectedQuestion?.sampleOutput || 'N/A'}</span>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Expected Answer Details */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
-                      {selectedQuestion?.type === 'MCQ' ? 'Correct Answer Details' : 'Expected Solution'}
-                    </h4>
-                    {selectedQuestion?.expectedAnswer && (
-                      <button
-                        onClick={() => handleCopyCode(selectedQuestion.expectedAnswer, selectedQuestion.id)}
-                        className="px-2.5 py-1 rounded-lg border border-dash-border-gray text-[9px] font-bold text-dash-primary-purple hover:bg-dash-soft-pink transition-all flex items-center gap-1 cursor-pointer"
-                      >
-                        {copiedId === selectedQuestion?.id ? (
-                          <>
-                            <Check size={10} strokeWidth={3} className="text-green-600" />
-                            <span className="text-green-600">Copied!</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy size={10} />
-                            <span>Copy Answer</span>
-                          </>
-                        )}
-                      </button>
+                  {/* Expected Answer Details */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
+                        {selectedQuestion?.type === 'MCQ' ? 'Correct Answer Details' : 'Expected Solution'}
+                      </h4>
+                      {selectedQuestion?.expectedAnswer && (
+                        <button
+                          onClick={() => handleCopyCode(selectedQuestion.expectedAnswer, selectedQuestion.id)}
+                          className="px-2.5 py-1 rounded-lg border border-dash-border-gray text-[9px] font-bold text-dash-primary-purple hover:bg-dash-soft-pink transition-all flex items-center gap-1 cursor-pointer"
+                        >
+                          {copiedId === selectedQuestion?.id ? (
+                            <>
+                              <Check size={10} strokeWidth={3} className="text-green-600" />
+                              <span className="text-green-600">Copied!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy size={10} />
+                              <span>Copy Answer</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+
+                    {selectedQuestion?.type === 'MCQ' ? (
+                      <div className="bg-green-50/40 border border-green-200 text-green-700 rounded-xl p-3.5 font-semibold text-xs flex items-center gap-2">
+                        <CheckCircle className="text-green-600 shrink-0" size={16} />
+                        <span>{selectedQuestion.correctAnswer}</span>
+                      </div>
+                    ) : (
+                      <div className="bg-[#fafafc] border border-dash-border-gray/50 rounded-2xl p-4.5 overflow-hidden shadow-inner border-l-4 border-l-dash-primary-purple relative">
+                        <div className="absolute right-3.5 top-3.5 text-[9px] font-bold text-dash-light-purple/60 font-mono uppercase tracking-wider select-none">
+                          {selectedQuestion?.subject?.toLowerCase() === 'sql' ? 'sql' : 'python'}
+                        </div>
+                        <SyntaxHighlighter
+                          code={selectedQuestion?.expectedAnswer || selectedQuestion?.correctAnswer || '# Solution code'}
+                          language={selectedQuestion?.subject?.toLowerCase() === 'sql' ? 'sql' : 'python'}
+                        />
+                      </div>
                     )}
                   </div>
 
-                  {selectedQuestion?.type === 'MCQ' ? (
-                    <div className="bg-green-50/40 border border-green-200 text-green-700 rounded-xl p-3.5 font-semibold text-xs flex items-center gap-2">
-                      <CheckCircle className="text-green-600 shrink-0" size={16} />
-                      <span>{selectedQuestion.correctAnswer}</span>
-                    </div>
-                  ) : (
-                    <div className="bg-[#fafafc] border border-dash-border-gray/50 rounded-2xl p-4.5 overflow-hidden shadow-inner border-l-4 border-l-dash-primary-purple relative">
-                      <div className="absolute right-3.5 top-3.5 text-[9px] font-bold text-dash-light-purple/60 font-mono uppercase tracking-wider select-none">
-                        {selectedQuestion?.subject?.toLowerCase() === 'sql' ? 'sql' : 'python'}
-                      </div>
-                      <SyntaxHighlighter
-                        code={selectedQuestion?.expectedAnswer || selectedQuestion?.correctAnswer || '# Solution code'}
-                        language={selectedQuestion?.subject?.toLowerCase() === 'sql' ? 'sql' : 'python'}
-                      />
+                  {/* Explanation */}
+                  {selectedQuestion?.explanation && (
+                    <div className="space-y-1.5 pb-2">
+                      <h4 className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
+                        Explanation
+                      </h4>
+                      <p className="text-xs font-medium text-dash-light-purple leading-relaxed bg-[#f8fafc]/50 p-4 rounded-2xl border border-dash-border-gray/30 shadow-[0_1px_5px_rgba(0,0,0,0.01)] select-text">
+                        {selectedQuestion.explanation}
+                      </p>
                     </div>
                   )}
                 </div>
+              </div>
 
-                {/* Explanation */}
-                {selectedQuestion?.explanation && (
-                  <div className="space-y-1.5 pb-2">
-                    <h4 className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
-                      Explanation
-                    </h4>
-                    <p className="text-xs font-medium text-dash-light-purple leading-relaxed bg-[#f8fafc]/50 p-4 rounded-2xl border border-dash-border-gray/30 shadow-[0_1px_5px_rgba(0,0,0,0.01)] select-text">
-                      {selectedQuestion.explanation}
-                    </p>
-                  </div>
-                )}
+              {/* Action buttons footer */}
+              <div className="flex items-center gap-3 border-t border-dash-border-gray/25 pt-4 mt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(true)}
+                  className="flex-1 py-3 rounded-xl border border-dash-border-gray/80 hover:bg-dash-soft-pink text-dash-dark-purple font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer bg-dash-white-card"
+                >
+                  <Edit3 size={13} />
+                  <span>Edit Question</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleDeleteQuestion(selectedQuestion?.id)}
+                  className="flex-1 py-3 rounded-xl border border-red-200 hover:border-red-300 bg-red-50/50 hover:bg-red-50 text-red-600 font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer"
+                  title="Delete Question"
+                >
+                  <Trash2 size={13} />
+                  <span>Delete Question</span>
+                </button>
               </div>
             </div>
-
-            {/* Action buttons footer */}
-            <div className="flex items-center gap-3 border-t border-dash-border-gray/25 pt-4 mt-4">
-              <button
-                type="button"
-                onClick={() => setIsEditing(true)}
-                className="flex-1 py-3 rounded-xl border border-dash-border-gray/80 hover:bg-dash-soft-pink text-dash-dark-purple font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer bg-dash-white-card"
-              >
-                <Edit3 size={13} />
-                <span>Edit Question</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleDeleteQuestion(selectedQuestion?.id)}
-                className="flex-1 py-3 rounded-xl border border-red-200 hover:border-red-300 bg-red-50/50 hover:bg-red-50 text-red-600 font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer"
-                title="Delete Question"
-              >
-                <Trash2 size={13} />
-                <span>Delete Question</span>
-              </button>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
-  </div>
   );
 };
 
@@ -4710,12 +4736,11 @@ const AssessmentsManager = ({
                                 </p>
                               </div>
                             </div>
-                            <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-md border uppercase tracking-wider shrink-0 ${
-                              singleAssigned.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
-                              singleAssigned.status === 'IN_PROGRESS' ? 'bg-amber-50 text-amber-600 border-amber-200' :
-                              singleAssigned.status === 'EXPIRED' ? 'bg-rose-50 text-rose-600 border-rose-200' :
-                              'bg-indigo-50 text-indigo-600 border-indigo-200'
-                            }`}>
+                            <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-md border uppercase tracking-wider shrink-0 ${singleAssigned.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
+                                singleAssigned.status === 'IN_PROGRESS' ? 'bg-amber-50 text-amber-600 border-amber-200' :
+                                  singleAssigned.status === 'EXPIRED' ? 'bg-rose-50 text-rose-600 border-rose-200' :
+                                    'bg-indigo-50 text-indigo-600 border-indigo-200'
+                              }`}>
                               {singleAssigned.status}
                             </span>
                           </div>
@@ -4826,7 +4851,7 @@ const ExpiredAssessmentsManager = ({
       if (!a) return false;
       const st = (a.status || '').toUpperCase();
       if (st === 'EXPIRED') return true;
-      
+
       if (st !== 'COMPLETED' && st !== 'SUBMITTED') {
         const endTimeVal = a.endTime || a.end_time || a.dueDate || a.due_date;
         if (endTimeVal && new Date(endTimeVal).getTime() < now) {
@@ -5084,8 +5109,8 @@ const AssessmentDetailsDrawer = ({ assessment, onClose, showToast }) => {
                               <div
                                 key={oIdx}
                                 className={`p-2.5 rounded-xl border flex items-center gap-2.5 text-xs ${isCorrect
-                                    ? 'border-green-400 bg-green-50/40 text-green-700 font-bold'
-                                    : 'border-dash-border-gray/30 bg-dash-white-card/50 text-dash-dark-purple'
+                                  ? 'border-green-400 bg-green-50/40 text-green-700 font-bold'
+                                  : 'border-dash-border-gray/30 bg-dash-white-card/50 text-dash-dark-purple'
                                   }`}
                               >
                                 {isCorrect ? (
@@ -5671,7 +5696,7 @@ const ResultsManager = ({ showToast, candidateGroups = [], candidates = [] }) =>
             </div>
             <div class="meta-card">
               <span class="meta-label">Submission Date</span>
-              <span class="meta-val">${new Date(result.createdAt).toLocaleDateString()} ${new Date(result.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+              <span class="meta-val">${new Date(result.createdAt).toLocaleDateString()} ${new Date(result.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
             </div>
           </div>
 
@@ -5727,7 +5752,7 @@ const ResultsManager = ({ showToast, candidateGroups = [], candidates = [] }) =>
     printWindow.document.close();
   };
 
-  const resultsToFilter = selectedGroupForView 
+  const resultsToFilter = selectedGroupForView
     ? (selectedGroupForView.id === 'ungrouped' ? ungroupedResults : selectedGroupForView.results || [])
     : results;
 
@@ -5961,146 +5986,146 @@ const ResultsManager = ({ showToast, candidateGroups = [], candidates = [] }) =>
               <>
                 <div className="flex-1 overflow-x-auto dashboard-scrollbar">
                   <table className="w-full min-w-[900px] border-collapse text-left text-sm">
-                <thead>
-                  <tr className="bg-dash-soft-pink border-b border-dash-border-gray text-[10px] font-extrabold text-dash-dark-purple tracking-widest uppercase">
-                    <th className="px-6 py-4.5">Candidate Name</th>
-                    <th className="px-6 py-4.5">Assessment Name</th>
-                    <th className="px-6 py-4.5">Submission Date & Time</th>
-                    <th className="px-6 py-4.5">Security Status</th>
-                    <th className="px-6 py-4.5">Score</th>
-                    <th className="px-6 py-4.5">AI Recommendation</th>
-                    <th className="px-6 py-4.5 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-dash-border-gray">
-                  <AnimatePresence mode="popLayout">
-                    {filteredAndSortedResults.map((res) => {
-                      const scoreVal = res.percentage;
-                      let scoreColor = '#149470';
-                      let scoreBg = 'rgba(20, 148, 112, 0.1)';
-                      if (scoreVal < 50) {
-                        scoreColor = '#E11D48';
-                        scoreBg = 'rgba(225, 29, 72, 0.1)';
-                      } else if (scoreVal < 80) {
-                        scoreColor = '#D97706';
-                        scoreBg = 'rgba(217, 119, 6, 0.1)';
-                      }
+                    <thead>
+                      <tr className="bg-dash-soft-pink border-b border-dash-border-gray text-[10px] font-extrabold text-dash-dark-purple tracking-widest uppercase">
+                        <th className="px-6 py-4.5">Candidate Name</th>
+                        <th className="px-6 py-4.5">Assessment Name</th>
+                        <th className="px-6 py-4.5">Submission Date & Time</th>
+                        <th className="px-6 py-4.5">Security Status</th>
+                        <th className="px-6 py-4.5">Score</th>
+                        <th className="px-6 py-4.5">AI Recommendation</th>
+                        <th className="px-6 py-4.5 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-dash-border-gray">
+                      <AnimatePresence mode="popLayout">
+                        {filteredAndSortedResults.map((res) => {
+                          const scoreVal = res.percentage;
+                          let scoreColor = '#149470';
+                          let scoreBg = 'rgba(20, 148, 112, 0.1)';
+                          if (scoreVal < 50) {
+                            scoreColor = '#E11D48';
+                            scoreBg = 'rgba(225, 29, 72, 0.1)';
+                          } else if (scoreVal < 80) {
+                            scoreColor = '#D97706';
+                            scoreBg = 'rgba(217, 119, 6, 0.1)';
+                          }
 
-                      return (
-                        <motion.tr
-                          key={res.id}
-                          layout
-                          initial={{ opacity: 0, y: 15 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.95 }}
-                          transition={{ duration: 0.3 }}
-                          className="bg-dash-white-card hover:bg-dash-soft-pink transition-colors duration-200 group"
-                        >
-                          <td className="px-6 py-4">
-                            <h4 className="text-xs font-bold text-dash-dark-purple group-hover:text-dash-primary-purple transition-colors duration-200">
-                              {res.candidateName}
-                            </h4>
-                            <span className="text-[10px] font-semibold text-dash-light-purple block mt-0.5">{res.candidateEmail}</span>
-                          </td>
-
-                          <td className="px-6 py-4 text-xs font-bold text-dash-dark-purple">
-                            {res.assessmentName}
-                          </td>
-
-                          <td className="px-6 py-4">
-                            <span className="text-xs font-bold text-dash-dark-purple block">
-                              {new Date(res.createdAt).toLocaleDateString(undefined, {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric'
-                              })}
-                            </span>
-                            <span className="text-[10px] font-semibold text-dash-light-purple block mt-0.5">
-                              {new Date(res.createdAt).toLocaleTimeString([], {
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
-                            </span>
-                          </td>
-
-                          <td className="px-6 py-4">
-                            {res.autoSubmitted || res.submissionType === 'Automatic' ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-rose-50 border border-rose-200 text-rose-600">
-                                <AlertTriangle size={11} className="text-rose-500 shrink-0" />
-                                <span>Auto Submitted ({res.warningCount || 4} Exits)</span>
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-50 border border-emerald-200 text-emerald-600">
-                                <CheckCircle size={11} className="text-emerald-500 shrink-0" />
-                                <span>Standard</span>
-                              </span>
-                            )}
-                          </td>
-
-                          <td className="px-6 py-4">
-                            <span
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold border"
-                              style={{
-                                color: scoreColor,
-                                backgroundColor: scoreBg,
-                                borderColor: `${scoreColor}30`
-                              }}
+                          return (
+                            <motion.tr
+                              key={res.id}
+                              layout
+                              initial={{ opacity: 0, y: 15 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, scale: 0.95 }}
+                              transition={{ duration: 0.3 }}
+                              className="bg-dash-white-card hover:bg-dash-soft-pink transition-colors duration-200 group"
                             >
-                              {scoreVal}%
-                            </span>
+                              <td className="px-6 py-4">
+                                <h4 className="text-xs font-bold text-dash-dark-purple group-hover:text-dash-primary-purple transition-colors duration-200">
+                                  {res.candidateName}
+                                </h4>
+                                <span className="text-[10px] font-semibold text-dash-light-purple block mt-0.5">{res.candidateEmail}</span>
+                              </td>
+
+                              <td className="px-6 py-4 text-xs font-bold text-dash-dark-purple">
+                                {res.assessmentName}
+                              </td>
+
+                              <td className="px-6 py-4">
+                                <span className="text-xs font-bold text-dash-dark-purple block">
+                                  {new Date(res.createdAt).toLocaleDateString(undefined, {
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: 'numeric'
+                                  })}
+                                </span>
+                                <span className="text-[10px] font-semibold text-dash-light-purple block mt-0.5">
+                                  {new Date(res.createdAt).toLocaleTimeString([], {
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
+                                </span>
+                              </td>
+
+                              <td className="px-6 py-4">
+                                {res.autoSubmitted || res.submissionType === 'Automatic' ? (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-rose-50 border border-rose-200 text-rose-600">
+                                    <AlertTriangle size={11} className="text-rose-500 shrink-0" />
+                                    <span>Auto Submitted ({res.warningCount || 4} Exits)</span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-50 border border-emerald-200 text-emerald-600">
+                                    <CheckCircle size={11} className="text-emerald-500 shrink-0" />
+                                    <span>Standard</span>
+                                  </span>
+                                )}
+                              </td>
+
+                              <td className="px-6 py-4">
+                                <span
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold border"
+                                  style={{
+                                    color: scoreColor,
+                                    backgroundColor: scoreBg,
+                                    borderColor: `${scoreColor}30`
+                                  }}
+                                >
+                                  {scoreVal}%
+                                </span>
+                              </td>
+
+                              <td className="px-6 py-4">
+                                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-dash-primary-purple bg-dash-primary-purple/5 border border-dash-primary-purple/20 px-3 py-1 rounded-full">
+                                  <Sparkles size={12} className="text-dash-primary-purple" />
+                                  {res.hiringRecommendation || "Recommended"}
+                                </span>
+                              </td>
+
+                              <td className="px-6 py-4 text-right">
+                                <button
+                                  disabled={loadingDetailId === (res.assignmentId || res.id)}
+                                  onClick={() => handleOpenDetail(res.assignmentId || res.id)}
+                                  className="px-3 py-1.5 rounded-lg bg-dash-white-card border border-dash-border-gray hover:border-dash-primary-purple text-dash-primary-purple text-xs font-bold hover:bg-dash-soft-pink transition-all duration-300 flex items-center gap-1.5 ml-auto cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {loadingDetailId === (res.assignmentId || res.id) ? (
+                                    <>
+                                      <div className="w-3.5 h-3.5 border-2 border-dash-primary-purple border-t-transparent rounded-full animate-spin shrink-0" />
+                                      <span>Loading...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Eye size={13} />
+                                      <span>View Details</span>
+                                    </>
+                                  )}
+                                </button>
+                              </td>
+                            </motion.tr>
+                          );
+                        })}
+                      </AnimatePresence>
+
+                      {filteredAndSortedResults.length === 0 && (
+                        <tr>
+                          <td colSpan={7} className="px-6 py-12 text-center text-sm text-dash-light-purple">
+                            <AlertCircle className="mx-auto mb-3 text-dash-light-purple" size={32} />
+                            No assessment evaluations found.
                           </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
 
-                          <td className="px-6 py-4">
-                            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-dash-primary-purple bg-dash-primary-purple/5 border border-dash-primary-purple/20 px-3 py-1 rounded-full">
-                              <Sparkles size={12} className="text-dash-primary-purple" />
-                              {res.hiringRecommendation || "Recommended"}
-                            </span>
-                          </td>
-
-                          <td className="px-6 py-4 text-right">
-                            <button
-                              disabled={loadingDetailId === (res.assignmentId || res.id)}
-                              onClick={() => handleOpenDetail(res.assignmentId || res.id)}
-                              className="px-3 py-1.5 rounded-lg bg-dash-white-card border border-dash-border-gray hover:border-dash-primary-purple text-dash-primary-purple text-xs font-bold hover:bg-dash-soft-pink transition-all duration-300 flex items-center gap-1.5 ml-auto cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              {loadingDetailId === (res.assignmentId || res.id) ? (
-                                <>
-                                  <div className="w-3.5 h-3.5 border-2 border-dash-primary-purple border-t-transparent rounded-full animate-spin shrink-0" />
-                                  <span>Loading...</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Eye size={13} />
-                                  <span>View Details</span>
-                                </>
-                              )}
-                            </button>
-                          </td>
-                        </motion.tr>
-                      );
-                    })}
-                  </AnimatePresence>
-
-                  {filteredAndSortedResults.length === 0 && (
-                    <tr>
-                      <td colSpan={7} className="px-6 py-12 text-center text-sm text-dash-light-purple">
-                        <AlertCircle className="mx-auto mb-3 text-dash-light-purple" size={32} />
-                        No assessment evaluations found.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="p-4 border-t border-dash-border-gray bg-dash-white-card flex items-center justify-between text-[11px] text-dash-light-purple font-semibold px-6">
-              <span>Showing {filteredAndSortedResults.length} evaluations</span>
-            </div>
+                <div className="p-4 border-t border-dash-border-gray bg-dash-white-card flex items-center justify-between text-[11px] text-dash-light-purple font-semibold px-6">
+                  <span>Showing {filteredAndSortedResults.length} evaluations</span>
+                </div>
+              </>
+            )}
           </>
         )}
-      </>
-    )}
-  </div>
+      </div>
 
       <AnimatePresence>
         {selectedResult && (
@@ -6152,7 +6177,7 @@ const ResultsManager = ({ showToast, candidateGroups = [], candidates = [] }) =>
                   <div className="bg-dash-light-blue-bg/30 border border-dash-border-gray rounded-xl p-3.5">
                     <span className="text-[10px] text-dash-light-purple font-bold uppercase tracking-wider block mb-1">Submitted On</span>
                     <span className="text-xs font-semibold text-dash-dark-purple block">
-                      {selectedResult.createdAt ? `${new Date(selectedResult.createdAt).toLocaleDateString()} ${new Date(selectedResult.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : 'Recent'}
+                      {selectedResult.createdAt ? `${new Date(selectedResult.createdAt).toLocaleDateString()} ${new Date(selectedResult.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Recent'}
                     </span>
                   </div>
                   <div className="bg-dash-light-blue-bg/30 border border-dash-border-gray rounded-xl p-3.5">
@@ -6336,7 +6361,7 @@ const ResultsManager = ({ showToast, candidateGroups = [], candidates = [] }) =>
 
                 <div className="bg-gradient-to-r from-dash-soft-pink to-dash-light-blue-bg/20 border border-dash-border-gray rounded-2xl p-5 mb-6">
                   <h4 className="text-xs font-extrabold text-dash-primary-purple uppercase tracking-wider mb-3">Overall AI Evaluation</h4>
-                  
+
                   <div className="grid grid-cols-3 gap-2 text-center border-b border-dash-border-gray/30 pb-4 mb-4">
                     <div>
                       <span className="text-2xl font-black text-dash-primary-purple">{selectedResult.percentage}%</span>
@@ -6424,9 +6449,8 @@ const ResultsManager = ({ showToast, candidateGroups = [], candidates = [] }) =>
                           </div>
                           <ChevronRight
                             size={16}
-                            className={`text-dash-light-purple transition-transform duration-200 shrink-0 ${
-                              isExpanded ? 'rotate-90' : ''
-                            }`}
+                            className={`text-dash-light-purple transition-transform duration-200 shrink-0 ${isExpanded ? 'rotate-90' : ''
+                              }`}
                           />
                         </button>
 
@@ -6445,7 +6469,7 @@ const ResultsManager = ({ showToast, candidateGroups = [], candidates = [] }) =>
                                     <div className="absolute right-3.5 top-3 text-[9px] font-bold text-zinc-600 uppercase tracking-wider select-none">Submitted Code ({q.type})</div>
                                     <SyntaxHighlighter code={q.candidateAnswer || '# No answer submitted.'} language={(q.type || '').toUpperCase() === 'SQL' ? 'sql' : 'python'} />
                                   </div>
-                                  
+
                                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                     <div className="bg-slate-50 border border-slate-200/50 rounded-xl p-3 text-center">
                                       <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Passed Cases</span>
@@ -6820,11 +6844,10 @@ const EnglishResultsManager = ({ showToast, handleOpenEnglishReport }) => {
 
                     {/* Status Badge */}
                     <td className="py-4">
-                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wide border ${
-                        item.status === 'COMPLETED'
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wide border ${item.status === 'COMPLETED'
                           ? 'bg-dash-light-green border-[#22c55e]/20 text-[#10b981]'
                           : 'bg-amber-50 border-amber-200 text-amber-700'
-                      }`}>
+                        }`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${item.status === 'COMPLETED' ? 'bg-[#10b981]' : 'bg-amber-500 animate-pulse'}`} />
                         {item.status}
                       </span>
@@ -6832,9 +6855,9 @@ const EnglishResultsManager = ({ showToast, handleOpenEnglishReport }) => {
 
                     {/* Completed At Timestamp */}
                     <td className="py-4 text-slate-700 font-medium">
-                      {item.end_time 
-                        ? new Date(item.end_time).toLocaleString() 
-                        : item.start_time 
+                      {item.end_time
+                        ? new Date(item.end_time).toLocaleString()
+                        : item.start_time
                           ? `Started: ${new Date(item.start_time).toLocaleString()}`
                           : '--'
                       }
@@ -6989,7 +7012,7 @@ const OverallResultsManager = ({ showToast }) => {
     }
   };
 
-  const filtered = data.filter(item => 
+  const filtered = data.filter(item =>
     item.candidate_name.toLowerCase().includes(search.toLowerCase()) ||
     item.candidate_email.toLowerCase().includes(search.toLowerCase())
   );

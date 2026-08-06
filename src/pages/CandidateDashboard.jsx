@@ -1096,7 +1096,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
   const [isMuted, setIsMuted] = useState(false);
   const [techRedirectCountdown, setTechRedirectCountdown] = useState(null);
   const [aiIsSpeaking, setAiIsSpeaking] = useState(false);
-  const [aiVoiceGender, setAiVoiceGender] = useState('female'); // 'female' or 'male'
+  const [aiVoiceGender, setAiVoiceGender] = useState('male'); // Forcing male voice ('Puck')
   const [autoSubmitting, setAutoSubmitting] = useState(false);
   const [englishUploading, setEnglishUploading] = useState(false);
   const [englishUploadProgress, setEnglishUploadProgress] = useState(0);
@@ -1118,8 +1118,21 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
   const startingTechRef = useRef(false);
   const startingEnglishRef = useRef(false);
 
-  // Stop recording and stream on unmount
+  // Load candidate profile on mount and handle unmount cleanup
   useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const res = await api.get('/api/candidate/profile');
+        if (res.data) {
+          setCandidate(res.data);
+          localStorage.setItem('current_candidate', JSON.stringify(res.data));
+        }
+      } catch (err) {
+        console.error("Failed to fetch candidate profile:", err);
+      }
+    };
+    fetchProfile();
+
     return () => {
       if (silenceTimerRef.current) {
         clearTimeout(silenceTimerRef.current);
@@ -1176,7 +1189,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     }
 
     // Require resume analysis before starting English assessment
-    const hasResume = candidate && ((candidate.resume && candidate.resume > 0) || candidate.resume_url || candidate.resume_path);
+    const hasResume = candidate && (candidate.resume_filename || (candidate.resume && candidate.resume > 0) || candidate.resume_url || candidate.resume_path);
     if (!hasResume) {
       showToast("Please upload and analyze your resume first! The AI generates personalized interview questions from your resume.");
       startingEnglishRef.current = false;
@@ -1416,10 +1429,16 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
       utterance.lang = 'en-US';
 
-      const voices = window.speechSynthesis.getVoices();
+      const voices = window.speechSynthesis.getVoices().filter(v => 
+        !v.name.toLowerCase().includes('gemini')
+      );
       let selectedVoiceObj = null;
 
-      if (aiVoiceGender === 'male') {
+      // Try to find the Puck voice first (case-insensitive)
+      selectedVoiceObj = voices.find(v => v.name.toLowerCase().includes('puck'));
+
+      if (!selectedVoiceObj) {
+        // Fallback to standard male voices
         selectedVoiceObj = voices.find(v => v.lang.startsWith('en') && (
           v.name.toLowerCase().includes('male') ||
           v.name.toLowerCase().includes('david') ||
@@ -1430,23 +1449,12 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
           v.name.toLowerCase().includes('fred') ||
           v.name.toLowerCase().includes('george')
         )) || voices.find(v => v.lang.startsWith('en'));
-        utterance.pitch = 0.85;
-      } else {
-        selectedVoiceObj = voices.find(v => v.lang.startsWith('en') && (
-          v.name.toLowerCase().includes('female') ||
-          v.name.toLowerCase().includes('zira') ||
-          v.name.toLowerCase().includes('jenny') ||
-          v.name.toLowerCase().includes('samantha') ||
-          v.name.toLowerCase().includes('victoria') ||
-          v.name.toLowerCase().includes('karen') ||
-          v.name.toLowerCase().includes('google us english')
-        )) || voices.find(v => v.lang.startsWith('en'));
-        utterance.pitch = 1.05;
       }
 
       if (selectedVoiceObj) {
         utterance.voice = selectedVoiceObj;
       }
+      utterance.pitch = 0.85;
 
       // Set a fallback timer to release the speaking lock if the browser gets stuck
       const speakingFallbackTimer = setTimeout(() => {
@@ -4173,70 +4181,44 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
             {englishInterview && (englishInterview.status === 'NOT_STARTED' || !englishInterview.status) && (
               <div className="w-full flex justify-center items-center py-6">
-                <div className="w-full max-w-2xl bg-dash-white-card border border-dash-border-gray/50 rounded-[28px] p-8 sm:p-10 shadow-[0_4px_25px_rgba(87,82,170,0.02)] text-center flex flex-col items-center gap-6">
-                  <div className="w-16 h-16 rounded-2xl bg-dash-primary-purple/10 flex items-center justify-center text-dash-primary-purple">
-                    <Volume2 size={32} />
+                <div className="w-full max-w-2xl bg-dash-white-card border border-dash-border-gray/50 rounded-[28px] p-8 sm:p-10 shadow-[0_12px_40px_rgba(0,0,0,0.03)] text-center flex flex-col items-center gap-7">
+                  
+                  {/* Interviewer Profile Card */}
+                  <div className="relative w-full rounded-2.5xl p-6 bg-gradient-to-br from-slate-50 to-slate-100/60 border border-slate-200/60 flex flex-col sm:flex-row items-center gap-5 text-left transition-all hover:shadow-md">
+                    <div className="relative w-16 h-16 rounded-2xl bg-dash-primary-purple flex items-center justify-center text-white text-3xl shadow-inner shrink-0">
+                      🎙️
+                      <div className="absolute -inset-1 rounded-2xl border-2 border-dash-primary-purple/35 animate-ping opacity-60 pointer-events-none" />
+                    </div>
+                    <div className="flex-1 min-w-0 text-center sm:text-left">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2.5">
+                        <span className="font-plus-jakarta font-extrabold text-lg text-dash-dark-purple">
+                          Interviewer: Puck
+                        </span>
+                        <span className="inline-flex self-center sm:self-auto items-center px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-dash-primary-purple/10 text-dash-primary-purple uppercase tracking-wide">
+                          Gemini 3.1 Live Voice
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 font-bold mt-0.5">AI HR Recruiting & Communications Manager</p>
+                      <p className="text-[11px] text-slate-400 font-medium mt-2 leading-relaxed">
+                        Puck uses the advanced Gemini Live voice synthesis protocol to conduct natural, real-time verbal assessments, evaluating your fluency, grammar, and pronunciation.
+                      </p>
+                    </div>
                   </div>
+
                   <div>
                     <h3 className="font-plus-jakarta font-extrabold text-2xl text-dash-dark-purple tracking-tight">
                       English Communication Assessment
                     </h3>
-                    <p className="text-xs font-bold text-dash-light-purple mt-1 uppercase tracking-wider">Real-Time AI HR Interview</p>
+                    <p className="text-xs font-bold text-dash-light-purple mt-1 uppercase tracking-wider">Real-Time Conversational Audit</p>
                   </div>
 
-                  {/* AI Voice Selection Options */}
-                  <div className="w-full text-left space-y-2">
-                    <label className="text-xs font-extrabold text-dash-dark-purple uppercase tracking-wider block">
-                      Choose AI HR Interviewer Voice:
-                    </label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 w-full">
-                      <button
-                        type="button"
-                        onClick={() => setAiVoiceGender('female')}
-                        className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer flex items-center gap-3.5 ${aiVoiceGender === 'female'
-                          ? 'border-dash-primary-purple bg-dash-primary-purple/10 shadow-sm ring-2 ring-dash-primary-purple/20'
-                          : 'border-dash-border-gray/50 bg-slate-50/50 hover:border-dash-primary-purple/50'
-                          }`}
-                      >
-                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-xl shrink-0 ${aiVoiceGender === 'female' ? 'bg-dash-primary-purple text-white' : 'bg-slate-200 text-slate-700'
-                          }`}>
-                          👩‍💼
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-extrabold text-dash-dark-purple flex items-center justify-between">
-                            <span>Female Voice</span>
-                            {aiVoiceGender === 'female' && <span className="text-[10px] bg-dash-primary-purple text-white px-2 py-0.5 rounded-full font-bold">Selected</span>}
-                          </div>
-                          <div className="text-[10px] text-slate-500 font-bold mt-0.5">Sophia - Natural & Clear</div>
-                        </div>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setAiVoiceGender('male')}
-                        className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer flex items-center gap-3.5 ${aiVoiceGender === 'male'
-                          ? 'border-dash-primary-purple bg-dash-primary-purple/10 shadow-sm ring-2 ring-dash-primary-purple/20'
-                          : 'border-dash-border-gray/50 bg-slate-50/50 hover:border-dash-primary-purple/50'
-                          }`}
-                      >
-                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-xl shrink-0 ${aiVoiceGender === 'male' ? 'bg-dash-primary-purple text-white' : 'bg-slate-200 text-slate-700'
-                          }`}>
-                          👨‍💼
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-extrabold text-dash-dark-purple flex items-center justify-between">
-                            <span>Male Voice</span>
-                            {aiVoiceGender === 'male' && <span className="text-[10px] bg-dash-primary-purple text-white px-2 py-0.5 rounded-full font-bold">Selected</span>}
-                          </div>
-                          <div className="text-[10px] text-slate-500 font-bold mt-0.5">Alex - Warm & Professional</div>
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="bg-dash-soft-pink/40 border border-dash-border-gray/40 rounded-2xl p-4 text-left w-full text-xs font-medium text-dash-dark-purple leading-relaxed">
-                    <p className="font-bold text-dash-primary-purple">🎤 Continuous Voice Interview Protocol:</p>
-                    <p className="mt-1">The AI will ask concise HR questions one at a time. Once the AI finishes speaking, your microphone automatically turns ON. Speak naturally — silence will automatically submit your response and continue the conversation.</p>
+                  <div className="bg-dash-soft-pink/40 border border-dash-border-gray/40 rounded-2xl p-4 text-left w-full text-xs font-medium text-dash-dark-purple leading-relaxed space-y-1">
+                    <p className="font-bold text-dash-primary-purple flex items-center gap-1.5">
+                      <span>🎤 Continuous Voice Interview Protocol:</span>
+                    </p>
+                    <p className="text-slate-600">
+                      The AI will read concise HR questions aloud one at a time. Once Puck finishes speaking, your microphone automatically turns ON. Speak naturally — silence will automatically submit your response and continue the conversation.
+                    </p>
                   </div>
 
                   {englishInterview.is_eligible === false ? (
@@ -4253,6 +4235,20 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                     </div>
                   ) : (
                     <div className="flex flex-col gap-4 w-full">
+                      {/* Hidden input for resume upload - placed outside conditional blocks so it is always present in DOM */}
+                      <input
+                        type="file"
+                        ref={englishFileInputRef}
+                        onChange={(e) => {
+                          const files = e.target.files;
+                          if (files && files.length > 0) {
+                            uploadEnglishResume(files[0]);
+                          }
+                        }}
+                        accept=".pdf"
+                        className="hidden"
+                      />
+
                       {/* Resume Analysis Badge & Detail Summary */}
                       {candidate && (candidate.resume_filename || (candidate.resume && candidate.resume > 0) || candidate.resume_url || candidate.resume_path) ? (
                         <div className="w-full bg-emerald-50/90 border border-emerald-200 rounded-2xl p-4 text-left shadow-sm space-y-2.5">
@@ -4290,55 +4286,45 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                           </div>
                         </div>
                       ) : (
-                        <div className="w-full bg-amber-50 border border-amber-200 rounded-2xl p-4 text-left flex items-center gap-3">
-                          <ShieldAlert size={18} className="text-amber-600 shrink-0" />
-                          <div>
-                            <p className="text-xs font-black text-amber-900">
-                              Mandatory Step 1: Upload Your Resume PDF
-                            </p>
-                            <p className="text-[10px] text-amber-700 font-bold mt-0.5">
-                              The AI will parse and analyze your resume to generate personalized interview questions based on your background.
-                            </p>
+                        <>
+                          <div className="w-full bg-amber-50 border border-amber-200 rounded-2xl p-4 text-left flex items-center gap-3">
+                            <ShieldAlert size={18} className="text-amber-600 shrink-0" />
+                            <div>
+                              <p className="text-xs font-black text-amber-900">
+                                Mandatory Step 1: Upload Your Resume PDF
+                              </p>
+                              <p className="text-[10px] text-amber-700 font-bold mt-0.5">
+                                The AI will parse and analyze your resume to generate personalized interview questions based on your background.
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      )}
 
-                      {/* Drag & Drop Zone */}
-                      <div
-                        onDragOver={(e) => { e.preventDefault(); setEnglishDragOver(true); }}
-                        onDragLeave={() => setEnglishDragOver(false)}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          setEnglishDragOver(false);
-                          const files = e.dataTransfer.files;
-                          if (files && files.length > 0) {
-                            uploadEnglishResume(files[0]);
-                          }
-                        }}
-                        onClick={() => englishFileInputRef.current && englishFileInputRef.current.click()}
-                        className={`w-full py-6 border-2 border-dashed rounded-[20px] transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${englishDragOver
-                          ? 'border-dash-primary-purple bg-dash-primary-purple/5 scale-[0.99]'
-                          : 'border-dash-border-gray hover:border-dash-primary-purple hover:bg-dash-light-blue-bg/40'
-                          }`}
-                      >
-                        <input
-                          type="file"
-                          ref={englishFileInputRef}
-                          onChange={(e) => {
-                            const files = e.target.files;
-                            if (files && files.length > 0) {
-                              uploadEnglishResume(files[0]);
-                            }
-                          }}
-                          accept=".pdf"
-                          className="hidden"
-                        />
-                        <UploadCloud size={24} className="text-dash-light-purple animate-pulse" />
-                        <span className="text-xs font-extrabold text-dash-dark-purple">
-                          {candidate && candidate.resume ? 'Re-upload / Update Resume PDF' : 'Upload Resume PDF to Analyze & Start Interview'}
-                        </span>
-                        <span className="text-[10px] text-slate-400 font-bold">Drag & Drop PDF file here or click to browse (max 5MB)</span>
-                      </div>
+                          {/* Drag & Drop Zone */}
+                          <div
+                            onDragOver={(e) => { e.preventDefault(); setEnglishDragOver(true); }}
+                            onDragLeave={() => setEnglishDragOver(false)}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              setEnglishDragOver(false);
+                              const files = e.dataTransfer.files;
+                              if (files && files.length > 0) {
+                                uploadEnglishResume(files[0]);
+                              }
+                            }}
+                            onClick={() => englishFileInputRef.current && englishFileInputRef.current.click()}
+                            className={`w-full py-6 border-2 border-dashed rounded-[20px] transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${englishDragOver
+                              ? 'border-dash-primary-purple bg-dash-primary-purple/5 scale-[0.99]'
+                              : 'border-dash-border-gray hover:border-dash-primary-purple hover:bg-dash-light-blue-bg/40'
+                              }`}
+                          >
+                            <UploadCloud size={24} className="text-dash-light-purple animate-pulse" />
+                            <span className="text-xs font-extrabold text-dash-dark-purple">
+                              Upload Resume PDF to Analyze & Start Interview
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-bold">Drag & Drop PDF file here or click to browse (max 5MB)</span>
+                          </div>
+                        </>
+                      )}
 
                       {englishUploadError && (
                         <p className="text-[10px] font-bold text-red-500">{englishUploadError}</p>
@@ -4356,7 +4342,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                             iconSize={13}
                             className="px-8 py-3.5 rounded-xl bg-dash-primary-purple text-white font-bold text-xs hover:bg-dash-dark-purple shadow-md justify-center w-full disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-all hover:scale-[1.01]"
                           >
-                            {candidate && candidate.resume ? 'Start AI Voice Interview (Based on Analyzed Resume)' : 'Upload Resume & Start AI Voice Interview'}
+                            {candidate && (candidate.resume_filename || (candidate.resume && candidate.resume > 0) || candidate.resume_url || candidate.resume_path) ? 'Start AI Voice Interview (Based on Analyzed Resume)' : 'Upload Resume & Start AI Voice Interview'}
                           </ActionButton>
                         </div>
                       )}
@@ -4371,7 +4357,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
               const currentQ = englishInterview.current_question || {};
               const currentQNum = conversations.length;
               const activeQuestionText = currentQ.ai_question || englishInterview.ai_question || "Please introduce yourself.";
-              const interviewerName = aiVoiceGender === 'male' ? 'Alex' : 'Sophia';
+              const interviewerName = 'Puck';
 
               return (
                 <div className="flex flex-col gap-6 w-full flex-1 animate-fade-in select-text">
@@ -4400,7 +4386,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                         <span className="text-xs font-extrabold text-dash-dark-purple block flex items-center gap-1.5">
                           <span>{interviewerName} - RecruitAI AI HR Manager</span>
                           <span className="text-[9px] bg-dash-primary-purple/10 text-dash-primary-purple px-2 py-0.5 rounded-full font-bold uppercase">
-                            {aiVoiceGender} Voice
+                            Puck Voice
                           </span>
                         </span>
                         <span className="text-[10px] font-extrabold text-dash-primary-purple">Question {currentQNum + 1} of 8</span>
