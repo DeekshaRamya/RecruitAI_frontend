@@ -649,36 +649,51 @@ const getSqlDefaultStarter = (q) => {
 };
 
 const getPythonStarter = (q) => {
-  if (!q) {
-    return `def solution(prices):\n    pass`;
+  if (!q) return "";
+
+  // 1. Direct starterCode or starter_code check
+  const directStarter = q.starterCode || q.starter_code;
+  if (directStarter && typeof directStarter === 'string' && directStarter.trim().startsWith('def ')) {
+    return directStarter.trim();
   }
 
-  // 1. Check for exact "def <func_name>(<params>):" pattern in starterCode, functionSignature, question, or problemStatement
-  const fullText = `${q.starterCode || ''}\n${q.starter_code || ''}\n${q.functionSignature || ''}\n${q.function_signature || ''}\n${q.question || ''}\n${q.problemStatement || ''}`;
-  const sigMatch = fullText.match(/def\s+([a-zA-Z0-9_]+)\s*\(([^)]*)\)/);
+  // 2. Aggregate all possible text sources
+  const fullText = `${q.starterCode || ''}\n${q.starter_code || ''}\n${q.functionSignature || ''}\n${q.function_signature || ''}\n${q.task || ''}\n${q.candidateTask || ''}\n${q.question || ''}\n${q.problemStatement || ''}`;
 
-  if (sigMatch) {
-    const fnName = sigMatch[1];
-    const params = sigMatch[2].trim();
-    return `def ${fnName}(${params}):\n    pass`;
+  // Match `def func_name(params)`
+  let match = fullText.match(/def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(([^)]*)\)/);
+  if (match) {
+    return `def ${match[1]}(${match[2].trim()}):\n    pass`;
   }
 
-  // Fallback signature matching question parameters
-  const funcName = q.functionName || "solution";
-  let paramsStr = "prices";
-  
-  const probText = `${q.problemStatement || ''} ${q.question || ''} ${q.inputFormat || ''}`.toLowerCase();
-  if (probText.includes("recharge") && probText.includes("fee")) {
-    paramsStr = "recharge_amount, service_fee";
-  } else if (probText.includes("price") && probText.includes("tax")) {
-    paramsStr = "price, tax";
-  } else if (probText.includes("prices") || probText.includes("revenue")) {
-    paramsStr = "prices";
-  } else if (probText.includes("numbers") || probText.includes("arr")) {
-    paramsStr = "numbers";
+  // Match `function `func_name(params)`` or `function func_name(params)`
+  match = fullText.match(/function\s+`?([a-zA-Z_][a-zA-Z0-9_]*)`?\s*\(([^)]*)\)/i);
+  if (match && !['python', 'write', 'def'].includes(match[1].toLowerCase())) {
+    return `def ${match[1]}(${match[2].trim()}):\n    pass`;
   }
 
-  return `def ${funcName}(${paramsStr}):\n    pass`;
+  // Match `func_name(params)` in backticks
+  match = fullText.match(/`([a-zA-Z_][a-zA-Z0-9_]*)\s*\(([^)]*)\)`/);
+  if (match) {
+    return `def ${match[1]}(${match[2].trim()}):\n    pass`;
+  }
+
+  // Match general `func_name(params)`
+  match = fullText.match(/\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\(([^)]+)\)/);
+  if (match) {
+    const fn = match[1];
+    const banned = new Set(['function', 'python', 'def', 'write', 'takes', 'returns', 'given', 'that', 'and', 'a', 'an', 'the', 'if', 'return', 'pass']);
+    if (!banned.has(fn.toLowerCase())) {
+      return `def ${fn}(${match[2].trim()}):\n    pass`;
+    }
+  }
+
+  // Dynamic fallback based on topic/title
+  const topicName = String(q.topic || q.title || 'solution').toLowerCase();
+  const cleanWords = topicName.replace(/[^a-zA-Z0-9_\s]/g, '').split(/\s+/).filter(w => w.length > 2 && !['python', 'coding', 'challenge', 'task', 'section'].includes(w));
+  const derivedFn = cleanWords.length > 0 ? cleanWords.slice(0, 3).join('_') : (q.functionName || 'solution');
+
+  return `def ${derivedFn}(numbers):\n    pass`;
 };
 
 const getDynamicStarterForQuestion = (q) => {
@@ -2628,17 +2643,26 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     }
 
     try {
-      const visibleTC = currentQuestion?.visibleTestCase || (currentQuestion?.visibleTestCases && currentQuestion.visibleTestCases[0]) || {
-        input: currentQuestion?.sampleInput || currentQuestion?.exampleInput || '',
-        expectedOutput: currentQuestion?.sampleOutput || currentQuestion?.exampleOutput || ''
-      };
+      const rawSampleInput = currentQuestion?.sampleInput ||
+                             currentQuestion?.visibleTestCase?.input ||
+                             (currentQuestion?.visibleTestCases && currentQuestion.visibleTestCases[0] && currentQuestion.visibleTestCases[0].input) ||
+                             currentQuestion?.exampleInput || '';
+
+      const rawSampleOutput = currentQuestion?.sampleOutput ||
+                              currentQuestion?.visibleTestCase?.expectedOutput ||
+                              (currentQuestion?.visibleTestCases && currentQuestion.visibleTestCases[0] && currentQuestion.visibleTestCases[0].expectedOutput) ||
+                              currentQuestion?.exampleOutput || '';
+
+      const activeInput = (customInput !== undefined && customInput !== null && customInput.trim() !== '')
+        ? customInput
+        : rawSampleInput;
 
       const hiddenTCs = Array.isArray(currentQuestion?.hiddenTestCases) ? currentQuestion.hiddenTestCases : [];
 
       const visibleList = [
         {
-          input: String(visibleTC.input || ''),
-          expectedOutput: String(visibleTC.expectedOutput || '')
+          input: String(activeInput),
+          expectedOutput: String(rawSampleOutput)
         }
       ];
 
@@ -2647,14 +2671,14 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
         expectedOutput: String(htc.expectedOutput || '')
       }));
 
-      const allTestCases = [...visibleList, ...hiddenList];
-
       const payload = {
         code: currentCode,
         visibleTestCases: visibleList,
         hiddenTestCases: hiddenList,
-        testCases: allTestCases,
-        input: String(visibleTC.input || '')
+        testCases: visibleList,
+        input: String(activeInput),
+        function_name: funcName,
+        functionName: funcName
       };
 
       const res = await api.post('/api/assessment/run-code', payload);
