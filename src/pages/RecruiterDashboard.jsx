@@ -3718,6 +3718,16 @@ const QuestionPreviewHub = ({
                       max="100"
                     />
                   </div>
+                  <div>
+                    <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Expected Answer</label>
+                    <input
+                      type="text"
+                      value={editForm.expectedAnswer}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, expectedAnswer: e.target.value }))}
+                      className="w-full bg-[#fafafc] border border-dash-border-gray rounded-xl py-2.5 px-4 text-xs font-semibold text-[#0f172a] focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
+                      placeholder="Enter expected answer"
+                    />
+                  </div>
                 </div>
 
                 {/* Problem statement / Question block */}
@@ -4046,8 +4056,8 @@ const QuestionPreviewHub = ({
                     </div>
                   )}
 
-                  {/* Example Input / Output for Scenario/Coding */}
-                  {(selectedQuestion?.exampleInput || selectedQuestion?.exampleOutput || selectedQuestion?.sampleInput || selectedQuestion?.sampleOutput) && (
+                  {/* Example Input / Output for Coding Questions Only (HIDDEN FOR APTITUDE SCENARIOS) */}
+                  {selectedQuestion?.subject?.toUpperCase() !== 'APTITUDE' && (selectedQuestion?.exampleInput || selectedQuestion?.exampleOutput || selectedQuestion?.sampleInput || selectedQuestion?.sampleOutput) && (
                     <div className="space-y-2">
                       <h4 className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
                         Sample Input & Output
@@ -4075,7 +4085,7 @@ const QuestionPreviewHub = ({
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
                       <h4 className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
-                        {selectedQuestion?.type === 'MCQ' ? 'Correct Answer Details' : 'Expected Solution'}
+                        {selectedQuestion?.type === 'MCQ' ? 'Correct Answer Details' : (selectedQuestion?.subject?.toUpperCase() === 'APTITUDE' ? 'Expected Answer' : 'Expected Solution')}
                       </h4>
                       {selectedQuestion?.expectedAnswer && (
                         <button
@@ -4101,6 +4111,11 @@ const QuestionPreviewHub = ({
                       <div className="bg-green-50/40 border border-green-200 text-green-700 rounded-xl p-3.5 font-semibold text-xs flex items-center gap-2">
                         <CheckCircle className="text-green-600 shrink-0" size={16} />
                         <span>{selectedQuestion.correctAnswer}</span>
+                      </div>
+                    ) : selectedQuestion?.subject?.toUpperCase() === 'APTITUDE' ? (
+                      <div className="bg-indigo-50/40 border border-indigo-200 text-indigo-900 rounded-xl p-4 font-bold text-sm flex items-center gap-2.5">
+                        <CheckCircle className="text-indigo-600 shrink-0" size={18} />
+                        <span className="select-text">{selectedQuestion?.expectedAnswer || selectedQuestion?.correctAnswer}</span>
                       </div>
                     ) : (
                       <div className="bg-[#fafafc] border border-dash-border-gray/50 rounded-2xl p-4.5 overflow-hidden shadow-inner border-l-4 border-l-dash-primary-purple relative">
@@ -5128,8 +5143,8 @@ const AssessmentDetailsDrawer = ({ assessment, onClose, showToast }) => {
                       </div>
                     )}
 
-                    {/* Scenario Input/Output */}
-                    {isCoding && (
+                    {/* Scenario Input/Output (Coding questions only) */}
+                    {isCoding && q.subject?.toUpperCase() !== 'APTITUDE' && (
                       <div className="grid grid-cols-2 gap-3 text-[10px]">
                         <div className="space-y-1">
                           <span className="font-bold text-dash-light-purple uppercase tracking-wider">Input</span>
