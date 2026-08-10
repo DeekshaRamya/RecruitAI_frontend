@@ -43,10 +43,105 @@ import {
   ListOrdered,
   Flag,
   HelpCircle,
-  Edit3
+  Edit3,
+  Copy
 } from 'lucide-react';
 
 const MAX_QUESTIONS = 8;
+
+const getAptitudeOutputFormat = (q) => {
+  if (!q) return null;
+  const subj = (q.subject || '').toUpperCase();
+  const type = (q.type || '').toUpperCase();
+  if (subj === 'PYTHON' || subj === 'PY' || type === 'CODING' || type === 'PYTHON_CODING' || type === 'SCENARIO_CODING') {
+    return null;
+  }
+  let rawFmt = q.outputFormat || q.output_format || q.output_fmt;
+
+  if (!rawFmt && q.problemStatement && typeof q.problemStatement === 'string' && q.problemStatement.includes("Output Format:")) {
+    const parts = q.problemStatement.split(/Output Format:/i);
+    if (parts.length > 1) {
+      rawFmt = parts[1].trim();
+    }
+  }
+  if (!rawFmt && q.question && typeof q.question === 'string' && q.question.includes("Output Format:")) {
+    const parts = q.question.split(/Output Format:/i);
+    if (parts.length > 1) {
+      rawFmt = parts[1].trim();
+    }
+  }
+
+  // Clean rawFmt if present to extract ONLY the answer data type
+  if (rawFmt && typeof rawFmt === 'string' && rawFmt.trim()) {
+    let clean = rawFmt.trim();
+    if (clean.includes("Output Format:")) {
+      clean = clean.split("Output Format:").pop().trim();
+    }
+    clean = clean.split('\n')[0].replace(/^[-*•\s]+/, '').replace(/^(Return a|Return an|Return)\s+/i, '').replace(/[\.:]$/, '').trim();
+    if (clean) {
+      const lower = clean.toLowerCase();
+      if (lower.includes('int')) return 'Integer';
+      if (lower.includes('dec')) return 'Decimal';
+      if (lower.includes('percent')) return 'Percentage';
+      if (lower.includes('fraction')) return 'Fraction';
+      if (lower.includes('ratio')) return 'Ratio';
+      if (lower.includes('time') || lower.includes('durat')) return 'Time';
+      if (lower.includes('curr')) return 'Currency';
+      if (lower.includes('bool')) return 'Boolean';
+      if (lower.includes('str') || lower.includes('text')) return 'String';
+      return clean.charAt(0).toUpperCase() + clean.slice(1);
+    }
+  }
+
+  // Dynamically analyze expectedAnswer to derive answer data type
+  const expStr = String(q.expectedAnswer || q.correctAnswer || q.answer || '').trim();
+  const topic = (q.topic || q.subject || '').toLowerCase();
+  const isAptitude = topic.includes('aptitude') || (q.subject || '').toUpperCase() === 'APTITUDE';
+  const isScenario = !q.options || !Array.isArray(q.options) || q.options.length === 0;
+
+  if (isAptitude && isScenario) {
+    if (expStr) {
+      const expClean = expStr.replace(/,/g, '').trim();
+      const expLower = expClean.toLowerCase();
+
+      if (['true', 'false', 'yes', 'no'].includes(expLower)) {
+        return 'Boolean';
+      }
+      if (/\b\d+\s*\/\s*\d+\b/.test(expClean)) {
+        return 'Fraction';
+      }
+      if (expClean.includes(':') || /\b\d+\s*:\s*\d+\b/.test(expClean)) {
+        return 'Ratio';
+      }
+      if (expStr.includes('%') || topic.includes('percentage') || topic.includes('profit')) {
+        return 'Percentage';
+      }
+      if (/[\$,₹,€,£]/.test(expStr) || topic.includes('cost') || topic.includes('price') || topic.includes('salary')) {
+        return 'Currency';
+      }
+      if (/\b(day|days|hour|hours|min|minute|minutes|sec|second|seconds|year|years)\b/i.test(expStr)) {
+        return 'Time';
+      }
+      if (/\d/.test(expClean)) {
+        const numClean = expClean.replace(/[^\d\.]/g, '');
+        if (numClean.includes('.')) {
+          const val = parseFloat(numClean);
+          if (!isNaN(val) && val % 1 !== 0) {
+            return 'Decimal';
+          }
+        }
+        return 'Integer';
+      }
+    }
+
+    const ansType = (q.answerType || '').toUpperCase();
+    if (ansType === 'NUMBER') {
+      return 'Integer';
+    }
+    return 'String';
+  }
+  return null;
+};
 
 const DatabaseSchemaVisualizer = ({ schemaLines, dataLines, liveSchemaMap }) => {
   const [parsedTables, setParsedTables] = React.useState([]);
@@ -570,12 +665,17 @@ const QuestionCard = React.memo(({
                 <p className="text-xs font-medium text-slate-600 leading-normal">{question.inputFormat}</p>
               </div>
             )}
-            {question.outputFormat && (
-              <div>
-                <h4 className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">Output Format</h4>
-                <p className="text-xs font-medium text-slate-600 leading-normal">{question.outputFormat}</p>
-              </div>
-            )}
+            {(() => {
+              const fmt = getAptitudeOutputFormat(question);
+              return fmt ? (
+                <div>
+                  <h4 className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">Output Format</h4>
+                  <span className="inline-block text-xs font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2.5 py-1 rounded-lg shadow-2xs">
+                    {fmt}
+                  </span>
+                </div>
+              ) : null;
+            })()}
             {question.constraints && question.constraints.length > 0 && (
               <div>
                 <h4 className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">Constraints</h4>
@@ -727,6 +827,234 @@ const getDynamicStarterForQuestion = (q) => {
 
   return getPythonStarter(q);
 };
+
+const PythonCodeBlock = React.memo(({ code }) => {
+  const renderSyntaxHighlighted = (rawCode) => {
+    if (!rawCode) return null;
+    const lines = rawCode.split('\n');
+
+    const keywords = new Set([
+      'def', 'return', 'if', 'else', 'elif', 'for', 'while', 'in', 'import', 'from',
+      'as', 'class', 'try', 'except', 'finally', 'with', 'lambda', 'pass', 'break',
+      'continue', 'True', 'False', 'None', 'and', 'or', 'not', 'is', 'raise',
+      'yield', 'global', 'nonlocal', 'assert'
+    ]);
+
+    const builtins = new Set([
+      'print', 'len', 'range', 'type', 'str', 'int', 'float', 'list', 'dict',
+      'set', 'tuple', 'sum', 'max', 'min', 'sorted', 'enumerate', 'zip', 'input',
+      'open', 'isinstance', 'abs', 'all', 'any', 'map', 'filter', 'append'
+    ]);
+
+    return lines.map((line, lineIdx) => {
+      let commentIdx = -1;
+      let inSingle = false;
+      let inDouble = false;
+
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === "'" && !inDouble && (i === 0 || line[i - 1] !== '\\')) {
+          inSingle = !inSingle;
+        } else if (char === '"' && !inSingle && (i === 0 || line[i - 1] !== '\\')) {
+          inDouble = !inDouble;
+        } else if (char === '#' && !inSingle && !inDouble) {
+          commentIdx = i;
+          break;
+        }
+      }
+
+      let codePart = commentIdx !== -1 ? line.slice(0, commentIdx) : line;
+      let commentPart = commentIdx !== -1 ? line.slice(commentIdx) : '';
+
+      const tokens = [];
+      const regex = /("""[\s\S]*?"""|'''[\s\S]*?'''|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\b\d+(?:\.\d+)?\b|\b[a-zA-Z_][a-zA-Z0-9_]*\b|[==|!=|<=|>=|\+|\-|\*|\/|\%|=|<|>|:|\(|\)|\[|\]|\{|\}|,]+|\s+|[^\s\w])/g;
+
+      let match;
+      let lastDef = false;
+
+      while ((match = regex.exec(codePart)) !== null) {
+        const token = match[0];
+
+        if (token.startsWith('"') || token.startsWith("'")) {
+          tokens.push(<span key={tokens.length} className="text-[#ce9178]">{token}</span>);
+          lastDef = false;
+        } else if (/^\d+(?:\.\d+)?$/.test(token)) {
+          tokens.push(<span key={tokens.length} className="text-[#b5cea8]">{token}</span>);
+          lastDef = false;
+        } else if (keywords.has(token)) {
+          tokens.push(<span key={tokens.length} className="text-[#569cd6] font-bold">{token}</span>);
+          if (token === 'def' || token === 'class') {
+            lastDef = true;
+          } else {
+            lastDef = false;
+          }
+        } else if (builtins.has(token)) {
+          tokens.push(<span key={tokens.length} className="text-[#4ec9b0]">{token}</span>);
+          lastDef = false;
+        } else if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(token)) {
+          if (lastDef) {
+            tokens.push(<span key={tokens.length} className="text-[#dcdcaa] font-bold">{token}</span>);
+            lastDef = false;
+          } else {
+            tokens.push(<span key={tokens.length} className="text-[#9cdcfe]">{token}</span>);
+          }
+        } else if (/^[==|!=|<=|>=|\+|\-|\*|\/|\%|=|<|>|:]+$/.test(token)) {
+          tokens.push(<span key={tokens.length} className="text-[#d4d4d4]">{token}</span>);
+          lastDef = false;
+        } else {
+          tokens.push(<span key={tokens.length} className="text-[#d4d4d4]">{token}</span>);
+          if (token.trim() !== '') lastDef = false;
+        }
+      }
+
+      return (
+        <div key={lineIdx} className="table-row">
+          <span className="table-cell select-none pr-3 text-right text-zinc-600 font-mono text-xs w-7 border-r border-zinc-800/60 font-medium">
+            {lineIdx + 1}
+          </span>
+          <span className="table-cell pl-3.5 whitespace-pre font-mono text-xs text-zinc-200">
+            {tokens}
+            {commentPart && <span className="text-[#6a9955] italic font-mono">{commentPart}</span>}
+          </span>
+        </div>
+      );
+    });
+  };
+
+  return (
+    <div className="my-3.5 w-full rounded-xl overflow-hidden border border-zinc-800 bg-[#1e1e1e] shadow-lg text-left font-mono">
+      <div className="flex items-center justify-between px-3.5 py-1.5 bg-[#181818] border-b border-zinc-800 text-xs select-none">
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1.5 mr-1">
+            <span className="w-2.5 h-2.5 rounded-full bg-red-500/80 inline-block"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80 inline-block"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block"></span>
+          </div>
+          <span className="text-[10px] font-mono font-extrabold text-amber-400 bg-amber-950/70 border border-amber-800/60 px-2 py-0.5 rounded-md shadow-2xs flex items-center gap-1 uppercase tracking-wider">
+            <Code size={11} className="text-amber-400" />
+            Python
+          </span>
+        </div>
+      </div>
+
+      <div className="p-3 overflow-x-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-zinc-900 bg-[#1e1e1e] text-xs">
+        <div className="table w-full border-collapse">
+          {renderSyntaxHighlighted(code)}
+        </div>
+      </div>
+    </div>
+  );
+});
+
+const FormattedQuestionText = React.memo(({ text }) => {
+  if (!text || typeof text !== 'string') return null;
+
+  // 1. Markdown code blocks ``` python ... ``` or ``` ... ```
+  const codeBlockRegex = /```(?:python|py)?([\s\S]*?)```/gi;
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = codeBlockRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      const textChunk = text.slice(lastIndex, match.index);
+      if (textChunk.trim()) {
+        parts.push({ type: 'text', content: textChunk });
+      }
+    }
+    const codeContent = match[1].trim();
+    parts.push({ type: 'code', content: codeContent });
+    lastIndex = codeBlockRegex.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    const remainingText = text.slice(lastIndex);
+    if (remainingText.trim()) {
+      parts.push({ type: 'text', content: remainingText });
+    }
+  }
+
+  if (parts.some(p => p.type === 'code')) {
+    return (
+      <div className="w-full flex flex-col gap-1">
+        {parts.map((part, idx) => {
+          if (part.type === 'code') {
+            return <PythonCodeBlock key={idx} code={part.content} />;
+          }
+          return (
+            <p key={idx} className="text-[#1e1b4b] leading-relaxed whitespace-pre-line font-semibold my-1">
+              {part.content.trim()}
+            </p>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // 2. Un-fenced Python detection
+  const lines = text.split('\n');
+  const pythonTriggers = /^\s*(def\s+|class\s+|import\s+|from\s+|if\s+|for\s+|while\s+|try:|with\s+|print\(|[a-zA-Z_][a-zA-Z0-9_]*\s*=\s*)/;
+  
+  let textBefore = [];
+  let codeLines = [];
+  let textAfter = [];
+  let stage = 'before';
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    if (stage === 'before') {
+      if (pythonTriggers.test(line)) {
+        stage = 'code';
+        codeLines.push(line);
+      } else {
+        textBefore.push(line);
+      }
+    } else if (stage === 'code') {
+      if (pythonTriggers.test(line) || line.startsWith('    ') || line.startsWith('\t') || trimmed === '' || trimmed === 'pass' || trimmed.startsWith('return') || trimmed.startsWith('#')) {
+        codeLines.push(line);
+      } else if (codeLines.length >= 1 && (trimmed.toLowerCase().startsWith('select ') || trimmed.toLowerCase().startsWith('what ') || trimmed.toLowerCase().startsWith('which ') || trimmed.includes('?'))) {
+        stage = 'after';
+        textAfter.push(line);
+      } else {
+        codeLines.push(line);
+      }
+    } else {
+      textAfter.push(line);
+    }
+  }
+
+  if (codeLines.length >= 1) {
+    const cleanBefore = textBefore.join('\n').trim();
+    const cleanCode = codeLines.join('\n').trim();
+    const cleanAfter = textAfter.join('\n').trim();
+
+    if (cleanCode && (cleanCode.includes('def ') || cleanCode.includes('print(') || cleanCode.includes(' = ') || cleanCode.includes('for ') || cleanCode.includes('if '))) {
+      return (
+        <div className="w-full flex flex-col gap-1">
+          {cleanBefore && (
+            <p className="text-[#1e1b4b] leading-relaxed whitespace-pre-line font-semibold my-1">
+              {cleanBefore}
+            </p>
+          )}
+          <PythonCodeBlock code={cleanCode} />
+          {cleanAfter && (
+            <p className="text-[#1e1b4b] leading-relaxed whitespace-pre-line font-semibold my-1">
+              {cleanAfter}
+            </p>
+          )}
+        </div>
+      );
+    }
+  }
+
+  return (
+    <p className="text-[#1e1b4b] leading-relaxed whitespace-pre-line font-semibold">
+      {text}
+    </p>
+  );
+});
 
 const SqlStudioEditor = React.memo(({ isSql, currentIdx, answerValue, onAnswerChange, isFullscreen, onReset, onToggleFullscreen, onRunCode, isExecuting, question }) => {
   const fallbackTemplate = getDynamicStarterForQuestion(question);
@@ -909,7 +1237,7 @@ const QueryResultGrid = React.memo(({ isSql, consoleTab, setConsoleTab, sqlQuery
                     </thead>
                     <tbody className="divide-y divide-zinc-800/50 font-mono text-[11px] bg-[#111111]">
                       {sqlQueryResult.rows && sqlQueryResult.rows.length > 0 ? (
-                        sqlQueryResult.rows.map((row, rowIdx) => (
+                        sqlQueryResult.rows.slice(0, 100).map((row, rowIdx) => (
                           <tr key={rowIdx} className={`hover:bg-zinc-800/80 transition-colors ${rowIdx % 2 === 0 ? 'bg-[#121212]' : 'bg-[#181818]'}`}>
                             <td className="px-2.5 py-1 text-zinc-500 font-sans text-[10px] text-center bg-zinc-900/50 border-r border-zinc-800/60 font-bold">{rowIdx + 1}</td>
                             {sqlQueryResult.columns.map((col, colIdx) => (
@@ -970,7 +1298,7 @@ const QueryResultGrid = React.memo(({ isSql, consoleTab, setConsoleTab, sqlQuery
                       </thead>
                       <tbody className="divide-y divide-zinc-800/50 font-mono text-[11px] bg-[#111111]">
                         {sqlQueryResult.rows && sqlQueryResult.rows.length > 0 ? (
-                          sqlQueryResult.rows.map((row, rowIdx) => (
+                          sqlQueryResult.rows.slice(0, 100).map((row, rowIdx) => (
                             <tr key={rowIdx} className={`hover:bg-zinc-800/80 transition-colors ${rowIdx % 2 === 0 ? 'bg-[#121212]' : 'bg-[#181818]'}`}>
                               <td className="px-3 py-1.5 text-zinc-500 font-sans text-[10px] text-center bg-zinc-900/50 border-r border-zinc-800/60 font-bold">{rowIdx + 1}</td>
                               {sqlQueryResult.columns.map((col, colIdx) => (
@@ -2520,7 +2848,8 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
         const isSuccess = data.status === 'Success' || data.success === true;
         if (isSuccess && !data.runtime_error && !data.syntax_error) {
-          const rows = Array.isArray(data.rows) ? data.rows : (Array.isArray(data.output?.rows) ? data.output.rows : []);
+          const rawRows = Array.isArray(data.rows) ? data.rows : (Array.isArray(data.output?.rows) ? data.output.rows : []);
+          const rows = rawRows.slice(0, 100);
           let cols = Array.isArray(data.columns) && data.columns.length > 0
             ? data.columns
             : (Array.isArray(data.output?.columns) && data.output.columns.length > 0 ? data.output.columns : []);
@@ -4016,9 +4345,9 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
                       {/* Question Text - Full Width for Maximum Readability */}
                       <div className="w-full">
-                        <h3 className="font-plus-jakarta font-extrabold text-lg sm:text-xl text-[#1e1b4b] leading-relaxed">
-                          {question.question}
-                        </h3>
+                        <div className="font-plus-jakarta font-extrabold text-lg sm:text-xl text-[#1e1b4b] leading-relaxed">
+                          <FormattedQuestionText text={question.question} />
+                        </div>
                       </div>
 
                       {/* Options Header / Selection Clear Bar (ONLY FOR MCQ QUESTIONS) */}
@@ -4093,19 +4422,22 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                       ) : (
                         <div className="w-full flex flex-col gap-3">
                           {/* Output Format Guidelines Box */}
-                          {question.outputFormat && (
-                            <div className="bg-indigo-50/70 border border-indigo-200/80 rounded-2xl p-4 w-full text-slate-700 text-xs sm:text-sm shadow-2xs">
-                              <h6 className="font-extrabold uppercase tracking-wider text-indigo-900 mb-1.5 flex items-center gap-1.5 text-[11px]">
-                                <FileText size={14} className="text-indigo-600" />
-                                <span>Output Format Guidelines:</span>
-                              </h6>
-                              <p className="font-semibold whitespace-pre-line text-indigo-950/90 leading-relaxed text-xs">
-                                {question.outputFormat}
-                              </p>
-                            </div>
-                          )}
+                          {(() => {
+                            const fmt = getAptitudeOutputFormat(question);
+                            return fmt ? (
+                              <div className="bg-indigo-50/70 border border-indigo-200/80 rounded-2xl p-3.5 w-full text-slate-700 text-xs sm:text-sm shadow-2xs flex items-center justify-between">
+                                <h6 className="font-extrabold uppercase tracking-wider text-indigo-900 flex items-center gap-1.5 text-[11px]">
+                                  <FileText size={14} className="text-indigo-600" />
+                                  <span>Output Format:</span>
+                                </h6>
+                                <span className="font-extrabold text-xs text-indigo-700 bg-white border border-indigo-200 px-3 py-1 rounded-xl shadow-2xs">
+                                  {fmt}
+                                </span>
+                              </div>
+                            ) : null;
+                          })()}
 
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center justify-between pt-1">
                             <span className="text-xs font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
                               <Edit3 size={14} className="text-dash-primary-purple" />
                               <span>Type Your Answer:</span>

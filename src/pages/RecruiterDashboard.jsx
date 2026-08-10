@@ -3734,27 +3734,15 @@ const QuestionPreviewHub = ({
               ) : editForm.type === 'PYTHON_CODING' ? (
                 /* PYTHON CODING EDIT FIELDS */
                 <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Input Format</label>
-                      <input
-                        type="text"
-                        value={editForm.inputFormat}
-                        onChange={(e) => setEditForm(prev => ({ ...prev, inputFormat: e.target.value }))}
-                        className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
-                        placeholder="e.g. A single string of characters"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Output Format</label>
-                      <input
-                        type="text"
-                        value={editForm.outputFormat}
-                        onChange={(e) => setEditForm(prev => ({ ...prev, outputFormat: e.target.value }))}
-                        className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
-                        placeholder="e.g. Print True or False"
-                      />
-                    </div>
+                  <div>
+                    <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Input Format</label>
+                    <input
+                      type="text"
+                      value={editForm.inputFormat}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, inputFormat: e.target.value }))}
+                      className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
+                      placeholder="e.g. A single string of characters"
+                    />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -5126,6 +5114,54 @@ const AssessmentDetailsDrawer = ({ assessment, onClose, showToast }) => {
                         </div>
                       </div>
                     )}
+
+                    {/* Output Format */}
+                    {(() => {
+                      const subj = (q.subject || '').toUpperCase();
+                      const type = (q.type || '').toUpperCase();
+                      if (subj === 'PYTHON' || subj === 'PY' || type === 'CODING' || type === 'PYTHON_CODING' || type === 'SCENARIO_CODING') {
+                        return null;
+                      }
+                      let fmt = q.outputFormat || q.output_format || q.output_fmt;
+                      if (fmt && typeof fmt === 'string') {
+                        if (fmt.includes("Output Format:")) {
+                          fmt = fmt.split("Output Format:").pop().trim();
+                        }
+                        fmt = fmt.split('\n')[0].replace(/^[-*•\s]+/, '').replace(/^(Return a|Return an|Return)\s+/i, '').replace(/[\.:]$/, '').trim();
+                        const lower = fmt.toLowerCase();
+                        if (lower.includes('int')) fmt = 'Integer';
+                        else if (lower.includes('dec')) fmt = 'Decimal';
+                        else if (lower.includes('percent')) fmt = 'Percentage';
+                        else if (lower.includes('fraction')) fmt = 'Fraction';
+                        else if (lower.includes('ratio')) fmt = 'Ratio';
+                        else if (lower.includes('time') || lower.includes('durat')) fmt = 'Time';
+                        else if (lower.includes('curr')) fmt = 'Currency';
+                        else if (lower.includes('bool')) fmt = 'Boolean';
+                        else if (lower.includes('str') || lower.includes('text')) fmt = 'String';
+                        else fmt = fmt.charAt(0).toUpperCase() + fmt.slice(1);
+                      }
+                      if (!fmt && q.expectedAnswer) {
+                        const exp = String(q.expectedAnswer).trim();
+                        const expClean = exp.replace(/,/g, '');
+                        if (['true', 'false', 'yes', 'no'].includes(exp.toLowerCase())) fmt = 'Boolean';
+                        else if (/\b\d+\s*\/\s*\d+\b/.test(expClean)) fmt = 'Fraction';
+                        else if (expClean.includes(':') || /\b\d+\s*:\s*\d+\b/.test(expClean)) fmt = 'Ratio';
+                        else if (exp.includes('%')) fmt = 'Percentage';
+                        else if (/[\$,₹,€,£]/.test(exp)) fmt = 'Currency';
+                        else if (/\b(day|days|hour|hours|min|minute|minutes|sec|second|seconds|year|years)\b/i.test(exp)) fmt = 'Time';
+                        else if (/\d+\.\d+/.test(expClean)) fmt = 'Decimal';
+                        else if (/\d+/.test(expClean)) fmt = 'Integer';
+                        else fmt = 'String';
+                      }
+                      return fmt ? (
+                        <div className="space-y-1">
+                          <span className="text-[9px] font-bold text-dash-light-purple uppercase tracking-wider block">Output Format</span>
+                          <div className="inline-block bg-indigo-50/70 border border-purple-200/80 rounded-lg px-2.5 py-1 text-[10px] font-extrabold text-indigo-800 shadow-2xs">
+                            {fmt}
+                          </div>
+                        </div>
+                      ) : null;
+                    })()}
 
                     {/* Scenario Constraints */}
                     {isCoding && q.constraints && q.constraints.length > 0 && (
