@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Lock, LogIn, Check, User, Phone, Loader2 } from 'lucide-react';
+import { Mail, Lock, LogIn, Check } from 'lucide-react';
 import RoleSwitcher from './RoleSwitcher';
 import InputField from './InputField';
 import ActionButton from './ActionButton';
@@ -17,18 +17,10 @@ const MicrosoftIcon = () => (
 );
 
 const LoginCard = ({ role, setRole, onLogin }) => {
-  // Navigation mode for Candidate UI ('login' or 'register')
-  const [candidateMode, setCandidateMode] = useState('login');
-
   // Input states
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
-
-  // Candidate Registration states
-  const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [agreeTerms, setAgreeTerms] = useState(false);
 
   // Loading and Error states
   const [loading, setLoading] = useState(false);
@@ -38,13 +30,8 @@ const LoginCard = ({ role, setRole, onLogin }) => {
 
   // Reset states when switching roles
   useEffect(() => {
-    setCandidateMode('login');
     setError('');
   }, [role]);
-
-  useEffect(() => {
-    setError('');
-  }, [candidateMode]);
 
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
@@ -119,91 +106,6 @@ const LoginCard = ({ role, setRole, onLogin }) => {
         detailMsg = err.response.data.detail;
       } else {
         detailMsg = 'Invalid email or password. Please try again.';
-      }
-      setError(detailMsg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRegisterSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-
-    if (!fullName || !email || !password) {
-      setError('Please fill in all required fields.');
-      return;
-    }
-
-    if (!agreeTerms) {
-      setError('You must agree to the Terms & Conditions.');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const response = await api.post('/api/auth/register', {
-        name: fullName.trim(),
-        email: email.trim(),
-        phone: phone ? phone.trim() : null,
-        password: password
-      });
-
-      const { access_token, refresh_token, user, role: userRole } = response.data;
-
-      // Store tokens and user details
-      localStorage.setItem('recruitai_access_token', access_token);
-      localStorage.setItem('recruitai_refresh_token', refresh_token);
-      localStorage.setItem('recruitai_user', JSON.stringify(user));
-
-      // Build compatibility object for dashboards
-      const storedCandidates = localStorage.getItem('recruitai_candidates');
-      let candidatesList = [];
-      if (storedCandidates) {
-        try {
-          candidatesList = JSON.parse(storedCandidates);
-        } catch {
-          // Ignore parse error
-        }
-      }
-
-      const newCandidate = {
-        id: user.id,
-        name: user.full_name || user.name,
-        email: user.email,
-        role: 'Data Analyst',
-        date: new Date().toISOString().split('T')[0],
-        resume: 0,
-        python: 0,
-        sql: 0,
-        aptitude: 0,
-        english: 0,
-        final: 0,
-        recommendation: 'Not Ready',
-        status: 'In Progress'
-      };
-
-      candidatesList.unshift(newCandidate);
-      localStorage.setItem('recruitai_candidates', JSON.stringify(candidatesList));
-      localStorage.setItem('current_candidate', JSON.stringify(newCandidate));
-
-      alert(`Successfully registered account for ${user.full_name}!`);
-
-      if (onLogin) {
-        onLogin(userRole);
-      }
-    } catch (err) {
-      let detailMsg = 'An unexpected error occurred. Please try again later.';
-      if (!err.response) {
-        detailMsg = 'Unable to connect to the backend server. Please verify the server is running and the database is reachable.';
-      } else if (err.response.status === 500) {
-        detailMsg = 'Server Error: Database connection timed out or failed. Please check your DATABASE_URL.';
-      } else if (err.response.data?.errors) {
-        detailMsg = err.response.data.errors.map(e => `${e.field}: ${e.message}`).join(' | ');
-      } else if (err.response.data?.detail) {
-        detailMsg = err.response.data.detail;
-      } else {
-        detailMsg = 'Registration failed. Email might already be registered.';
       }
       setError(detailMsg);
     } finally {

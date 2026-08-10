@@ -442,8 +442,6 @@ const DatabaseSchemaVisualizer = ({ schemaLines, dataLines, liveSchemaMap }) => 
   );
 };
 
-/* CandidateResultsView removed */
-
 const ExpectedOutputTable = React.memo(({ rawOutput }) => {
   if (!rawOutput) return null;
 
@@ -1895,7 +1893,6 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       rec.lang = 'en-US';
 
       rec.onstart = () => {
-        console.log("[STT] Speech Recognition active");
         setIsRecording(true);
         isRecordingRef.current = true;
         setVoiceUsed(true);
@@ -1912,7 +1909,6 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
           }
         }
         const text = (localFinalTranscript + interimTranscript).trim();
-        console.log("[STT Live Text]:", text);
         setEnglishText(text);
         currentTextRef.current = text;
 
@@ -1923,7 +1919,6 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
           // Automatically submit candidate response after 5 seconds of silence
           silenceTimerRef.current = setTimeout(() => {
             if (currentTextRef.current && currentTextRef.current.trim().length > 0 && !isSubmittingRef.current) {
-              console.log("[English Assessment] 5 seconds of silence detected! Auto-submitting response...");
               handleRespondEnglish(currentTextRef.current);
             }
           }, 5000);
@@ -1944,7 +1939,6 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       };
 
       rec.onend = () => {
-        console.log("[STT End]");
         // Auto-restart if candidate is still in recording mode and AI is not speaking
         if (isRecordingRef.current && !isSubmittingRef.current && !aiIsSpeaking) {
           try {

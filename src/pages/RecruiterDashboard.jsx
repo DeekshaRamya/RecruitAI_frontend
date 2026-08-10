@@ -445,76 +445,6 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
     setNewTopicVal('');
   };
 
-  const _handleDeleteTopic = (subject, topic) => {
-    setSubjectsData(prev => ({
-      ...prev,
-      [subject]: prev[subject].filter(t => t !== topic)
-    }));
-
-    setSelectedTopics(prev => ({
-      ...prev,
-      [subject]: prev[subject].filter(t => t !== topic)
-    }));
-
-    setTopicConfigs(prevConfigs => {
-      const next = { ...prevConfigs };
-      delete next[topic];
-      return next;
-    });
-
-    showToast(`Deleted topic "${topic}" from ${subject}.`);
-  };
-
-  const _renderAddTopicControl = (subject) => {
-    const isAdding = addingTopicTo === subject;
-    const accentColorClass = subject === 'Aptitude' ? 'border-[#d97706] text-[#b45309]' : 'border-dash-primary-purple text-dash-primary-purple';
-    const bgClass = subject === 'Aptitude' ? 'bg-[#fef3c7]/30 hover:bg-[#fef3c7] hover:border-[#d97706]' : 'bg-dash-primary-purple/5 hover:bg-dash-primary-purple/10 hover:border-dash-primary-purple';
-    const checkBtnBg = subject === 'Aptitude' ? 'bg-[#d97706] hover:bg-[#b45309]' : 'bg-dash-primary-purple hover:bg-dash-dark-purple';
-
-    if (isAdding) {
-      return (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleAddTopic(subject);
-          }}
-          className="flex items-center gap-1.5"
-        >
-          <input
-            type="text"
-            placeholder={`New ${subject} topic...`}
-            value={newTopicVal}
-            onChange={(e) => setNewTopicVal(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') {
-                setAddingTopicTo(null);
-                setNewTopicVal('');
-              }
-            }}
-            className={`px-3.5 py-2 rounded-xl text-xs font-semibold border bg-dash-white-card text-dash-dark-purple focus:outline-none w-36 shadow-sm ${subject === 'Aptitude' ? 'border-[#d97706] focus:border-[#d97706]' : 'border-dash-primary-purple focus:border-dash-primary-purple'}`}
-            autoFocus
-          />
-          <button type="submit" className={`p-2 rounded-xl text-dash-white-card transition-all duration-200 cursor-pointer flex items-center justify-center ${checkBtnBg}`}>
-            <Check size={12} strokeWidth={3} />
-          </button>
-          <button type="button" onClick={() => { setAddingTopicTo(null); setNewTopicVal(''); }} className="p-2 rounded-xl bg-dash-border-gray/30 text-dash-dark-purple hover:bg-dash-border-gray/50 transition-all duration-200 cursor-pointer flex items-center justify-center">
-            <X size={12} strokeWidth={3} />
-          </button>
-        </form>
-      );
-    }
-
-    return (
-      <button
-        onClick={() => { setAddingTopicTo(subject); setNewTopicVal(''); }}
-        className={`px-3.5 py-2 rounded-xl text-xs font-semibold border border-dashed transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${accentColorClass} ${bgClass}`}
-      >
-        <Plus size={12} strokeWidth={3} />
-        <span>Add Topic</span>
-      </button>
-    );
-  };
-
   // Redesigned Assessment Creation state
   const [selectedSubjects, setSelectedSubjects] = useState(['Python', 'SQL']);
   const [assessmentTitle, setAssessmentTitle] = useState('Python & SQL Technical Assessment');
@@ -549,48 +479,6 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
   // Successful assessment toast/alert notification
   const [toastMessage, setToastMessage] = useState('');
 
-  // AI Generated preview questions state
-  const [_previewQuestions, _setPreviewQuestions] = useState([
-    {
-      id: 1,
-      subject: 'Python',
-      difficulty: 'Medium',
-      question: 'Which keyword is used to define a generator function in Python?',
-      options: [
-        { label: 'A', text: 'return', isCorrect: false },
-        { label: 'B', text: 'yield', isCorrect: true },
-        { label: 'C', text: 'async', isCorrect: false },
-        { label: 'D', text: 'lambda', isCorrect: false }
-      ]
-    },
-    {
-      id: 2,
-      subject: 'Python',
-      difficulty: 'Easy',
-      question: 'What is the output of: list(map(lambda x: x**2, [1, 2, 3, 4]))?',
-      options: [
-        { label: 'A', text: '[1, 4, 9, 16]', isCorrect: true },
-        { label: 'B', text: '[2, 4, 6, 8]', isCorrect: false },
-        { label: 'C', text: '[1, 2, 3, 4]', isCorrect: false },
-        { label: 'D', text: 'Error', isCorrect: false }
-      ]
-    },
-    {
-      id: 3,
-      subject: 'Python',
-      difficulty: 'Medium',
-      question: 'Which decorator defines a class method that takes the class as the first argument?',
-      options: [
-        { label: 'A', text: '@staticmethod', isCorrect: false },
-        { label: 'B', text: '@property', isCorrect: false },
-        { label: 'C', text: '@classmethod', isCorrect: true },
-        { label: 'D', text: '@instancemethod', isCorrect: false }
-      ]
-    }
-  ]);
-
-  const [_editingQuestionId, _setEditingQuestionId] = useState(null);
-  const [_editingText, _setEditingText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState({
     active: false,
@@ -683,22 +571,6 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
   );
 
   // Action: Create Assessment (legacy submit)
-  const _handleCreateAssessmentSubmit = (e) => {
-    e.preventDefault();
-    if (!newAssessment.title.trim()) return;
-
-    setIsCreateModalOpen(false);
-    showToast(`Assessment "${newAssessment.title}" successfully created!`);
-
-    // Reset form
-    setNewAssessment({
-      title: '',
-      role: 'Frontend Engineer',
-      duration: '45',
-      difficulty: 'Medium'
-    });
-  };
-
   const handleGenerateAssessment = async () => {
     if (!isValidForGeneration) {
       showToast("Please fix validation errors before generating assessment.");
@@ -5337,9 +5209,7 @@ const ResultsManager = ({ showToast, candidateGroups = [], candidates = [] }) =>
     }
     try {
       setLoadingDetailId(targetId);
-      console.info(`[Recruiter Dashboard] Requesting details for assessment ID: ${targetId}`);
       const response = await api.get(`/api/results/${targetId}`);
-      console.info(`[Recruiter Dashboard] Successfully loaded assessment report for ${response.data?.candidateName || 'candidate'}:`, response.data);
       setSelectedResult(response.data || {});
       const initialExpanded = {};
       if (response.data?.questionsAnalysis) {

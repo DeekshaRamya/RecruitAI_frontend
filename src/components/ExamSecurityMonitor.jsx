@@ -24,7 +24,7 @@ import {
  */
 export const ExamSecurityMonitor = ({
   securityState,
-  _assessmentName = 'Active Evaluation',
+  assessmentName = 'Active Evaluation',
   onAutoSubmit = null,
 }) => {
   const {
