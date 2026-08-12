@@ -550,19 +550,19 @@ const ExpectedOutputTable = React.memo(({ rawOutput }) => {
   );
 });
 
-const QuestionCard = React.memo(({ 
-  question, 
-  isSql, 
-  isCoding, 
-  liveSchemaMap, 
-  hasPrev, 
-  hasNext, 
-  goToQuestion, 
-  currentIdx, 
-  totalQuestions, 
-  toggleFlag, 
+const QuestionCard = React.memo(({
+  question,
+  isSql,
+  isCoding,
+  liveSchemaMap,
+  hasPrev,
+  hasNext,
+  goToQuestion,
+  currentIdx,
+  totalQuestions,
+  toggleFlag,
   isFlagged,
-  onOpenSubmitModal 
+  onOpenSubmitModal
 }) => {
   if (!question) return null;
 
@@ -587,11 +587,10 @@ const QuestionCard = React.memo(({
             <button
               type="button"
               onClick={toggleFlag}
-              className={`px-2.5 py-1 rounded-xl border text-[11px] font-extrabold flex items-center gap-1.5 cursor-pointer transition-all ${
-                isFlagged
-                  ? 'bg-amber-500/15 border-amber-500/40 text-amber-700 shadow-2xs'
-                  : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-              }`}
+              className={`px-2.5 py-1 rounded-xl border text-[11px] font-extrabold flex items-center gap-1.5 cursor-pointer transition-all ${isFlagged
+                ? 'bg-amber-500/15 border-amber-500/40 text-amber-700 shadow-2xs'
+                : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                }`}
             >
               <Flag size={12} className={isFlagged ? "fill-amber-500 text-amber-500" : ""} />
               <span>{isFlagged ? 'Flagged' : 'Flag Question'}</span>
@@ -704,11 +703,10 @@ const QuestionCard = React.memo(({
             type="button"
             onClick={() => goToQuestion(currentIdx - 1)}
             disabled={!hasPrev}
-            className={`px-4 py-2 rounded-xl border font-extrabold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
-              hasPrev
-                ? 'bg-slate-100 text-slate-800 border-slate-300 hover:bg-slate-200 hover:scale-[1.01]'
-                : 'opacity-40 cursor-not-allowed text-slate-400 border-slate-200 bg-slate-50'
-            }`}
+            className={`px-4 py-2 rounded-xl border font-extrabold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${hasPrev
+              ? 'bg-slate-100 text-slate-800 border-slate-300 hover:bg-slate-200 hover:scale-[1.01]'
+              : 'opacity-40 cursor-not-allowed text-slate-400 border-slate-200 bg-slate-50'
+              }`}
           >
             <ChevronLeft size={16} />
             <span>Previous</span>
@@ -1508,7 +1506,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [isTextMode, setIsTextMode] = useState(false);
   const [userDeactivatedMic, setUserDeactivatedMic] = useState(false);
-  const [englishTimeLeft, setEnglishTimeLeft] = useState(900); // 15 minutes = 900 seconds
+  const [englishTimeLeft, setEnglishTimeLeft] = useState(600); // 10 minutes = 600 seconds
   const [aiTyping, setAiTyping] = useState(false);
   const [voiceUsed, setVoiceUsed] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -1522,6 +1520,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
   const [englishUploadError, setEnglishUploadError] = useState('');
   const englishFileInputRef = useRef(null);
   const recognitionRef = useRef(null);
+  const isNativeSRActiveRef = useRef(false);
   const mediaStreamRef = useRef(null);
   const silenceTimerRef = useRef(null);
   const currentTextRef = useRef('');
@@ -1532,6 +1531,14 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
   const isSubmittingRef = useRef(false);
   const isRecordingRef = useRef(false);
   const chatContainerRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const silenceCheckFrameRef = useRef(null);
+  const shouldSubmitAfterTranscribeRef = useRef(false);
+  const isTranscribingRef = useRef(false);
+  const activeAudioRef = useRef(null);
   const [isStartingTechnical, setIsStartingTechnical] = useState(false);
   const startingTechRef = useRef(false);
   const startingEnglishRef = useRef(false);
@@ -1563,6 +1570,16 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
           mediaStreamRef.current.getTracks().forEach(track => track.stop());
         } catch (e) { }
       }
+      if (silenceCheckFrameRef.current) {
+        cancelAnimationFrame(silenceCheckFrameRef.current);
+      }
+      if (audioContextRef.current) {
+        try { audioContextRef.current.close(); } catch (e) { }
+      }
+      if (activeAudioRef.current) {
+        try { activeAudioRef.current.pause(); } catch (e) { }
+        activeAudioRef.current = null;
+      }
       if (typeof window !== 'undefined' && window.speechSynthesis) {
         window.speechSynthesis.cancel();
       }
@@ -1586,7 +1603,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
         const startTime = new Date(res.data.start_time).getTime();
         const now = Date.now();
         const elapsed = Math.floor((now - startTime) / 1000);
-        const remaining = Math.max(0, 900 - elapsed);
+        const remaining = Math.max(0, 600 - elapsed);
         setEnglishTimeLeft(remaining);
       }
     } catch (err) {
@@ -1622,7 +1639,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       setAiTyping(true);
       const res = await api.post('/api/english-assessment/start');
       setEnglishInterview(res.data);
-      setEnglishTimeLeft(900);
+      setEnglishTimeLeft(600);
       setEnglishText('');
       currentTextRef.current = '';
       finalTranscriptHistoryRef.current = '';
@@ -1636,7 +1653,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
       // Auto TTS first question if not muted
       if (res.data && res.data.ai_question && !isMuted) {
-        setTimeout(() => speakQuestion(res.data.ai_question), 800);
+        setTimeout(() => speakQuestion(res.data.ai_question, res.data.audio_base64), 800);
       }
 
       showToast("English Interview started!");
@@ -1689,7 +1706,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       showToast("Answer recorded!");
       // Speak next question out loud if not muted
       if (res.data && res.data.ai_question && !isMuted) {
-        setTimeout(() => speakQuestion(res.data.ai_question), 600);
+        setTimeout(() => speakQuestion(res.data.ai_question, res.data.audio_base64), 600);
       }
     } catch (err) {
       console.error("Failed to submit English Assessment response:", err);
@@ -1718,10 +1735,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       setAiTyping(true);
       await api.post('/api/english-assessment/complete', { voice_used: voiceUsed });
       showToast("English Assessment completed successfully!");
-      if (typeof window !== 'undefined' && window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-        setAiIsSpeaking(false);
-      }
+      stopSpeech();
       await fetchEnglishStatus();
     } catch (err) {
       console.error("Failed to complete English Assessment:", err);
@@ -1798,7 +1812,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
   const getChatMessages = () => {
     const list = [];
     if (!englishInterview) return list;
-    
+
     const apiConvs = englishInterview.conversations || [];
     if (apiConvs.length > 0) {
       apiConvs.forEach(c => {
@@ -1816,8 +1830,19 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     return list;
   };
 
-  // TTS speak helper
-  const speakQuestion = (text) => {
+  const stopSpeech = () => {
+    if (activeAudioRef.current) {
+      try { activeAudioRef.current.pause(); } catch (e) { }
+      activeAudioRef.current = null;
+    }
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      try { window.speechSynthesis.cancel(); } catch (e) { }
+    }
+    setAiIsSpeaking(false);
+  };
+
+  // TTS speak helper using Gemini TTS API (with support for preloaded audio)
+  const speakQuestion = async (text, preloadedAudioBase64 = null) => {
     userDeactivatedMicRef.current = false;
     setUserDeactivatedMic(false);
 
@@ -1827,102 +1852,65 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     finalTranscriptHistoryRef.current = '';
     currentSessionFinalRef.current = '';
 
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (typeof window !== 'undefined' && window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-      setAiIsSpeaking(true);
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
 
-      if (silenceTimerRef.current) {
-        clearTimeout(silenceTimerRef.current);
-        silenceTimerRef.current = null;
-      }
+    stopRecording();
 
-      stopRecording();
+    if (isMuted) return;
 
+    if (activeAudioRef.current) {
+      try { activeAudioRef.current.pause(); } catch (e) { }
+      activeAudioRef.current = null;
+    }
+
+    setAiIsSpeaking(true);
+    try {
       const cleanText = text.replace(/Welcome to the English Assessment.*?Click "Start Interview" to begin\./gi, '');
-      const utterance = new SpeechSynthesisUtterance(cleanText);
 
-      // Store utterance globally to prevent garbage collection in Chrome/Safari
-      window.activeUtterance = utterance;
-
-      utterance.lang = 'en-US';
-
-      const voices = window.speechSynthesis.getVoices().filter(v => 
-        !v.name.toLowerCase().includes('gemini')
-      );
-      let selectedVoiceObj = null;
-
-      // Try to find the Puck voice first (case-insensitive)
-      selectedVoiceObj = voices.find(v => v.name.toLowerCase().includes('puck'));
-
-      if (!selectedVoiceObj) {
-        // Fallback to standard male voices
-        selectedVoiceObj = voices.find(v => v.lang.startsWith('en') && (
-          v.name.toLowerCase().includes('male') ||
-          v.name.toLowerCase().includes('david') ||
-          v.name.toLowerCase().includes('mark') ||
-          v.name.toLowerCase().includes('guy') ||
-          v.name.toLowerCase().includes('alex') ||
-          v.name.toLowerCase().includes('daniel') ||
-          v.name.toLowerCase().includes('fred') ||
-          v.name.toLowerCase().includes('george')
-        )) || voices.find(v => v.lang.startsWith('en'));
+      let audioBase64 = preloadedAudioBase64;
+      if (!audioBase64) {
+        console.log("[TTS] Requesting speech synthesis from Gemini API...");
+        const res = await api.post('/api/english-assessment/tts', { text: cleanText });
+        audioBase64 = res.data?.audio_base64;
+      } else {
+        console.log("[TTS] Using preloaded speech audio.");
       }
 
-      if (selectedVoiceObj) {
-        utterance.voice = selectedVoiceObj;
-      }
-      utterance.pitch = 0.85;
+      if (audioBase64) {
+        const audioUrl = `data:audio/wav;base64,${audioBase64}`;
+        const audio = new Audio(audioUrl);
+        activeAudioRef.current = audio;
 
-      // Set a fallback timer to release the speaking lock if the browser gets stuck
-      const speakingFallbackTimer = setTimeout(() => {
-        if (window.activeUtterance === utterance) {
-          console.warn("[TTS] SpeechSynthesis took too long, auto-releasing speaking lock.");
-          window.activeUtterance = null;
+        audio.onended = () => {
           setAiIsSpeaking(false);
-          if (SpeechRecognition && !isMuted && !isTextModeRef.current && !userDeactivatedMicRef.current && !isSubmittingRef.current) {
+          activeAudioRef.current = null;
+          // Automatically activate candidate microphone when AI finishes speaking!
+          if (!isMuted && !isTextModeRef.current && !userDeactivatedMicRef.current && !isSubmittingRef.current) {
             setTimeout(() => {
               if (!isSubmittingRef.current && !userDeactivatedMicRef.current && !isTextModeRef.current) {
-                startRecording(SpeechRecognition);
+                startRecording();
               }
             }, 300);
           }
-        }
-      }, 15000); // 15 seconds fallback
+        };
 
-      utterance.onstart = () => {
-        setAiIsSpeaking(true);
-      };
+        audio.onerror = (e) => {
+          console.error("[TTS Playback Error] Failed to play synthesized audio:", e);
+          setAiIsSpeaking(false);
+          activeAudioRef.current = null;
+        };
 
-      utterance.onend = () => {
-        clearTimeout(speakingFallbackTimer);
-        window.activeUtterance = null;
+        await audio.play();
+      } else {
+        console.warn("[TTS] No audio data returned from backend.");
         setAiIsSpeaking(false);
-        // Automatically activate candidate microphone when AI finishes speaking!
-        if (SpeechRecognition && !isMuted && !isTextModeRef.current && !userDeactivatedMicRef.current && !isSubmittingRef.current) {
-          setTimeout(() => {
-            if (!isSubmittingRef.current && !userDeactivatedMicRef.current && !isTextModeRef.current) {
-              startRecording(SpeechRecognition);
-            }
-          }, 300);
-        }
-      };
-
-      utterance.onerror = (e) => {
-        clearTimeout(speakingFallbackTimer);
-        console.error("[TTS Error]:", e);
-        window.activeUtterance = null;
-        setAiIsSpeaking(false);
-        if (SpeechRecognition && !isMuted && !isTextModeRef.current && !userDeactivatedMicRef.current && !isSubmittingRef.current) {
-          setTimeout(() => {
-            if (!isSubmittingRef.current && !userDeactivatedMicRef.current && !isTextModeRef.current) {
-              startRecording(SpeechRecognition);
-            }
-          }, 300);
-        }
-      };
-
-      window.speechSynthesis.speak(utterance);
+      }
+    } catch (err) {
+      console.error("[TTS Exception]:", err);
+      setAiIsSpeaking(false);
     }
   };
 
@@ -1930,10 +1918,9 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
   const toggleMute = () => {
     setIsMuted(prev => {
       const newVal = !prev;
-      if (newVal && typeof window !== 'undefined' && window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-        setAiIsSpeaking(false);
-      } else if (!newVal) {
+      if (newVal) {
+        stopSpeech();
+      } else {
         const activeQ = englishInterview?.current_question?.ai_question || englishInterview?.ai_question;
         if (activeQ) {
           speakQuestion(activeQ);
@@ -1943,11 +1930,86 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     });
   };
 
-  // Toggle Microphone / Web Speech API Speech-to-Text
+  // Helper to transcribe audio using backend Gemini endpoint
+  const handleAudioTranscribe = async (audioBlob) => {
+    try {
+      setEnglishLoading(true);
+      setAiTyping(true);
+
+      const formData = new FormData();
+      formData.append('file', audioBlob, 'recording.webm');
+
+      console.log("[STT] Uploading audio chunk for transcription...");
+      const res = await api.post('/api/english-assessment/transcribe', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      const text = res.data?.transcription || '';
+      console.log("[STT Gemini Transcript]:", text);
+
+      setEnglishText(text);
+      currentTextRef.current = text;
+      return text;
+    } catch (err) {
+      console.error("[STT] Transcription error:", err);
+      showToast("Could not transcribe audio. Please try again or switch to text mode.");
+      return '';
+    } finally {
+      setEnglishLoading(false);
+      setAiTyping(false);
+    }
+  };
+
+  const stopRecordingAndSubmit = (isAuto = false) => {
+    shouldSubmitAfterTranscribeRef.current = isAuto;
+    stopRecording();
+  };
+
+  // Periodic helper to transcribe audio in the background for real-time visual output
+  const triggerPeriodicTranscribe = async () => {
+    if (isTranscribingRef.current || !isRecordingRef.current) return;
+
+    const chunks = audioChunksRef.current;
+    if (chunks.length === 0) return;
+
+    isTranscribingRef.current = true;
+    try {
+      let mimeType = 'audio/webm';
+      if (mediaRecorderRef.current) {
+        mimeType = mediaRecorderRef.current.mimeType;
+      }
+
+      const audioBlob = new Blob(chunks, { type: mimeType });
+      const formData = new FormData();
+      formData.append('file', audioBlob, 'recording.webm');
+
+      console.log("[STT] Uploading intermediate audio for real-time display...");
+      const res = await api.post('/api/english-assessment/transcribe', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      const text = res.data?.transcription || '';
+      console.log("[STT Live Display]:", text);
+
+      if (isRecordingRef.current && text.trim().length > 0) {
+        setEnglishText(text);
+        currentTextRef.current = text;
+      }
+    } catch (err) {
+      console.warn("[STT Live Display] Periodic transcription failed:", err);
+    } finally {
+      isTranscribingRef.current = false;
+    }
+  };
+
+  // Toggle Microphone / MediaRecorder Speech-to-Text
   const toggleRecording = async () => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      showToast("Speech Recognition is not supported in this browser. Please use Chrome, Edge, or Safari.");
+    if (!window.MediaRecorder) {
+      showToast("Audio recording is not supported in this browser. Please use Chrome, Edge, or Safari.");
       return;
     }
 
@@ -1970,123 +2032,245 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
         return;
       }
 
-      if (typeof window !== 'undefined' && window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-      }
-      setAiIsSpeaking(false);
-      startRecording(SpeechRecognition, true);
+      stopSpeech();
+      startRecording(null, true);
     }
   };
 
-  const startRecording = (SpeechRecognition, force = false, isAutoRestart = false) => {
+  const startRecording = async (ignoredSpeechRec, force = false, isAutoRestart = false) => {
     if (isSubmittingRef.current || (aiIsSpeaking && !force) || isTextModeRef.current) return;
 
     if (!isAutoRestart) {
-      finalTranscriptHistoryRef.current = '';
-      currentSessionFinalRef.current = '';
+      setEnglishText('');
+      currentTextRef.current = '';
     }
 
+    // Reset/Stop previous recording instance if active
+    if (mediaRecorderRef.current) {
+      try { mediaRecorderRef.current.stop(); } catch (e) { }
+      mediaRecorderRef.current = null;
+    }
+    if (mediaStreamRef.current) {
+      try {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      } catch (e) { }
+      mediaStreamRef.current = null;
+    }
+    if (silenceCheckFrameRef.current) {
+      cancelAnimationFrame(silenceCheckFrameRef.current);
+      silenceCheckFrameRef.current = null;
+    }
+    if (audioContextRef.current) {
+      try { await audioContextRef.current.close(); } catch (e) { }
+      audioContextRef.current = null;
+    }
+
+    // Stop and clean up any existing browser SpeechRecognition
     if (recognitionRef.current) {
-      try { recognitionRef.current.abort(); } catch (e) { }
+      try {
+        recognitionRef.current.onend = null;
+        recognitionRef.current.stop();
+      } catch (e) { }
       recognitionRef.current = null;
     }
+    isNativeSRActiveRef.current = false;
 
     try {
-      const rec = new SpeechRecognition();
-      rec.continuous = true;
-      rec.interimResults = true;
-      rec.lang = 'en-US';
+      console.log("[STT] Starting audio recording...");
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
 
-      rec.onstart = () => {
-        setIsRecording(true);
-        isRecordingRef.current = true;
-        setVoiceUsed(true);
-      };
-
-      rec.onresult = (event) => {
-        // Guard: Do not process speech while AI is speaking, submitting, or thinking
-        if (aiIsSpeaking || isSubmittingRef.current || englishLoading || aiTyping) return;
-
-        let localFinalTranscript = '';
-        let interimTranscript = '';
-        for (let i = 0; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            localFinalTranscript += event.results[i][0].transcript;
-          } else {
-            interimTranscript += event.results[i][0].transcript;
-          }
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) {
+        const audioCtx = new AudioCtx();
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume().catch(err => console.warn("Failed to resume AudioContext on init:", err));
         }
-        currentSessionFinalRef.current = localFinalTranscript;
+        const source = audioCtx.createMediaStreamSource(stream);
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 256;
+        source.connect(analyser);
+        audioContextRef.current = audioCtx;
+        analyserRef.current = analyser;
+      }
 
-        const currentSessionText = (localFinalTranscript + interimTranscript).trim();
-        const history = finalTranscriptHistoryRef.current;
-        const text = history 
-          ? (history + " " + currentSessionText).trim() 
-          : currentSessionText;
+      let mimeType = 'audio/webm';
+      if (MediaRecorder.isTypeSupported('audio/webm')) {
+        mimeType = 'audio/webm';
+      } else if (MediaRecorder.isTypeSupported('audio/ogg')) {
+        mimeType = 'audio/ogg';
+      } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+        mimeType = 'audio/mp4';
+      } else if (MediaRecorder.isTypeSupported('audio/wav')) {
+        mimeType = 'audio/wav';
+      }
 
-        console.log("[STT Live Text]:", text);
-        setEnglishText(text);
-        currentTextRef.current = text;
+      audioChunksRef.current = [];
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      mediaRecorderRef.current = mediaRecorder;
 
-        if (text.length > 0) {
-          if (silenceTimerRef.current) {
-            clearTimeout(silenceTimerRef.current);
-          }
-          // Automatically submit candidate response after 5 seconds of silence
-          silenceTimerRef.current = setTimeout(() => {
-            if (currentTextRef.current && currentTextRef.current.trim().length > 0 && !isSubmittingRef.current) {
-              handleRespondEnglish(currentTextRef.current);
-            }
-          }, 5000);
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
         }
       };
 
-      rec.onerror = (e) => {
-        console.warn("[STT Error]:", e.error);
-        if (e.error === 'no-speech') {
-          // Ignore no-speech error; stay active so user can speak whenever ready
-          return;
-        }
-        if (e.error === 'aborted') {
-          return;
-        }
-        
-        if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-          showToast("Microphone permission denied. Please click the Lock icon in your browser address bar to allow microphone access.");
-        } else if (e.error === 'audio-capture') {
-          showToast("Microphone not found. Please connect a microphone and try again.");
-        } else {
-          showToast(`Microphone error: ${e.error}. Please try toggling the microphone button.`);
-        }
-        
+      mediaRecorder.onstop = async () => {
+        console.log("[STT] Recording stopped. Preparing to transcribe...");
         setIsRecording(false);
         isRecordingRef.current = false;
-      };
 
-      rec.onend = () => {
-        console.log("[STT End]");
-        // Save current session's final transcript into history ref
-        if (currentSessionFinalRef.current) {
-          finalTranscriptHistoryRef.current = (finalTranscriptHistoryRef.current + " " + currentSessionFinalRef.current).trim();
-          currentSessionFinalRef.current = '';
+        const chunks = audioChunksRef.current;
+        if (chunks.length === 0) {
+          console.warn("[STT] No audio chunks captured.");
+          shouldSubmitAfterTranscribeRef.current = false;
+          return;
         }
 
-        // Auto-restart with fresh SpeechRecognition instance and small timeout
-        if (isRecordingRef.current && !isSubmittingRef.current && !aiIsSpeaking && !isTextModeRef.current && !userDeactivatedMicRef.current) {
-          setTimeout(() => {
-            if (isRecordingRef.current && !isSubmittingRef.current && !aiIsSpeaking && !isTextModeRef.current && !userDeactivatedMicRef.current) {
-              startRecording(SpeechRecognition, false, true);
+        const audioBlob = new Blob(chunks, { type: mimeType });
+        const transcribedText = await handleAudioTranscribe(audioBlob);
+
+        if (shouldSubmitAfterTranscribeRef.current) {
+          shouldSubmitAfterTranscribeRef.current = false;
+          const textToSubmit = (transcribedText && transcribedText.trim().length > 0)
+            ? transcribedText
+            : (currentTextRef.current || '');
+
+          if (textToSubmit && textToSubmit.trim().length > 0) {
+            console.log("[STT] Auto-submitting response: ", textToSubmit);
+            handleRespondEnglish(textToSubmit);
+          } else {
+            console.log("[STT] Auto-submit skipped: No speech detected in either backend or native recognition.");
+            // Restart recording so candidate doesn't get stuck with mic turned off
+            if (!isMuted && !isTextModeRef.current && !userDeactivatedMicRef.current && !isSubmittingRef.current) {
+              startRecording(null, true, true);
             }
-          }, 300);
-        } else {
-          setIsRecording(false);
-          isRecordingRef.current = false;
+          }
         }
       };
 
-      recognitionRef.current = rec;
+      setIsRecording(true);
       isRecordingRef.current = true;
-      rec.start();
+      setVoiceUsed(true);
+      mediaRecorder.start(250);
+
+      // Start browser native SpeechRecognition for instant, zero-delay feedback
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        try {
+          const recognition = new SpeechRecognition();
+          recognition.continuous = true;
+          recognition.interimResults = true;
+          recognition.lang = 'en-US';
+
+          recognition.onresult = (event) => {
+            let interimTranscript = '';
+            let finalTranscript = '';
+
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+              const result = event.results[i];
+              const transcript = result[0].transcript;
+              const confidence = result[0].confidence;
+
+              // Filter out non-Latin scripts (e.g. Tamil characters like 'வணக்கம்')
+              const isLatinScript = /^[a-zA-Z0-9\s.,\/#!$%\^&\*;:{}=\-_`~()?'"\n]*$/.test(transcript);
+
+              // Filter out low confidence results (non-English or background noise)
+              const isConfident = confidence >= 0.60;
+
+              if (isLatinScript && isConfident) {
+                if (result.isFinal) {
+                  finalTranscript += transcript;
+                } else {
+                  interimTranscript += transcript;
+                }
+              } else {
+                console.log(`[STT Native Filtered] Ignored: "${transcript}" | Confidence: ${confidence} | Latin: ${isLatinScript}`);
+              }
+            }
+
+            const currentText = finalTranscript + interimTranscript;
+            if (isRecordingRef.current && currentText.trim().length > 0) {
+              setEnglishText(currentText);
+              currentTextRef.current = currentText;
+            }
+          };
+
+          recognition.onerror = (event) => {
+            console.error("Native Speech recognition error:", event.error);
+          };
+
+          recognition.onend = () => {
+            // Auto-restart if we are still recording and this is still the active instance
+            if (isRecordingRef.current && recognitionRef.current === recognition) {
+              try { recognition.start(); } catch (e) { }
+            }
+          };
+
+          recognitionRef.current = recognition;
+          recognition.start();
+          isNativeSRActiveRef.current = true;
+          console.log("[STT] Browser SpeechRecognition started successfully.");
+        } catch (srErr) {
+          console.warn("[STT] Failed to start browser SpeechRecognition:", srErr);
+        }
+      }
+
+      if (analyserRef.current) {
+        const bufferLength = analyserRef.current.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+        let lastSoundTime = Date.now();
+        let lastTranscribeTime = Date.now();
+        let hasSpoken = false;
+        let lastTextLength = 0;
+
+        const checkSilence = () => {
+          if (!isRecordingRef.current) return;
+
+          analyserRef.current.getByteFrequencyData(dataArray);
+          let sum = 0;
+          for (let i = 0; i < bufferLength; i++) {
+            sum += dataArray[i];
+          }
+          const average = sum / bufferLength;
+
+          const now = Date.now();
+
+          const currentText = currentTextRef.current || '';
+          const textChanged = currentText.length > lastTextLength;
+          if (textChanged) {
+            lastTextLength = currentText.length;
+            lastSoundTime = now;
+            hasSpoken = true;
+          }
+
+          // If they haven't spoken any words yet, use volume/amplitude to detect if they started speaking
+          if (currentText.trim().length === 0) {
+            const audioLevelThreshold = 20; // raised to ignore background hiss
+            if (average > audioLevelThreshold) {
+              lastSoundTime = now;
+              hasSpoken = true;
+            }
+          }
+
+          // Trigger background transcription updates for live display (every 2.5 seconds)
+          // ONLY if we are NOT using the browser's native SpeechRecognition
+          if (!isNativeSRActiveRef.current && (now - lastTranscribeTime > 2500)) {
+            lastTranscribeTime = now;
+            triggerPeriodicTranscribe();
+          }
+
+          if (hasSpoken && (now - lastSoundTime > 3000)) {
+            console.log("[STT] Silence detected. Stopping recording and submitting...");
+            stopRecordingAndSubmit(true);
+            return;
+          }
+
+          silenceCheckFrameRef.current = requestAnimationFrame(checkSilence);
+        };
+
+        silenceCheckFrameRef.current = requestAnimationFrame(checkSilence);
+      }
     } catch (e) {
       console.error("[STT Exception]:", e);
       showToast(`Failed to start microphone: ${e.message || e}`);
@@ -2101,9 +2285,12 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       clearTimeout(silenceTimerRef.current);
       silenceTimerRef.current = null;
     }
-    if (recognitionRef.current) {
-      try { recognitionRef.current.stop(); } catch (e) { }
-      recognitionRef.current = null;
+    if (silenceCheckFrameRef.current) {
+      cancelAnimationFrame(silenceCheckFrameRef.current);
+      silenceCheckFrameRef.current = null;
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try { mediaRecorderRef.current.stop(); } catch (e) { }
     }
     if (mediaStreamRef.current) {
       try {
@@ -2111,6 +2298,21 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       } catch (e) { }
       mediaStreamRef.current = null;
     }
+    if (audioContextRef.current) {
+      try { audioContextRef.current.close(); } catch (e) { }
+      audioContextRef.current = null;
+    }
+
+    // Stop native SpeechRecognition if active
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.onend = null;
+        recognitionRef.current.stop();
+      } catch (e) { }
+      recognitionRef.current = null;
+    }
+    isNativeSRActiveRef.current = false;
+
     setIsRecording(false);
   };
 
@@ -2273,13 +2475,16 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
   // Auto-redirect to English Assessment after Technical Assessment completion
   useEffect(() => {
     if (activeTab === 'technical' && activeAssignment && examState?.submitted) {
+      const isExpired = examState.timeLeft <= 0 || activeAssignment.status === 'EXPIRED';
+      if (isExpired) return;
+
       const redirectTimer = setTimeout(() => {
         setActiveTab('english');
         setActiveAssignment(null);
       }, 3000);
       return () => clearTimeout(redirectTimer);
     }
-  }, [activeTab, activeAssignment, examState?.submitted]);
+  }, [activeTab, activeAssignment, examState?.submitted, examState?.timeLeft]);
 
   const handleEditorDidMount = (editor, monaco) => {
     if (sqlCompletionProviderRef.current) {
@@ -2646,6 +2851,12 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                 const elapsedSeconds = Math.floor((Date.now() - saved.lastSavedTimestamp) / 1000);
                 saved.examState.timeLeft = Math.max(0, saved.examState.timeLeft - elapsedSeconds);
               }
+              if (saved.examState.timeLeft <= 0) {
+                localStorage.removeItem(key);
+                api.patch(`/api/assignments/${saved.assignment.id}/status`, { status: 'EXPIRED' })
+                  .catch(err => console.warn("Failed to patch status to EXPIRED on restore timeout:", err));
+                continue;
+              }
               setActiveAssignment(saved.assignment);
               setExamState({
                 ...saved.examState,
@@ -2688,14 +2899,14 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     if (activeAssignment && !loadingAssignments) {
       if (assignments.length > 0) {
         const match = assignments.find(a => a.id === activeAssignment.id);
-        if (!match || match.status === 'COMPLETED') {
+        if (!match || match.status === 'COMPLETED' || match.status === 'EXPIRED') {
           try {
             localStorage.removeItem(`recruitai_active_exam_${activeAssignment.id}`);
           } catch (e) { }
           setActiveAssignment(null);
           setExamState(DEFAULT_EXAM_STATE);
           setActiveTab('dashboard');
-          showToast("Assessment session is no longer active.");
+          showToast(match?.status === 'EXPIRED' ? "Assessment session has expired." : "Assessment session is no longer active.");
         }
       } else {
         try {
@@ -2827,6 +3038,13 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     setExamState(prev => ({ ...prev, submitted: true }));
     setIsSubmitModalOpen(false);
 
+    // If auto-submitted due to timeout, set activeAssignment status to EXPIRED
+    const durationSeconds = parseDuration(activeAssignment?.assessment?.duration || activeAssignment?.duration || "30") * 60;
+    const isAuto = securityMetadata?.autoSubmitted === true || (examState.timeLeft !== undefined && examState.timeLeft <= 0);
+    if (isAuto) {
+      setActiveAssignment(prev => prev ? { ...prev, status: 'EXPIRED' } : null);
+    }
+
     try {
       try {
         localStorage.removeItem(`recruitai_active_exam_${targetId}`);
@@ -2858,7 +3076,14 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
       // 4. Perform actual assessment submission asynchronously in the background
       api.post('/api/assessment/submit', payload)
-        .then(() => {
+        .then(async () => {
+          if (isAuto) {
+            try {
+              await api.patch(`/api/assignments/${targetId}/status`, { status: 'EXPIRED' });
+            } catch (err) {
+              console.error("Failed to update status to EXPIRED:", err);
+            }
+          }
           fetchAssignments();
         })
         .catch(err => {
@@ -3102,14 +3327,14 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
     try {
       const rawSampleInput = currentQuestion?.sampleInput ||
-                             currentQuestion?.visibleTestCase?.input ||
-                             (currentQuestion?.visibleTestCases && currentQuestion.visibleTestCases[0] && currentQuestion.visibleTestCases[0].input) ||
-                             currentQuestion?.exampleInput || '';
+        currentQuestion?.visibleTestCase?.input ||
+        (currentQuestion?.visibleTestCases && currentQuestion.visibleTestCases[0] && currentQuestion.visibleTestCases[0].input) ||
+        currentQuestion?.exampleInput || '';
 
       const rawSampleOutput = currentQuestion?.sampleOutput ||
-                              currentQuestion?.visibleTestCase?.expectedOutput ||
-                              (currentQuestion?.visibleTestCases && currentQuestion.visibleTestCases[0] && currentQuestion.visibleTestCases[0].expectedOutput) ||
-                              currentQuestion?.exampleOutput || '';
+        currentQuestion?.visibleTestCase?.expectedOutput ||
+        (currentQuestion?.visibleTestCases && currentQuestion.visibleTestCases[0] && currentQuestion.visibleTestCases[0].expectedOutput) ||
+        currentQuestion?.exampleOutput || '';
 
       const activeInput = (customInput !== undefined && customInput !== null && customInput.trim() !== '')
         ? customInput
@@ -3791,6 +4016,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                   const asm = assignment?.assessment || assignment || {};
                   const isCompleted = assignment.status === 'COMPLETED';
                   const isInProgress = assignment.status === 'IN_PROGRESS';
+                  const isExpired = assignment.status === 'EXPIRED';
 
                   return (
                     <div
@@ -3808,7 +4034,9 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                           ? 'text-[#22c55e] bg-[#22c55e]/10 border-[#22c55e]/20'
                           : isInProgress
                             ? 'text-[#f97316] bg-[#f97316]/10 border-[#f97316]/20'
-                            : 'text-[#3b82f6] bg-[#3b82f6]/10 border-[#3b82f6]/20'
+                            : isExpired
+                              ? 'text-red-500 bg-red-50 border-red-200'
+                              : 'text-[#3b82f6] bg-[#3b82f6]/10 border-[#3b82f6]/20'
                           }`}>
                           {assignment.status}
                         </span>
@@ -3856,6 +4084,11 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                           <CheckCircle2 size={16} />
                           <span>Completed</span>
                         </div>
+                      ) : isExpired ? (
+                        <div className="w-full py-3 rounded-xl bg-red-50 text-red-600 text-center font-bold text-sm border border-red-200 flex items-center justify-center gap-2">
+                          <X size={16} />
+                          <span>Assessment Expired</span>
+                        </div>
                       ) : (() => {
                         const startTimeVal = assignment.startTime || assignment.start_time;
                         const isFuture = startTimeVal ? new Date(startTimeVal).getTime() > Date.now() : false;
@@ -3897,43 +4130,79 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
           </div>
         )}
 
-        {activeTab === 'technical' && activeAssignment && examState.submitted && (
-          <div className="flex justify-center items-center py-12 animate-fade-in w-full">
-            <div className="w-full max-w-2xl bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-10 shadow-[0_4px_25px_rgba(87,82,170,0.02)] flex flex-col items-center text-center gap-6">
-              <div className="w-20 h-20 rounded-full bg-dash-success-green/10 flex items-center justify-center text-dash-success-green mb-2 animate-bounce">
-                <Check size={40} />
-              </div>
-              <div>
-                <h3 className="font-plus-jakarta font-extrabold text-2xl text-dash-dark-purple tracking-tight">
-                  Assessment Completed!
-                </h3>
-                <p className="text-sm text-dash-light-purple font-semibold mt-3 max-w-md mx-auto leading-relaxed">
-                  Thank you for taking the assessment. Your response has been securely saved and submitted to your recruiter.
-                </p>
-                <p className="text-xs text-dash-primary-purple font-extrabold mt-3 animate-pulse flex items-center justify-center gap-2">
-                  <Loader2 size={14} className="animate-spin" />
-                  <span>Redirecting to English Communication Assessment in 3 seconds...</span>
-                </p>
-              </div>
+        {activeTab === 'technical' && activeAssignment && examState.submitted && (() => {
+          const isExpired = examState.timeLeft <= 0 || activeAssignment.status === 'EXPIRED';
 
-              {examSecurity?.autoSubmittedDueToViolations && (
-                <div className="w-full bg-red-50 border border-red-200 text-red-600 p-4 rounded-2xl font-bold text-xs flex items-center justify-center gap-2">
-                  <span>Your assessment has been automatically submitted because you exited full-screen mode multiple times.</span>
+          if (isExpired) {
+            return (
+              <div className="flex justify-center items-center py-12 animate-fade-in w-full">
+                <div className="w-full max-w-2xl bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-10 shadow-[0_4px_25px_rgba(87,82,170,0.02)] flex flex-col items-center text-center gap-6">
+                  <div className="w-20 h-20 rounded-full bg-red-50 flex items-center justify-center text-red-500 mb-2 animate-pulse border border-red-200">
+                    <ShieldAlert size={40} />
+                  </div>
+                  <div>
+                    <h3 className="font-plus-jakarta font-extrabold text-2xl text-red-600 tracking-tight">
+                      Assessment Expired
+                    </h3>
+                    <p className="text-sm text-dash-light-purple font-semibold mt-3 max-w-md mx-auto leading-relaxed">
+                      The time limit for this assessment has expired. You can no longer continue or restart this assessment. Your progress has been auto-saved and submitted.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-3 justify-center mt-4">
+                    <button
+                      onClick={() => {
+                        setActiveTab('dashboard');
+                        setActiveAssignment(null);
+                        setExamState(DEFAULT_EXAM_STATE);
+                      }}
+                      className="px-6 py-3 rounded-xl bg-slate-800 text-white font-bold text-xs hover:bg-slate-900 transition-all duration-200 shadow-md cursor-pointer border-0"
+                    >
+                      Return to Dashboard
+                    </button>
+                  </div>
                 </div>
-              )}
+              </div>
+            );
+          }
 
-              <div className="flex flex-wrap gap-3 justify-center">
-                <button
-                  onClick={() => { setActiveTab('english'); setActiveAssignment(null); }}
-                  className="px-6 py-3 rounded-xl bg-dash-primary-purple text-dash-white-card font-bold text-xs hover:bg-dash-dark-purple transition-all duration-200 shadow-md cursor-pointer border-0 flex items-center gap-2"
-                >
-                  <span>Proceed to English Assessment Now</span>
-                  <ChevronRight size={14} />
-                </button>
+          return (
+            <div className="flex justify-center items-center py-12 animate-fade-in w-full">
+              <div className="w-full max-w-2xl bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-10 shadow-[0_4px_25px_rgba(87,82,170,0.02)] flex flex-col items-center text-center gap-6">
+                <div className="w-20 h-20 rounded-full bg-dash-success-green/10 flex items-center justify-center text-dash-success-green mb-2 animate-bounce">
+                  <Check size={40} />
+                </div>
+                <div>
+                  <h3 className="font-plus-jakarta font-extrabold text-2xl text-dash-dark-purple tracking-tight">
+                    Assessment Completed!
+                  </h3>
+                  <p className="text-sm text-dash-light-purple font-semibold mt-3 max-w-md mx-auto leading-relaxed">
+                    Thank you for taking the assessment. Your response has been securely saved and submitted to your recruiter.
+                  </p>
+                  <p className="text-xs text-dash-primary-purple font-extrabold mt-3 animate-pulse flex items-center justify-center gap-2">
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>Redirecting to English Communication Assessment in 3 seconds...</span>
+                  </p>
+                </div>
+
+                {examSecurity?.autoSubmittedDueToViolations && (
+                  <div className="w-full bg-red-50 border border-red-200 text-red-600 p-4 rounded-2xl font-bold text-xs flex items-center justify-center gap-2">
+                    <span>Your assessment has been automatically submitted because you exited full-screen mode multiple times.</span>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-3 justify-center">
+                  <button
+                    onClick={() => { setActiveTab('english'); setActiveAssignment(null); }}
+                    className="px-6 py-3 rounded-xl bg-dash-primary-purple text-dash-white-card font-bold text-xs hover:bg-dash-dark-purple transition-all duration-200 shadow-md cursor-pointer border-0 flex items-center gap-2"
+                  >
+                    <span>Proceed to English Assessment Now</span>
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {activeTab === 'technical' && activeAssignment && !examState?.submitted && (() => {
           const asm = activeAssignment?.assessment || activeAssignment || {};
@@ -4120,15 +4389,14 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                                 key={idx}
                                 onClick={() => goToQuestion(idx)}
                                 title={`Question ${idx + 1}: MCQ (${isCurrent ? 'Active' : qFlagged ? 'Flagged' : isCompleted ? 'Answered' : 'Unanswered'})`}
-                                className={`w-8 h-8 rounded-lg font-extrabold text-xs flex items-center justify-center cursor-pointer border transition-all duration-200 shrink-0 relative ${
-                                  isCurrent
-                                    ? 'bg-dash-primary-purple text-white border-dash-primary-purple shadow-sm scale-105 ring-2 ring-dash-primary-purple/40 font-black'
-                                    : qFlagged
-                                      ? 'bg-amber-500/15 text-amber-700 border-amber-500/50 hover:bg-amber-500/25'
-                                      : isCompleted
-                                        ? 'bg-emerald-500/15 text-emerald-700 border-emerald-500/40 hover:bg-emerald-500/25'
-                                        : 'bg-slate-100 border-slate-200/80 text-slate-600 hover:bg-slate-200/70'
-                                }`}
+                                className={`w-8 h-8 rounded-lg font-extrabold text-xs flex items-center justify-center cursor-pointer border transition-all duration-200 shrink-0 relative ${isCurrent
+                                  ? 'bg-dash-primary-purple text-white border-dash-primary-purple shadow-sm scale-105 ring-2 ring-dash-primary-purple/40 font-black'
+                                  : qFlagged
+                                    ? 'bg-amber-500/15 text-amber-700 border-amber-500/50 hover:bg-amber-500/25'
+                                    : isCompleted
+                                      ? 'bg-emerald-500/15 text-emerald-700 border-emerald-500/40 hover:bg-emerald-500/25'
+                                      : 'bg-slate-100 border-slate-200/80 text-slate-600 hover:bg-slate-200/70'
+                                  }`}
                               >
                                 <span>{idx + 1}</span>
                                 {qFlagged ? (
@@ -4167,15 +4435,14 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                                 key={idx}
                                 onClick={() => goToQuestion(idx)}
                                 title={`Question ${idx + 1}: Coding (${isCurrent ? 'Active' : qFlagged ? 'Flagged' : isCompleted ? 'Answered' : 'Unanswered'})`}
-                                className={`w-8 h-8 rounded-lg font-extrabold text-xs flex items-center justify-center cursor-pointer border transition-all duration-200 shrink-0 relative ${
-                                  isCurrent
-                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm scale-105 ring-2 ring-indigo-500/40 font-black'
-                                    : qFlagged
-                                      ? 'bg-amber-500/15 text-amber-700 border-amber-500/50 hover:bg-amber-500/25'
-                                      : isCompleted
-                                        ? 'bg-emerald-500/15 text-emerald-700 border-emerald-500/40 hover:bg-emerald-500/25'
-                                        : 'bg-slate-100 border-slate-200/80 text-slate-600 hover:bg-slate-200/70'
-                                }`}
+                                className={`w-8 h-8 rounded-lg font-extrabold text-xs flex items-center justify-center cursor-pointer border transition-all duration-200 shrink-0 relative ${isCurrent
+                                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm scale-105 ring-2 ring-indigo-500/40 font-black'
+                                  : qFlagged
+                                    ? 'bg-amber-500/15 text-amber-700 border-amber-500/50 hover:bg-amber-500/25'
+                                    : isCompleted
+                                      ? 'bg-emerald-500/15 text-emerald-700 border-emerald-500/40 hover:bg-emerald-500/25'
+                                      : 'bg-slate-100 border-slate-200/80 text-slate-600 hover:bg-slate-200/70'
+                                  }`}
                               >
                                 <span>{idx + 1}</span>
                                 {qFlagged ? (
@@ -4266,7 +4533,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
                   {/* FIXED STICKY VERTICAL SIDEBAR QUESTION NAVIGATOR (Left Side 20-22%) */}
                   <div className="w-full lg:w-72 xl:w-80 shrink-0 sticky top-4 bg-dash-white-card border border-dash-border-gray/50 rounded-2xl p-4.5 shadow-sm flex flex-col gap-4">
-                    
+
                     {/* Sidebar Title & Total Count */}
                     <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                       <div className="flex items-center gap-2">
@@ -4309,7 +4576,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
                     {/* SECTIONED QUESTION LIST */}
                     <div className="flex flex-col gap-4 max-h-[420px] overflow-y-auto dashboard-scrollbar pr-1">
-                      
+
                       {/* MCQ QUESTIONS SECTION */}
                       {mcqNavItems.length > 0 && (
                         <div className="flex flex-col gap-2">
@@ -4333,18 +4600,17 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                                   key={idx}
                                   onClick={() => goToQuestion(idx)}
                                   title={`Question ${idx + 1}: MCQ (${isCurrent ? 'Active (Current)' : qFlagged ? 'Flagged' : isCompleted ? 'Answered' : 'Unanswered'})`}
-                                  className={`h-9 rounded-xl font-extrabold text-xs flex items-center justify-center cursor-pointer border transition-all duration-200 relative ${
-                                    isCurrent
-                                      ? 'bg-dash-primary-purple text-white border-dash-primary-purple shadow-sm scale-105 ring-2 ring-dash-primary-purple/40 font-black'
-                                      : qFlagged
-                                        ? 'bg-amber-500/15 text-amber-700 border-amber-500/50 hover:bg-amber-500/25'
-                                        : isCompleted
-                                          ? 'bg-emerald-500/15 text-emerald-700 border-emerald-500/40 hover:bg-emerald-500/25'
-                                          : 'bg-slate-100 border-slate-200/80 text-slate-600 hover:bg-slate-200/70'
-                                  }`}
+                                  className={`h-9 rounded-xl font-extrabold text-xs flex items-center justify-center cursor-pointer border transition-all duration-200 relative ${isCurrent
+                                    ? 'bg-dash-primary-purple text-white border-dash-primary-purple shadow-sm scale-105 ring-2 ring-dash-primary-purple/40 font-black'
+                                    : qFlagged
+                                      ? 'bg-amber-500/15 text-amber-700 border-amber-500/50 hover:bg-amber-500/25'
+                                      : isCompleted
+                                        ? 'bg-emerald-500/15 text-emerald-700 border-emerald-500/40 hover:bg-emerald-500/25'
+                                        : 'bg-slate-100 border-slate-200/80 text-slate-600 hover:bg-slate-200/70'
+                                    }`}
                                 >
                                   <span>{idx + 1}</span>
-                                  
+
                                   {/* Mini Badges */}
                                   {qFlagged ? (
                                     <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-amber-500 text-white rounded-full flex items-center justify-center text-[7px] font-black shadow-xs">
@@ -4385,18 +4651,17 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                                   key={idx}
                                   onClick={() => goToQuestion(idx)}
                                   title={`Question ${idx + 1}: Coding (${isCurrent ? 'Active (Current)' : qFlagged ? 'Flagged' : isCompleted ? 'Answered' : 'Unanswered'})`}
-                                  className={`h-9 rounded-xl font-extrabold text-xs flex items-center justify-center cursor-pointer border transition-all duration-200 relative ${
-                                    isCurrent
-                                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm scale-105 ring-2 ring-indigo-500/40 font-black'
-                                      : qFlagged
-                                        ? 'bg-amber-500/15 text-amber-700 border-amber-500/50 hover:bg-amber-500/25'
-                                        : isCompleted
-                                          ? 'bg-emerald-500/15 text-emerald-700 border-emerald-500/40 hover:bg-emerald-500/25'
-                                          : 'bg-slate-100 border-slate-200/80 text-slate-600 hover:bg-slate-200/70'
-                                  }`}
+                                  className={`h-9 rounded-xl font-extrabold text-xs flex items-center justify-center cursor-pointer border transition-all duration-200 relative ${isCurrent
+                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm scale-105 ring-2 ring-indigo-500/40 font-black'
+                                    : qFlagged
+                                      ? 'bg-amber-500/15 text-amber-700 border-amber-500/50 hover:bg-amber-500/25'
+                                      : isCompleted
+                                        ? 'bg-emerald-500/15 text-emerald-700 border-emerald-500/40 hover:bg-emerald-500/25'
+                                        : 'bg-slate-100 border-slate-200/80 text-slate-600 hover:bg-slate-200/70'
+                                    }`}
                                 >
                                   <span>{idx + 1}</span>
-                                  
+
                                   {/* Mini Badges */}
                                   {qFlagged ? (
                                     <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-amber-500 text-white rounded-full flex items-center justify-center text-[7px] font-black shadow-xs">
@@ -4421,11 +4686,10 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                       <span>Click any number to jump</span>
                       <button
                         onClick={toggleFlag}
-                        className={`px-2.5 py-1 rounded-lg border text-[10px] font-extrabold flex items-center gap-1 cursor-pointer transition-colors ${
-                          isFlagged
-                            ? 'bg-amber-50 border-amber-200 text-amber-600'
-                            : 'bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-700'
-                        }`}
+                        className={`px-2.5 py-1 rounded-lg border text-[10px] font-extrabold flex items-center gap-1 cursor-pointer transition-colors ${isFlagged
+                          ? 'bg-amber-50 border-amber-200 text-amber-600'
+                          : 'bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-700'
+                          }`}
                       >
                         <Flag size={10} className={isFlagged ? "fill-amber-500 text-amber-500" : ""} />
                         <span>{isFlagged ? 'Flagged' : 'Flag'}</span>
@@ -4436,10 +4700,10 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
                   {/* MAIN CONTENT AREA: Single Large Assessment Card (78% Width) */}
                   <div className="flex-1 w-full bg-dash-white-card border border-dash-border-gray/50 rounded-2xl p-6 shadow-sm flex flex-col justify-between gap-6 min-h-[540px]">
-                    
+
                     {/* CARD CONTENT BODY */}
                     <div className="flex flex-col gap-5 w-full">
-                      
+
                       {/* Question Header & Meta Bar */}
                       <div className="flex items-center justify-between border-b border-slate-100 pb-4 w-full">
                         <div className="flex items-center gap-2.5">
@@ -4455,11 +4719,10 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                         <button
                           type="button"
                           onClick={toggleFlag}
-                          className={`px-3.5 py-1.5 rounded-xl border text-xs font-extrabold flex items-center gap-1.5 cursor-pointer transition-all duration-200 ${
-                            isFlagged
-                              ? 'bg-amber-500/15 border-amber-500/40 text-amber-700 shadow-2xs'
-                              : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-800'
-                          }`}
+                          className={`px-3.5 py-1.5 rounded-xl border text-xs font-extrabold flex items-center gap-1.5 cursor-pointer transition-all duration-200 ${isFlagged
+                            ? 'bg-amber-500/15 border-amber-500/40 text-amber-700 shadow-2xs'
+                            : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-800'
+                            }`}
                         >
                           <Flag size={13} className={isFlagged ? "fill-amber-500 text-amber-500" : ""} />
                           <span>{isFlagged ? 'Flagged for Review' : 'Flag Question'}</span>
@@ -4524,18 +4787,16 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                                     ...prev,
                                     answers: { ...prev.answers, [currentIdx]: option }
                                   }))}
-                                  className={`w-full text-left p-4.5 rounded-2xl border font-semibold text-sm transition-all duration-200 cursor-pointer flex items-start gap-4 group shadow-2xs ${
-                                    isSelected
-                                      ? 'bg-dash-primary-purple/10 border-2 border-dash-primary-purple text-dash-dark-purple shadow-sm font-bold scale-[1.003]'
-                                      : 'bg-white border-dash-border-gray/60 text-slate-700 hover:border-dash-primary-purple/40 hover:bg-dash-soft-pink/30 hover:shadow-xs'
-                                  }`}
+                                  className={`w-full text-left p-4.5 rounded-2xl border font-semibold text-sm transition-all duration-200 cursor-pointer flex items-start gap-4 group shadow-2xs ${isSelected
+                                    ? 'bg-dash-primary-purple/10 border-2 border-dash-primary-purple text-dash-dark-purple shadow-sm font-bold scale-[1.003]'
+                                    : 'bg-white border-dash-border-gray/60 text-slate-700 hover:border-dash-primary-purple/40 hover:bg-dash-soft-pink/30 hover:shadow-xs'
+                                    }`}
                                 >
                                   {/* Option Letter Badge */}
-                                  <div className={`w-7 h-7 rounded-xl font-extrabold text-xs flex items-center justify-center shrink-0 transition-all ${
-                                    isSelected
-                                      ? 'bg-dash-primary-purple text-white shadow-xs'
-                                      : 'bg-slate-100 text-slate-600 border border-slate-200 group-hover:bg-dash-primary-purple/20 group-hover:text-dash-primary-purple'
-                                  }`}>
+                                  <div className={`w-7 h-7 rounded-xl font-extrabold text-xs flex items-center justify-center shrink-0 transition-all ${isSelected
+                                    ? 'bg-dash-primary-purple text-white shadow-xs'
+                                    : 'bg-slate-100 text-slate-600 border border-slate-200 group-hover:bg-dash-primary-purple/20 group-hover:text-dash-primary-purple'
+                                    }`}>
                                     {optionLetter}
                                   </div>
 
@@ -4543,11 +4804,10 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                                   <span className="flex-1 pt-0.5 leading-relaxed font-sans text-slate-800">{option}</span>
 
                                   {/* Selection Radio Circle */}
-                                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all ${
-                                    isSelected
-                                      ? 'border-dash-primary-purple bg-dash-primary-purple text-white shadow-2xs'
-                                      : 'border-slate-300 group-hover:border-dash-primary-purple'
-                                  }`}>
+                                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all ${isSelected
+                                    ? 'border-dash-primary-purple bg-dash-primary-purple text-white shadow-2xs'
+                                    : 'border-slate-300 group-hover:border-dash-primary-purple'
+                                    }`}>
                                     {isSelected && <Check size={12} strokeWidth={3} />}
                                   </div>
                                 </button>
@@ -4625,11 +4885,10 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                         type="button"
                         onClick={() => goToQuestion(currentIdx - 1)}
                         disabled={!hasPrev}
-                        className={`px-5 py-2.5 rounded-xl border font-extrabold text-xs flex items-center gap-2 transition-all cursor-pointer ${
-                          hasPrev
-                            ? 'bg-slate-100 text-slate-800 border-slate-300 hover:bg-slate-200 hover:scale-[1.01]'
-                            : 'opacity-40 cursor-not-allowed text-slate-400 border-slate-200 bg-slate-50'
-                        }`}
+                        className={`px-5 py-2.5 rounded-xl border font-extrabold text-xs flex items-center gap-2 transition-all cursor-pointer ${hasPrev
+                          ? 'bg-slate-100 text-slate-800 border-slate-300 hover:bg-slate-200 hover:scale-[1.01]'
+                          : 'opacity-40 cursor-not-allowed text-slate-400 border-slate-200 bg-slate-50'
+                          }`}
                       >
                         <ChevronLeft size={16} />
                         <span>Previous Question</span>
@@ -4675,7 +4934,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
             {englishInterview && (englishInterview.status === 'NOT_STARTED' || !englishInterview.status) && (
               <div className="w-full flex justify-center items-center py-6">
                 <div className="w-full max-w-2xl bg-dash-white-card border border-dash-border-gray/50 rounded-[28px] p-8 sm:p-10 shadow-[0_12px_40px_rgba(0,0,0,0.03)] text-center flex flex-col items-center gap-7">
-                  
+
                   {/* Interviewer Profile Card */}
                   <div className="relative w-full rounded-2.5xl p-6 bg-gradient-to-br from-slate-50 to-slate-100/60 border border-slate-200/60 flex flex-col sm:flex-row items-center gap-5 text-left transition-all hover:shadow-md">
                     <div className="relative w-16 h-16 rounded-2xl bg-dash-primary-purple flex items-center justify-center text-white text-3xl shadow-inner shrink-0">
@@ -4922,55 +5181,54 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                       <div className="flex flex-col items-center justify-start gap-5 lg:w-64 shrink-0">
                         <div className="relative w-40 h-40 flex items-center justify-center rounded-full bg-white/5 border border-white/10 shadow-[0_0_50px_rgba(139,92,246,0.15)] shrink-0">
 
-                        {/* Pulse wave rings based on state */}
-                        {isRecording && (
-                          <>
-                            <div className="absolute inset-0 rounded-full border border-emerald-500/30 animate-ripple-fast" style={{ animationDelay: '0s' }} />
-                            <div className="absolute inset-0 rounded-full border border-emerald-500/20 animate-ripple-fast" style={{ animationDelay: '0.4s' }} />
-                            <div className="absolute inset-0 rounded-full border border-emerald-500/10 animate-ripple-fast" style={{ animationDelay: '0.8s' }} />
-                          </>
-                        )}
+                          {/* Pulse wave rings based on state */}
+                          {isRecording && (
+                            <>
+                              <div className="absolute inset-0 rounded-full border border-emerald-500/30 animate-ripple-fast" style={{ animationDelay: '0s' }} />
+                              <div className="absolute inset-0 rounded-full border border-emerald-500/20 animate-ripple-fast" style={{ animationDelay: '0.4s' }} />
+                              <div className="absolute inset-0 rounded-full border border-emerald-500/10 animate-ripple-fast" style={{ animationDelay: '0.8s' }} />
+                            </>
+                          )}
 
-                        {aiIsSpeaking && (
-                          <>
-                            <div className="absolute inset-0 rounded-full border border-violet-500/30 animate-ripple-medium" style={{ animationDelay: '0s' }} />
-                            <div className="absolute inset-0 rounded-full border border-violet-500/20 animate-ripple-medium" style={{ animationDelay: '0.6s' }} />
-                            <div className="absolute inset-0 rounded-full border border-violet-500/10 animate-ripple-medium" style={{ animationDelay: '1.2s' }} />
-                          </>
-                        )}
+                          {aiIsSpeaking && (
+                            <>
+                              <div className="absolute inset-0 rounded-full border border-violet-500/30 animate-ripple-medium" style={{ animationDelay: '0s' }} />
+                              <div className="absolute inset-0 rounded-full border border-violet-500/20 animate-ripple-medium" style={{ animationDelay: '0.6s' }} />
+                              <div className="absolute inset-0 rounded-full border border-violet-500/10 animate-ripple-medium" style={{ animationDelay: '1.2s' }} />
+                            </>
+                          )}
 
-                        {(aiTyping || englishLoading || autoSubmitting) && (
-                          <>
-                            <div className="absolute inset-0 rounded-full border border-amber-400/30 animate-ripple-slow" style={{ animationDelay: '0s' }} />
-                            <div className="absolute inset-0 rounded-full border border-amber-400/15 animate-ripple-slow" style={{ animationDelay: '1.2s' }} />
-                          </>
-                        )}
+                          {(aiTyping || englishLoading || autoSubmitting) && (
+                            <>
+                              <div className="absolute inset-0 rounded-full border border-amber-400/30 animate-ripple-slow" style={{ animationDelay: '0s' }} />
+                              <div className="absolute inset-0 rounded-full border border-amber-400/15 animate-ripple-slow" style={{ animationDelay: '1.2s' }} />
+                            </>
+                          )}
 
-                        {/* Inner Avatar Box */}
-                        <div className={`w-28 h-28 rounded-full flex items-center justify-center text-white shadow-2xl relative z-10 transition-all duration-500 ${isRecording
-                          ? 'bg-emerald-600 shadow-emerald-500/30 border-2 border-emerald-400/40'
-                          : aiIsSpeaking
-                            ? 'bg-violet-600 shadow-violet-500/30 border-2 border-violet-400/40'
-                            : autoSubmitting || aiTyping || englishLoading
-                              ? 'bg-amber-600 shadow-amber-500/30 border-2 border-amber-400/40'
-                              : 'bg-[#231b42] border border-[#40356c]'
-                          }`}>
-                          <Volume2 size={40} className={isRecording ? "animate-pulse" : aiIsSpeaking ? "animate-bounce" : ""} />
+                          {/* Inner Avatar Box */}
+                          <div className={`w-28 h-28 rounded-full flex items-center justify-center text-white shadow-2xl relative z-10 transition-all duration-500 ${isRecording
+                            ? 'bg-emerald-600 shadow-emerald-500/30 border-2 border-emerald-400/40'
+                            : aiIsSpeaking
+                              ? 'bg-violet-600 shadow-violet-500/30 border-2 border-violet-400/40'
+                              : autoSubmitting || aiTyping || englishLoading
+                                ? 'bg-amber-600 shadow-amber-500/30 border-2 border-amber-400/40'
+                                : 'bg-[#231b42] border border-[#40356c]'
+                            }`}>
+                            <Volume2 size={40} className={isRecording ? "animate-pulse" : aiIsSpeaking ? "animate-bounce" : ""} />
+                          </div>
                         </div>
-                      </div>
 
                         {/* Microphone Toggle Button */}
                         <button
                           type="button"
                           onClick={toggleRecording}
                           disabled={isTextMode}
-                          className={`w-full px-4 py-2.5 rounded-full flex items-center justify-center gap-2 font-bold text-xs uppercase tracking-wider transition-all duration-300 shadow-md border ${
-                            isTextMode
-                              ? 'bg-slate-800 border-slate-700/50 text-slate-500 cursor-not-allowed opacity-50'
-                              : isRecording
-                                ? 'bg-emerald-600 hover:bg-emerald-700 border-emerald-500 text-white animate-pulse'
-                                : 'bg-white/10 hover:bg-white/20 border-white/20 text-white cursor-pointer'
-                          }`}
+                          className={`w-full px-4 py-2.5 rounded-full flex items-center justify-center gap-2 font-bold text-xs uppercase tracking-wider transition-all duration-300 shadow-md border ${isTextMode
+                            ? 'bg-slate-800 border-slate-700/50 text-slate-500 cursor-not-allowed opacity-50'
+                            : isRecording
+                              ? 'bg-emerald-600 hover:bg-emerald-700 border-emerald-500 text-white animate-pulse'
+                              : 'bg-white/10 hover:bg-white/20 border-white/20 text-white cursor-pointer'
+                            }`}
                         >
                           {isRecording ? <Mic size={13} /> : <MicOff size={13} className="opacity-75" />}
                           {isRecording ? 'Mic: ON' : 'Mic: OFF'}
@@ -4978,15 +5236,14 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
                         {/* Speech status pill */}
                         <div className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-[10px] font-semibold text-white flex items-center gap-2">
-                          <span className={`w-2 h-2 rounded-full shrink-0 ${
-                            isRecording
-                              ? 'bg-emerald-500 animate-ping'
-                              : aiIsSpeaking
-                                ? 'bg-violet-500 animate-pulse'
-                                : autoSubmitting || aiTyping || englishLoading
-                                  ? 'bg-amber-400 animate-ping'
-                                  : 'bg-slate-400'
-                          }`} />
+                          <span className={`w-2 h-2 rounded-full shrink-0 ${isRecording
+                            ? 'bg-emerald-500 animate-ping'
+                            : aiIsSpeaking
+                              ? 'bg-violet-500 animate-pulse'
+                              : autoSubmitting || aiTyping || englishLoading
+                                ? 'bg-amber-400 animate-ping'
+                                : 'bg-slate-400'
+                            }`} />
                           <span className="leading-tight">
                             {isRecording
                               ? 'You are speaking...'
@@ -5004,11 +5261,10 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                         <button
                           type="button"
                           onClick={toggleMute}
-                          className={`w-full px-4 py-2.5 rounded-full flex items-center justify-center gap-2 font-bold text-xs uppercase tracking-wider transition-all duration-300 shadow-md border ${
-                            isMuted
-                              ? 'bg-amber-600 border-amber-600 text-white hover:bg-amber-700'
-                              : 'bg-white/10 border-white/20 text-white hover:bg-white/20'
-                          }`}
+                          className={`w-full px-4 py-2.5 rounded-full flex items-center justify-center gap-2 font-bold text-xs uppercase tracking-wider transition-all duration-300 shadow-md border ${isMuted
+                            ? 'bg-amber-600 border-amber-600 text-white hover:bg-amber-700'
+                            : 'bg-white/10 border-white/20 text-white hover:bg-white/20'
+                            }`}
                           title={isMuted ? `Unmute ${interviewerName}'s Voice` : `Mute ${interviewerName}'s Voice`}
                         >
                           {isMuted ? <VolumeX size={13} /> : <Volume2 size={13} />}
@@ -5027,18 +5283,16 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                           {getChatMessages().map((msg, idx) => (
                             <div key={idx} className="flex flex-col gap-1 w-full">
                               <div className={`flex gap-2 items-start max-w-[88%] ${msg.type === 'ai' ? 'self-start' : 'self-end flex-row-reverse'}`}>
-                                <div className={`w-6 h-6 rounded-lg flex items-center justify-center font-black text-[8px] shrink-0 border ${
-                                  msg.type === 'ai'
-                                    ? 'bg-violet-500/20 border-violet-500/30 text-violet-300'
-                                    : 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
-                                }`}>
+                                <div className={`w-6 h-6 rounded-lg flex items-center justify-center font-black text-[8px] shrink-0 border ${msg.type === 'ai'
+                                  ? 'bg-violet-500/20 border-violet-500/30 text-violet-300'
+                                  : 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
+                                  }`}>
                                   {msg.type === 'ai' ? 'AI' : 'YOU'}
                                 </div>
-                                <div className={`rounded-2xl px-3 py-2 text-xs font-medium leading-relaxed border ${
-                                  msg.type === 'ai'
-                                    ? 'bg-[#29204a]/80 text-violet-100 border-violet-500/15'
-                                    : 'bg-[#0f2a1e]/80 text-emerald-100 border-emerald-500/15'
-                                }`}>
+                                <div className={`rounded-2xl px-3 py-2 text-xs font-medium leading-relaxed border ${msg.type === 'ai'
+                                  ? 'bg-[#29204a]/80 text-violet-100 border-violet-500/15'
+                                  : 'bg-[#0f2a1e]/80 text-emerald-100 border-emerald-500/15'
+                                  }`}>
                                   {msg.text}
                                 </div>
                               </div>
@@ -5093,9 +5347,8 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                                     : "Waiting for your turn..."
                             }
                             rows={3}
-                            className={`w-full bg-black/40 text-white font-sans text-xs font-medium p-3 rounded-xl border border-white/10 focus:outline-none resize-none shadow-inner leading-relaxed placeholder:text-slate-500 placeholder:italic ${
-                              isTextMode ? 'cursor-text select-text focus:border-white/30' : 'select-none cursor-default'
-                            }`}
+                            className={`w-full bg-black/40 text-white font-sans text-xs font-medium p-3 rounded-xl border border-white/10 focus:outline-none resize-none shadow-inner leading-relaxed placeholder:text-slate-500 placeholder:italic ${isTextMode ? 'cursor-text select-text focus:border-white/30' : 'select-none cursor-default'
+                              }`}
                           />
 
                           <div className="flex items-center justify-between mt-2.5 gap-3">
@@ -5103,7 +5356,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                               {isTextMode
                                 ? '📝 Text Mode — type and click Submit'
                                 : isRecording && englishText
-                                  ? '✨ Transcribing live — 5s silence will auto-submit'
+                                  ? '✨ Transcribing live — 3s silence will auto-submit'
                                   : isRecording
                                     ? '🎙️ Mic active — speak clearly'
                                     : autoSubmitting
@@ -5264,7 +5517,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                 <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
                   <CheckCircle2 size={30} />
                 </div>
-                
+
                 <div>
                   <h3 className="font-plus-jakarta font-extrabold text-xl text-slate-900">
                     Submit Assessment?
@@ -5279,7 +5532,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                   <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 text-left">
                     Progress Summary
                   </span>
-                  
+
                   <div className="grid grid-cols-2 gap-3">
                     {/* Completed Questions */}
                     <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 flex flex-col items-center justify-center">
@@ -5290,11 +5543,10 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                     </div>
 
                     {/* Unanswered Questions */}
-                    <div className={`border rounded-xl p-3 flex flex-col items-center justify-center ${
-                      unansweredModalQuestions > 0
-                        ? 'bg-amber-500/10 border-amber-500/20 text-amber-700'
-                        : 'bg-slate-100 border-slate-200 text-slate-600'
-                    }`}>
+                    <div className={`border rounded-xl p-3 flex flex-col items-center justify-center ${unansweredModalQuestions > 0
+                      ? 'bg-amber-500/10 border-amber-500/20 text-amber-700'
+                      : 'bg-slate-100 border-slate-200 text-slate-600'
+                      }`}>
                       <span className="text-[10px] font-extrabold uppercase tracking-wider">Unanswered</span>
                       <span className="font-plus-jakarta font-black text-lg mt-0.5">
                         {unansweredModalQuestions}/{totalModalQuestions}
