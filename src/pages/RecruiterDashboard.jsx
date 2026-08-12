@@ -445,76 +445,6 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
     setNewTopicVal('');
   };
 
-  const _handleDeleteTopic = (subject, topic) => {
-    setSubjectsData(prev => ({
-      ...prev,
-      [subject]: prev[subject].filter(t => t !== topic)
-    }));
-
-    setSelectedTopics(prev => ({
-      ...prev,
-      [subject]: prev[subject].filter(t => t !== topic)
-    }));
-
-    setTopicConfigs(prevConfigs => {
-      const next = { ...prevConfigs };
-      delete next[topic];
-      return next;
-    });
-
-    showToast(`Deleted topic "${topic}" from ${subject}.`);
-  };
-
-  const _renderAddTopicControl = (subject) => {
-    const isAdding = addingTopicTo === subject;
-    const accentColorClass = subject === 'Aptitude' ? 'border-[#d97706] text-[#b45309]' : 'border-dash-primary-purple text-dash-primary-purple';
-    const bgClass = subject === 'Aptitude' ? 'bg-[#fef3c7]/30 hover:bg-[#fef3c7] hover:border-[#d97706]' : 'bg-dash-primary-purple/5 hover:bg-dash-primary-purple/10 hover:border-dash-primary-purple';
-    const checkBtnBg = subject === 'Aptitude' ? 'bg-[#d97706] hover:bg-[#b45309]' : 'bg-dash-primary-purple hover:bg-dash-dark-purple';
-
-    if (isAdding) {
-      return (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleAddTopic(subject);
-          }}
-          className="flex items-center gap-1.5"
-        >
-          <input
-            type="text"
-            placeholder={`New ${subject} topic...`}
-            value={newTopicVal}
-            onChange={(e) => setNewTopicVal(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') {
-                setAddingTopicTo(null);
-                setNewTopicVal('');
-              }
-            }}
-            className={`px-3.5 py-2 rounded-xl text-xs font-semibold border bg-dash-white-card text-dash-dark-purple focus:outline-none w-36 shadow-sm ${subject === 'Aptitude' ? 'border-[#d97706] focus:border-[#d97706]' : 'border-dash-primary-purple focus:border-dash-primary-purple'}`}
-            autoFocus
-          />
-          <button type="submit" className={`p-2 rounded-xl text-dash-white-card transition-all duration-200 cursor-pointer flex items-center justify-center ${checkBtnBg}`}>
-            <Check size={12} strokeWidth={3} />
-          </button>
-          <button type="button" onClick={() => { setAddingTopicTo(null); setNewTopicVal(''); }} className="p-2 rounded-xl bg-dash-border-gray/30 text-dash-dark-purple hover:bg-dash-border-gray/50 transition-all duration-200 cursor-pointer flex items-center justify-center">
-            <X size={12} strokeWidth={3} />
-          </button>
-        </form>
-      );
-    }
-
-    return (
-      <button
-        onClick={() => { setAddingTopicTo(subject); setNewTopicVal(''); }}
-        className={`px-3.5 py-2 rounded-xl text-xs font-semibold border border-dashed transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${accentColorClass} ${bgClass}`}
-      >
-        <Plus size={12} strokeWidth={3} />
-        <span>Add Topic</span>
-      </button>
-    );
-  };
-
   // Redesigned Assessment Creation state
   const [selectedSubjects, setSelectedSubjects] = useState(['Python', 'SQL']);
   const [assessmentTitle, setAssessmentTitle] = useState('Python & SQL Technical Assessment');
@@ -549,48 +479,6 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
   // Successful assessment toast/alert notification
   const [toastMessage, setToastMessage] = useState('');
 
-  // AI Generated preview questions state
-  const [_previewQuestions, _setPreviewQuestions] = useState([
-    {
-      id: 1,
-      subject: 'Python',
-      difficulty: 'Medium',
-      question: 'Which keyword is used to define a generator function in Python?',
-      options: [
-        { label: 'A', text: 'return', isCorrect: false },
-        { label: 'B', text: 'yield', isCorrect: true },
-        { label: 'C', text: 'async', isCorrect: false },
-        { label: 'D', text: 'lambda', isCorrect: false }
-      ]
-    },
-    {
-      id: 2,
-      subject: 'Python',
-      difficulty: 'Easy',
-      question: 'What is the output of: list(map(lambda x: x**2, [1, 2, 3, 4]))?',
-      options: [
-        { label: 'A', text: '[1, 4, 9, 16]', isCorrect: true },
-        { label: 'B', text: '[2, 4, 6, 8]', isCorrect: false },
-        { label: 'C', text: '[1, 2, 3, 4]', isCorrect: false },
-        { label: 'D', text: 'Error', isCorrect: false }
-      ]
-    },
-    {
-      id: 3,
-      subject: 'Python',
-      difficulty: 'Medium',
-      question: 'Which decorator defines a class method that takes the class as the first argument?',
-      options: [
-        { label: 'A', text: '@staticmethod', isCorrect: false },
-        { label: 'B', text: '@property', isCorrect: false },
-        { label: 'C', text: '@classmethod', isCorrect: true },
-        { label: 'D', text: '@instancemethod', isCorrect: false }
-      ]
-    }
-  ]);
-
-  const [_editingQuestionId, _setEditingQuestionId] = useState(null);
-  const [_editingText, _setEditingText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState({
     active: false,
@@ -683,22 +571,6 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
   );
 
   // Action: Create Assessment (legacy submit)
-  const _handleCreateAssessmentSubmit = (e) => {
-    e.preventDefault();
-    if (!newAssessment.title.trim()) return;
-
-    setIsCreateModalOpen(false);
-    showToast(`Assessment "${newAssessment.title}" successfully created!`);
-
-    // Reset form
-    setNewAssessment({
-      title: '',
-      role: 'Frontend Engineer',
-      duration: '45',
-      difficulty: 'Medium'
-    });
-  };
-
   const handleGenerateAssessment = async () => {
     if (!isValidForGeneration) {
       showToast("Please fix validation errors before generating assessment.");
@@ -3663,6 +3535,42 @@ const QuestionPreviewHub = ({
                       required
                     />
                   </div>
+                </div>
+              ) : editForm.type === 'PYTHON_CODING' ? (
+                /* PYTHON CODING EDIT FIELDS */
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Input Format</label>
+                    <input
+                      type="text"
+                      value={editForm.inputFormat}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, inputFormat: e.target.value }))}
+                      className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
+                      placeholder="e.g. A single string of characters"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Sample Input</label>
+                      <textarea
+                        rows="2"
+                        value={editForm.sampleInput}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, sampleInput: e.target.value }))}
+                        className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10 resize-y"
+                        placeholder="madam"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Sample Output</label>
+                      <textarea
+                        rows="2"
+                        value={editForm.sampleOutput}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, sampleOutput: e.target.value }))}
+                        className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10 resize-y"
+                        placeholder="True"
+                      />
+                    </div>
+                  </div>
                   <div>
                     <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Topic</label>
                     <input
@@ -5161,6 +5069,54 @@ const AssessmentDetailsDrawer = ({ assessment, onClose, showToast }) => {
                       </div>
                     )}
 
+                    {/* Output Format */}
+                    {(() => {
+                      const subj = (q.subject || '').toUpperCase();
+                      const type = (q.type || '').toUpperCase();
+                      if (subj === 'PYTHON' || subj === 'PY' || type === 'CODING' || type === 'PYTHON_CODING' || type === 'SCENARIO_CODING') {
+                        return null;
+                      }
+                      let fmt = q.outputFormat || q.output_format || q.output_fmt;
+                      if (fmt && typeof fmt === 'string') {
+                        if (fmt.includes("Output Format:")) {
+                          fmt = fmt.split("Output Format:").pop().trim();
+                        }
+                        fmt = fmt.split('\n')[0].replace(/^[-*•\s]+/, '').replace(/^(Return a|Return an|Return)\s+/i, '').replace(/[\.:]$/, '').trim();
+                        const lower = fmt.toLowerCase();
+                        if (lower.includes('int')) fmt = 'Integer';
+                        else if (lower.includes('dec')) fmt = 'Decimal';
+                        else if (lower.includes('percent')) fmt = 'Percentage';
+                        else if (lower.includes('fraction')) fmt = 'Fraction';
+                        else if (lower.includes('ratio')) fmt = 'Ratio';
+                        else if (lower.includes('time') || lower.includes('durat')) fmt = 'Time';
+                        else if (lower.includes('curr')) fmt = 'Currency';
+                        else if (lower.includes('bool')) fmt = 'Boolean';
+                        else if (lower.includes('str') || lower.includes('text')) fmt = 'String';
+                        else fmt = fmt.charAt(0).toUpperCase() + fmt.slice(1);
+                      }
+                      if (!fmt && q.expectedAnswer) {
+                        const exp = String(q.expectedAnswer).trim();
+                        const expClean = exp.replace(/,/g, '');
+                        if (['true', 'false', 'yes', 'no'].includes(exp.toLowerCase())) fmt = 'Boolean';
+                        else if (/\b\d+\s*\/\s*\d+\b/.test(expClean)) fmt = 'Fraction';
+                        else if (expClean.includes(':') || /\b\d+\s*:\s*\d+\b/.test(expClean)) fmt = 'Ratio';
+                        else if (exp.includes('%')) fmt = 'Percentage';
+                        else if (/[\$,₹,€,£]/.test(exp)) fmt = 'Currency';
+                        else if (/\b(day|days|hour|hours|min|minute|minutes|sec|second|seconds|year|years)\b/i.test(exp)) fmt = 'Time';
+                        else if (/\d+\.\d+/.test(expClean)) fmt = 'Decimal';
+                        else if (/\d+/.test(expClean)) fmt = 'Integer';
+                        else fmt = 'String';
+                      }
+                      return fmt ? (
+                        <div className="space-y-1">
+                          <span className="text-[9px] font-bold text-dash-light-purple uppercase tracking-wider block">Output Format</span>
+                          <div className="inline-block bg-indigo-50/70 border border-purple-200/80 rounded-lg px-2.5 py-1 text-[10px] font-extrabold text-indigo-800 shadow-2xs">
+                            {fmt}
+                          </div>
+                        </div>
+                      ) : null;
+                    })()}
+
                     {/* Scenario Constraints */}
                     {isCoding && q.constraints && q.constraints.length > 0 && (
                       <div className="space-y-1">
@@ -5335,9 +5291,7 @@ const ResultsManager = ({ showToast, candidateGroups = [], candidates = [] }) =>
     }
     try {
       setLoadingDetailId(targetId);
-      console.info(`[Recruiter Dashboard] Requesting details for assessment ID: ${targetId}`);
       const response = await api.get(`/api/results/${targetId}`);
-      console.info(`[Recruiter Dashboard] Successfully loaded assessment report for ${response.data?.candidateName || 'candidate'}:`, response.data);
       setSelectedResult(response.data || {});
       const initialExpanded = {};
       if (response.data?.questionsAnalysis) {
