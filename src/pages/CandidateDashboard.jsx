@@ -8,7 +8,6 @@ import ActionButton from '../components/ActionButton';
 import { useExamSecurity } from '../hooks/useExamSecurity';
 import { ExamSecurityMonitor } from '../components/ExamSecurityMonitor';
 import {
-  Briefcase,
   LogOut,
   Menu,
   X,
