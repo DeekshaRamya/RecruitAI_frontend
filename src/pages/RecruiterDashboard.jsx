@@ -38,7 +38,6 @@ import {
   Play,
   BookOpen,
   RefreshCw,
-  RotateCcw,
   Eye,
   Code,
   Database,
@@ -46,8 +45,7 @@ import {
   PieChart,
   Volume2,
   BarChart2,
-  Loader2,
-  CheckCircle2
+  Loader2
 } from 'lucide-react';
 import api from '../api';
 

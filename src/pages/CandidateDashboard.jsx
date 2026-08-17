@@ -12,8 +12,6 @@ import {
   Menu,
   X,
   FileText,
-  Award,
-  TrendingUp,
   Volume2,
   Terminal,
   Sparkles,
@@ -26,7 +24,6 @@ import {
   Bell,
   Check,
   Loader2,
-  Eye,
   Maximize2,
   Minimize2,
   RotateCcw,
@@ -42,9 +39,7 @@ import {
   Lock,
   ListOrdered,
   Flag,
-  HelpCircle,
-  Edit3,
-  Copy
+  Edit3
 } from 'lucide-react';
 
 const MAX_QUESTIONS = 8;
@@ -1721,6 +1716,13 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
   // Conclude/Complete English Interview
   const handleCompleteEnglish = async () => {
+    // Exit Full Screen mode immediately on assessment completion
+    if (englishExamSecurity?.exitFullscreen) {
+      await englishExamSecurity.exitFullscreen();
+    } else if (document.fullscreenElement) {
+      try { await document.exitFullscreen(); } catch (_e) {}
+    }
+
     if (silenceTimerRef.current) {
       clearTimeout(silenceTimerRef.current);
       silenceTimerRef.current = null;
@@ -2357,7 +2359,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
   const [activeAssignment, setActiveAssignment] = useState(null);
 
   const handleOpenInstructions = (assignment) => {
-    if (startingTechRef.current || isStartingTechnical) return;
+    if (startingTechRef.current || isStartingTechnical || isSubmittingManual) return;
     const asm = assignment?.assessment || assignment || {};
     const startTimeVal = assignment?.startTime || assignment?.start_time || asm?.startTime || asm?.start_time;
     if (startTimeVal && new Date(startTimeVal).getTime() > Date.now()) {
@@ -2921,7 +2923,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
 
   const handleStartExam = async (assignment) => {
-    if (startingTechRef.current || isStartingTechnical) return;
+    if (startingTechRef.current || isStartingTechnical || isSubmittingManual) return;
     startingTechRef.current = true;
     setIsStartingTechnical(true);
     try {
@@ -3015,6 +3017,13 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
   };
 
   const handleSubmitExam = async (assignmentIdOverride, securityMetadata = {}) => {
+    // Exit Full Screen mode immediately on assessment submission
+    if (examSecurity?.exitFullscreen) {
+      await examSecurity.exitFullscreen();
+    } else if (document.fullscreenElement) {
+      try { await document.exitFullscreen(); } catch (_e) {}
+    }
+
     // If string passed (or object from proctoring), use string or fallback to activeAssignment ID
     const targetId = (typeof assignmentIdOverride === 'string' ? assignmentIdOverride : null) || activeAssignment?.id || activeAssignment?.assignmentId || activeAssignment?._id;
     if (!targetId) {
@@ -4107,17 +4116,33 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                             </div>
                           );
                         }
+                        const isSubmittingThisAssignment = isSubmittingManual && (
+                          (activeAssignment?.id && String(activeAssignment.id) === String(assignment.id)) ||
+                          (activeAssignment?.assignmentId && String(activeAssignment.assignmentId) === String(assignment.id)) ||
+                          (activeAssignment?._id && String(activeAssignment._id) === String(assignment.id))
+                        );
+
                         return (
                           <ActionButton
                             onClick={() => handleOpenInstructions(assignment)}
-                            isLoading={isStartingTechnical}
-                            loadingText={isInProgress ? "Resuming Assessment..." : "Starting Technical Assessment..."}
-                            disabled={isStartingTechnical || startingTechRef.current}
+                            isLoading={isStartingTechnical || isSubmittingThisAssignment}
+                            loadingText={
+                              isSubmittingThisAssignment
+                                ? "Submitting Assessment..."
+                                : isInProgress
+                                ? "Resuming Assessment..."
+                                : "Starting Technical Assessment..."
+                            }
+                            disabled={isStartingTechnical || startingTechRef.current || isSubmittingManual || isSubmittingThisAssignment}
                             icon={Play}
                             iconSize={14}
                             className="w-full py-3 rounded-xl bg-dash-primary-purple text-dash-white-card font-bold text-sm hover:bg-dash-dark-purple shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            {isInProgress ? 'Resume Technical Assessment' : 'Start Technical Assessment'}
+                            {isSubmittingThisAssignment
+                              ? "Submitting Assessment..."
+                              : isInProgress
+                              ? 'Resume Technical Assessment'
+                              : 'Start Technical Assessment'}
                           </ActionButton>
                         );
                       })()}

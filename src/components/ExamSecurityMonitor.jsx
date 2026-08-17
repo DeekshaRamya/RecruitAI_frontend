@@ -48,6 +48,10 @@ export const ExamSecurityMonitor = ({
     if (e) e.preventDefault();
     if (submissionReason.trim().length < 10) return;
 
+    if (securityState?.exitFullscreen) {
+      await securityState.exitFullscreen();
+    }
+
     setSubmitting(true);
     if (onAutoSubmit) {
       await onAutoSubmit({

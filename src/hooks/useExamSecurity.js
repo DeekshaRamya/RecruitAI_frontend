@@ -47,6 +47,7 @@ export const useExamSecurity = ({
   const lastTabSwitchTimeRef = useRef(0);
   const lastWindowBlurTimeRef = useRef(0);
   const lastEscTimeRef = useRef(0);
+  const isIntentionalExitRef = useRef(false);
 
   const onLockRef = useRef(onLock);
   const onViolationRef = useRef(onViolation);
@@ -81,10 +82,12 @@ export const useExamSecurity = ({
     lastTabSwitchTimeRef.current = 0;
     lastWindowBlurTimeRef.current = 0;
     lastEscTimeRef.current = 0;
+    isIntentionalExitRef.current = false;
   }, []);
 
   const requestFullscreen = useCallback(async () => {
     try {
+      isIntentionalExitRef.current = false;
       const element = document.documentElement;
       if (element.requestFullscreen) {
         await element.requestFullscreen();
@@ -97,6 +100,34 @@ export const useExamSecurity = ({
       }
     } catch {
       // Ignore fullscreen failure
+    }
+  }, []);
+
+  const exitFullscreen = useCallback(async () => {
+    try {
+      isIntentionalExitRef.current = true;
+      const isCurrentlyFull = !!(
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement
+      );
+      if (isCurrentlyFull) {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+          await document.webkitExitFullscreen();
+        } else if (document.mozCancelFullScreen) {
+          await document.mozCancelFullScreen();
+        } else if (document.msExitFullscreen) {
+          await document.msExitFullscreen();
+        }
+      }
+    } catch {
+      // Ignore exit fullscreen error if already exited or unsupported
+    } finally {
+      setIsFullscreen(false);
+      setIsFullscreenGraceActive(false);
     }
   }, []);
 
@@ -436,8 +467,8 @@ export const useExamSecurity = ({
       // Track transition from fullscreen to non-fullscreen
       if (wasFullscreenRef.current && !isCurrentlyFull) {
         const now = Date.now();
-        // Prevent duplicate events within 1500ms
-        if (now - lastExitTimeRef.current > 1500) {
+        // Prevent duplicate events within 1500ms and skip if exiting upon assessment completion
+        if (!isIntentionalExitRef.current && now - lastExitTimeRef.current > 1500) {
           lastExitTimeRef.current = now;
           triggerViolation(
             `Fullscreen Exit`,
@@ -453,6 +484,7 @@ export const useExamSecurity = ({
           }
         }
       } else if (isCurrentlyFull) {
+        isIntentionalExitRef.current = false;
         setIsFullscreenGraceActive(false);
       }
 
@@ -646,6 +678,7 @@ export const useExamSecurity = ({
     autoSubmittedDueToViolations,
     resetExamSecurity,
     requestFullscreen,
+    exitFullscreen,
     triggerViolation,
   };
 };
