@@ -15,7 +15,7 @@ const InputField = ({
 }) => {
   const [showPassword, setShowPassword] = useState(false);
   const isPassword = type === 'password';
-  const isRecruiter = role === 'recruiter';
+  const isRecruiter = role === 'recruiter' || role === 'admin';
 
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);

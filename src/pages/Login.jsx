@@ -7,10 +7,12 @@ import CandidateAnimation from '../components/CandidateAnimation';
 import logo from '../assets/systech.jpg';
 
 const Login = () => {
-  const [role, setRole] = useState('recruiter'); // 'recruiter' or 'candidate'
+  const [role, setRole] = useState('recruiter'); // 'admin', 'recruiter', or 'candidate'
   const navigate = useNavigate();
 
-  const isRecruiter = role === 'recruiter';
+  const isCandidate = role === 'candidate';
+  const isStaff = role === 'recruiter' || role === 'admin';
+  const isRecruiter = isStaff;
 
   // Check for existing valid sessions on load
   useEffect(() => {
@@ -21,7 +23,7 @@ const Login = () => {
         const user = JSON.parse(userStr);
         if (user.role === 'candidate') {
           navigate('/candidate/dashboard', { replace: true });
-        } else if (user.role === 'recruiter') {
+        } else if (user.role === 'admin' || user.role === 'recruiter') {
           navigate('/recruiter/dashboard', { replace: true });
         }
       } catch {
@@ -33,7 +35,7 @@ const Login = () => {
   const handleLoginSuccess = (userRole) => {
     if (userRole === 'candidate') {
       navigate('/candidate/dashboard', { replace: true });
-    } else if (userRole === 'recruiter') {
+    } else if (userRole === 'admin' || userRole === 'recruiter') {
       navigate('/recruiter/dashboard', { replace: true });
     }
   };
@@ -41,15 +43,17 @@ const Login = () => {
 
   return (
     <div
-      className={`flex h-screen max-h-screen w-screen relative overflow-hidden transition-all duration-500 ease-in-out select-none ${isRecruiter
+      className={`flex h-screen max-h-screen w-screen relative overflow-hidden transition-all duration-500 ease-in-out select-none ${
+        isStaff
           ? 'recruiter-bg-mesh text-recruiter-text-main'
           : 'candidate-bg-mesh text-candidate-text-main'
-        }`}
+      }`}
     >
       {/* Network / Grid Background Decorator */}
       <div
-        className={`absolute top-0 left-0 w-full h-full pointer-events-none z-10 transition-all duration-500 ${isRecruiter ? 'recruiter-grid-overlay' : 'candidate-grid-overlay'
-          }`}
+        className={`absolute top-0 left-0 w-full h-full pointer-events-none z-10 transition-all duration-500 ${
+          isStaff ? 'recruiter-grid-overlay' : 'candidate-grid-overlay'
+        }`}
       />
 
       {/* LEFT SECTION: Brand and Role Animations (Hidden on mobile/tablet) */}

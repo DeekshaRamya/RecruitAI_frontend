@@ -26,7 +26,10 @@ const LoginCard = ({ role, setRole, onLogin }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const isAdmin = role === 'admin';
   const isRecruiter = role === 'recruiter';
+  const isCandidate = role === 'candidate';
+  const isStaff = isAdmin || isRecruiter;
 
   // Reset states when switching roles
   useEffect(() => {
@@ -113,37 +116,31 @@ const LoginCard = ({ role, setRole, onLogin }) => {
     }
   };
 
-  const handleMicrosoftLogin = () => {
-    // Statically log in as a recruiter (completely on frontend, no auth API call)
-    const mockRecruiter = {
-      id: "f3b3970b-689e-4e4b-91ef-a5d6f1bfd8c1",
-      full_name: "Admin Recruiter",
-      name: "Admin Recruiter",
-      email: "recruiter@recruitai.com",
-      role: "recruiter"
-    };
-
-    localStorage.setItem('recruitai_access_token', 'mock_recruiter_access_token');
-    localStorage.setItem('recruitai_refresh_token', 'mock_recruiter_refresh_token');
-    localStorage.setItem('recruitai_user', JSON.stringify(mockRecruiter));
-
-    if (onLogin) {
-      onLogin('recruiter');
+  // Check if redirected back with an OAuth error
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const oauthError = params.get('error');
+    if (oauthError) {
+      setError(decodeURIComponent(oauthError));
     }
-  };
+  }, []);
 
+  const handleMicrosoftLogin = () => {
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+    window.location.href = `${apiBaseUrl}/api/auth/microsoft/login`;
+  };
 
   // Dynamic Header contents
   const getHeaderContent = () => {
-    if (isRecruiter) {
+    if (isStaff) {
       return {
         title: 'Recruiter Portal',
-        subtitle: 'Secure access to RecruitAI recruiter management and assessment dashboard.'
+        subtitle: 'Secure access to RecruitAI recruiter & administrator assessment dashboard.'
       };
     }
     return {
       title: 'Welcome Back',
-      subtitle: 'Enter your credentials to access your candidate dashboard.'
+      subtitle: 'Enter your credentials to access your candidate assessments.'
     };
   };
 
@@ -151,10 +148,11 @@ const LoginCard = ({ role, setRole, onLogin }) => {
 
   return (
     <motion.div
-      className={`w-full max-w-[460px] relative z-[50] transition-all duration-500 ${isRecruiter
+      className={`w-full max-w-[460px] relative z-[50] transition-all duration-500 ${
+        isStaff
           ? 'bg-recruiter-card-bg border border-recruiter-card-border rounded-2xl p-8 md:p-10 shadow-[0_10px_40px_rgba(15,23,42,0.04)]'
           : 'bg-candidate-card-bg border border-candidate-card-border rounded-2xl p-8 md:p-9 shadow-[0_10px_40px_rgba(124,58,237,0.04)]'
-        }`}
+      }`}
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: 'easeOut' }}
@@ -189,16 +187,18 @@ const LoginCard = ({ role, setRole, onLogin }) => {
             transition={{ duration: 0.25 }}
           >
             <h2
-              className={`font-plus-jakarta font-bold tracking-tight transition-colors duration-500 text-left ${isRecruiter
+              className={`font-plus-jakarta font-bold tracking-tight transition-colors duration-500 text-left ${
+                isStaff
                   ? 'text-[2.1rem] text-recruiter-text-main mb-3'
                   : 'text-2xl text-candidate-text-main mb-2'
-                }`}
+              }`}
             >
               {headerContent.title}
             </h2>
             <p
-              className={`text-[0.925rem] leading-relaxed transition-colors duration-500 text-left ${isRecruiter ? 'text-recruiter-text-sub' : 'text-candidate-text-muted'
-                }`}
+              className={`text-[0.925rem] leading-relaxed transition-colors duration-500 text-left ${
+                isStaff ? 'text-recruiter-text-sub' : 'text-candidate-text-muted'
+              }`}
             >
               {headerContent.subtitle}
             </p>
@@ -208,7 +208,7 @@ const LoginCard = ({ role, setRole, onLogin }) => {
 
       {/* Dynamic Auth Forms based on Role selection */}
       <AnimatePresence mode="wait">
-        {isRecruiter ? (
+        {isStaff ? (
           <motion.div
             key="recruiter-auth"
             initial={{ opacity: 0, y: 15 }}
@@ -230,7 +230,7 @@ const LoginCard = ({ role, setRole, onLogin }) => {
             </motion.button>
 
             <div className="text-left text-[0.8rem] text-recruiter-text-sub leading-[1.4] mt-2">
-              Sign in securely using your organization’s Microsoft account.
+              Sign in securely using your organization’s Microsoft Entra ID account. Role and permissions are synced from your internal user account.
             </div>
           </motion.div>
         ) : (
