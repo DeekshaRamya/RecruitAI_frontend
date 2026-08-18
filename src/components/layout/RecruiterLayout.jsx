@@ -17,7 +17,8 @@ import {
   LogOut,
   SlidersHorizontal,
   FolderOpen,
-  UserCheck
+  UserCheck,
+  UserPlus
 } from 'lucide-react';
 import logo from '../../assets/systech.jpg';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
@@ -52,10 +53,9 @@ import {
 export const RECRUITER_TABS = {
   'dashboard': { label: 'Dashboard Overview', category: 'General', description: 'Real-time candidate pipeline metrics and recent activity' },
   'candidates': { label: 'Candidates Directory', category: 'Candidates', description: 'Add, edit, manage, and assign technical assessments to candidates' },
-  'create-assessment': { label: 'Create Assessment', category: 'Management', description: 'Configure custom technical and domain-specific assessments' },
-  'preview-questions': { label: 'Question Bank', category: 'Management', description: 'Review, edit, and organize generated assessment questions' },
-  'assessments': { label: 'Active Assessments', category: 'Management', description: 'Manage published tests, candidate assignments, and schedules' },
-  'expired-assessments': { label: 'Archived Assessments', category: 'Management', description: 'Historical records of closed and past assessment assignments' },
+  'create-assessment': { label: 'Create Assessment', category: 'Assessments', description: 'Configure custom technical and domain-specific assessments' },
+  'assessments': { label: 'Manage Assessments', category: 'Assessments', description: 'View, edit, manage, and assign created assessments' },
+  'assign-assessment': { label: 'Assign Assessment', category: 'Assessments', description: 'Schedule and dispatch technical assessments to candidates and cohorts' },
   'groups': { label: 'Candidate Groups', category: 'Candidates', description: 'Organize candidate cohorts, departments, and bulk invitations' },
   'results': { label: 'Technical Evaluations', category: 'Analytics', description: 'Detailed coding performance, SQL execution, and test cases' },
   'english-results': { label: 'Communication Reports', category: 'Analytics', description: 'Language fluency, pronunciation, and spoken English evaluation' },
@@ -126,9 +126,8 @@ const RecruiterLayout = ({
       title: 'Assessments',
       items: [
         { id: 'create-assessment', label: 'Create Assessment', icon: PlusCircle },
-        { id: 'assessments', label: 'Active Tests', icon: ClipboardList },
-        { id: 'preview-questions', label: 'Question Bank', icon: FileCode2 },
-        { id: 'expired-assessments', label: 'Archive', icon: Archive },
+        { id: 'assessments', label: 'Manage Assessments', icon: ClipboardList },
+        { id: 'assign-assessment', label: 'Assign Assessment', icon: UserPlus },
       ]
     },
     {

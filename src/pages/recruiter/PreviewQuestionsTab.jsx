@@ -20,7 +20,12 @@ import {
   Loader2,
   Save,
   UserPlus,
-  HelpCircle
+  HelpCircle,
+  Code2,
+  Database,
+  Brain,
+  SlidersHorizontal,
+  ChevronRight
 } from 'lucide-react';
 import api from '../../api';
 
@@ -63,25 +68,25 @@ const SyntaxHighlighter = ({ code, language = 'python' }) => {
     while ((match = combinedRegex.exec(code)) !== null) {
       const groups = match.groups;
       if (groups.comment) {
-        tokens.push(<span key={match.index} className="text-[#94a3b8] italic">{groups.comment}</span>);
+        tokens.push(<span key={match.index} className="text-slate-400 dark:text-slate-500 italic">{groups.comment}</span>);
       } else if (groups.string) {
-        tokens.push(<span key={match.index} className="text-[#10b981] font-medium">{groups.string}</span>);
+        tokens.push(<span key={match.index} className="text-emerald-600 dark:text-emerald-400 font-medium">{groups.string}</span>);
       } else if (groups.keyword) {
-        tokens.push(<span key={match.index} className="text-[#8b5cf6] font-bold">{groups.keyword}</span>);
+        tokens.push(<span key={match.index} className="text-purple-600 dark:text-purple-400 font-bold">{groups.keyword}</span>);
       } else if (groups.func) {
-        tokens.push(<span key={match.index} className="text-[#3b82f6] font-semibold">{groups.func}</span>);
+        tokens.push(<span key={match.index} className="text-blue-600 dark:text-blue-400 font-semibold">{groups.func}</span>);
       } else if (groups.number) {
-        tokens.push(<span key={match.index} className="text-[#f59e0b] font-medium">{groups.number}</span>);
+        tokens.push(<span key={match.index} className="text-amber-600 dark:text-amber-400 font-medium">{groups.number}</span>);
       } else {
         tokens.push(groups.other);
       }
     }
-    return <pre className="font-mono text-xs leading-relaxed overflow-x-auto whitespace-pre-wrap text-[#0f172a]">{tokens}</pre>;
+    return <pre className="font-mono text-xs leading-relaxed overflow-x-auto whitespace-pre-wrap text-slate-800 dark:text-slate-200">{tokens}</pre>;
   }
 
   if (lang === 'sql') {
     const combinedRegex = new RegExp(
-      `(?<comment>--.*)|(?<string>'(?:\\\\.|[^'\\\\])*')|(?<keyword>\\b(?:SELECT|FROM|WHERE|GROUP\\s+BY|HAVING|ORDER\\s+BY|JOIN|LEFT|RIGHT|INNER|OUTER|ON|AND|OR|NOT|AS|IN|LIKE|IS|NULL|LIMIT|OFFSET)\\b)|(?<func>\\b(?:COUNT|SUM|AVG|MIN|MAX|COALESCE|CONCAT|NOW|DATE|ROW_NUMBER|DENSE_RANK)\\b)|(?<number>\\b\\d+\\b)|(?<other>[\\s\\S])`,
+      `(?<comment>--.*)|(?<string>'(?:\\\\.|[^'\\\\])*')|(?<keyword>\\b(?:SELECT|FROM|WHERE|GROUP\\s+BY|HAVING|ORDER\\s+BY|JOIN|LEFT|RIGHT|INNER|OUTER|ON|AND|OR|NOT|AS|IN|LIKE|IS|NULL|LIMIT|OFFSET|TOP|INSERT|INTO|VALUES|UPDATE|DELETE|CREATE|TABLE|ALTER)\\b)|(?<func>\\b(?:COUNT|SUM|AVG|MIN|MAX|COALESCE|CONCAT|NOW|DATE|ROW_NUMBER|DENSE_RANK|ISNULL|CAST|CONVERT)\\b)|(?<number>\\b\\d+\\b)|(?<other>[\\s\\S])`,
       'gi'
     );
 
@@ -90,23 +95,23 @@ const SyntaxHighlighter = ({ code, language = 'python' }) => {
     while ((match = combinedRegex.exec(code)) !== null) {
       const groups = match.groups;
       if (groups.comment) {
-        tokens.push(<span key={match.index} className="text-[#94a3b8] italic">{groups.comment}</span>);
+        tokens.push(<span key={match.index} className="text-slate-400 dark:text-slate-500 italic">{groups.comment}</span>);
       } else if (groups.string) {
-        tokens.push(<span key={match.index} className="text-[#10b981] font-medium">{groups.string}</span>);
+        tokens.push(<span key={match.index} className="text-emerald-600 dark:text-emerald-400 font-medium">{groups.string}</span>);
       } else if (groups.keyword) {
-        tokens.push(<span key={match.index} className="text-[#2563eb] font-bold uppercase">{groups.keyword}</span>);
+        tokens.push(<span key={match.index} className="text-blue-600 dark:text-blue-400 font-bold uppercase">{groups.keyword}</span>);
       } else if (groups.func) {
-        tokens.push(<span key={match.index} className="text-[#8b5cf6] font-semibold uppercase">{groups.func}</span>);
+        tokens.push(<span key={match.index} className="text-purple-600 dark:text-purple-400 font-semibold uppercase">{groups.func}</span>);
       } else if (groups.number) {
-        tokens.push(<span key={match.index} className="text-[#f59e0b] font-medium">{groups.number}</span>);
+        tokens.push(<span key={match.index} className="text-amber-600 dark:text-amber-400 font-medium">{groups.number}</span>);
       } else {
         tokens.push(groups.other);
       }
     }
-    return <pre className="font-mono text-xs leading-relaxed overflow-x-auto whitespace-pre-wrap text-[#0f172a]">{tokens}</pre>;
+    return <pre className="font-mono text-xs leading-relaxed overflow-x-auto whitespace-pre-wrap text-slate-800 dark:text-slate-200">{tokens}</pre>;
   }
 
-  return <pre className="font-mono text-xs leading-relaxed overflow-x-auto whitespace-pre-wrap text-[#0f172a]">{code}</pre>;
+  return <pre className="font-mono text-xs leading-relaxed overflow-x-auto whitespace-pre-wrap text-slate-800 dark:text-slate-200">{code}</pre>;
 };
 
 const ProgressiveGenerationBanner = ({ generationProgress }) => {
@@ -115,31 +120,31 @@ const ProgressiveGenerationBanner = ({ generationProgress }) => {
   const { topics, statusMessage, overallPercent, completedTopicsCount, totalTopicsCount } = generationProgress;
 
   return (
-    <div className="w-full bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border border-indigo-500/30 rounded-[22px] p-5 shadow-lg text-white mb-6 animate-fade-in">
+    <div className="w-full bg-slate-900 dark:bg-slate-950 border border-indigo-500/30 rounded-3xl p-5 shadow-lg text-white mb-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-3">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-purple-500/20 border border-purple-400/30 flex items-center justify-center text-purple-300 shrink-0">
+          <div className="w-8 h-8 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300 shrink-0">
             <Sparkles size={18} className="animate-pulse" />
           </div>
           <div>
             <h4 className="font-outfit font-extrabold text-sm text-white tracking-wide">
               AI Progressive Assessment Generation
             </h4>
-            <p className="text-[11px] font-semibold text-purple-200/80">
+            <p className="text-[11px] font-semibold text-indigo-200/80">
               {statusMessage || "Generating questions topic by topic..."}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full border border-white/10 shrink-0">
-          <span className="text-xs font-black text-purple-300">{overallPercent}%</span>
+          <span className="text-xs font-black text-indigo-300">{overallPercent}%</span>
           <span className="text-[10px] font-bold text-slate-300">({completedTopicsCount}/{totalTopicsCount} Topics)</span>
         </div>
       </div>
 
       {/* Progress Bar */}
-      <div className="w-full bg-slate-800/80 h-2.5 rounded-full overflow-hidden mb-4 border border-white/5">
+      <div className="w-full bg-slate-800/80 h-2 rounded-full overflow-hidden mb-4 border border-white/5">
         <div
-          className="h-full bg-gradient-to-r from-purple-500 via-indigo-400 to-emerald-400 rounded-full transition-all duration-500 shadow-[0_0_12px_rgba(168,85,247,0.5)]"
+          className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 rounded-full transition-all duration-500 shadow-[0_0_12px_rgba(99,102,241,0.5)]"
           style={{ width: `${overallPercent}%` }}
         />
       </div>
@@ -148,30 +153,27 @@ const ProgressiveGenerationBanner = ({ generationProgress }) => {
       <div className="flex flex-wrap items-center gap-2">
         {topics && topics.map((t, idx) => {
           const isDone = t.status === 'completed';
-          const isGenerating = t.status === 'generating';
-          const isFailed = t.status === 'failed';
+          const isCurrent = t.status === 'generating';
+          const isFail = t.status === 'failed';
+
+          let chipBg = 'bg-slate-800/80 border-slate-700 text-slate-400';
+          if (isDone) chipBg = 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300 font-bold';
+          else if (isCurrent) chipBg = 'bg-indigo-500/30 border-indigo-400/60 text-white font-bold ring-2 ring-indigo-500/30 animate-pulse';
+          else if (isFail) chipBg = 'bg-rose-500/20 border-rose-500/40 text-rose-300';
 
           return (
-            <div
-              key={idx}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold transition-all ${isDone
-                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-sm'
-                : isGenerating
-                  ? 'bg-purple-500/25 text-purple-200 border border-purple-400/50 animate-pulse shadow-md'
-                  : isFailed
-                    ? 'bg-red-500/20 text-red-300 border border-red-500/30'
-                    : 'bg-slate-800/60 text-slate-400 border border-slate-700/50'
-                }`}
-            >
-              {isDone && <CheckCircle size={13} className="text-emerald-400" />}
-              {isGenerating && <Loader2 size={13} className="animate-spin text-purple-300" />}
-              {isFailed && <AlertCircle size={13} className="text-red-400" />}
-              {!isDone && !isGenerating && !isFailed && <Clock size={13} className="text-slate-400" />}
-
+            <div key={idx} className={`px-3 py-1 rounded-xl text-xs border flex items-center gap-1.5 transition-all ${chipBg}`}>
+              {isDone ? (
+                <CheckCircle size={13} className="text-emerald-400" />
+              ) : isCurrent ? (
+                <Loader2 size={13} className="animate-spin text-indigo-300" />
+              ) : isFail ? (
+                <AlertCircle size={13} className="text-rose-400" />
+              ) : (
+                <Clock size={13} className="text-slate-500" />
+              )}
               <span>{t.name}</span>
-              {isDone && <span className="text-[10px] opacity-85">✓ ({t.count} Qs)</span>}
-              {isGenerating && <span className="text-[10px] opacity-90">⏳ Generating...</span>}
-              {isFailed && <span className="text-[10px] opacity-90">❌</span>}
+              {t.count > 0 && <span className="text-[10px] opacity-80 font-mono">({t.count} Qs)</span>}
             </div>
           );
         })}
@@ -182,77 +184,86 @@ const ProgressiveGenerationBanner = ({ generationProgress }) => {
 
 const PreviewQuestionsTab = ({
   previewAssessmentId,
-  savedAssessments,
-  generatedQuestions,
+  onSelectAssessment,
+  showToast,
+  generatedQuestions = [],
   setGeneratedQuestions,
   generationProgress,
-  showToast,
+  isGenerating,
   onSave,
+  onSaveAssessment,
   onSaveAndAssign,
-  onSelectAssessment
+  savedAssessments = []
 }) => {
-  const [loading, setLoading] = useState(false);
-  const [fetchError, setFetchError] = useState(null);
-  const [activeAssessment, setActiveAssessment] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSavingAndAssigning, setIsSavingAndAssigning] = useState(false);
 
-  // Dynamic assessment data fetching from backend
-  const fetchAssessmentData = useCallback(async (asmId) => {
-    if (!asmId) return;
+  // Fetch assessment details if previewing an existing assessment from DB
+  const fetchAssessmentData = useCallback(async (id) => {
+    if (!id) return;
     setLoading(true);
     setFetchError(null);
     try {
-      const res = await api.get(`/api/assessment/${asmId}?t=${Date.now()}`);
-      if (res.data) {
-        setActiveAssessment(res.data);
-        if (res.data.questions && Array.isArray(res.data.questions)) {
-          const formatted = res.data.questions.map((q, idx) => ({
-            id: idx + 1,
-            subject: q.subject || (res.data.subjects?.[0] || 'General'),
-            topic: q.topic || 'General',
-            type: q.type || 'MCQ',
-            difficulty: q.difficulty || res.data.difficulty || 'Medium',
-            scenario: q.scenario || q.problemStatement || '',
-            question: q.question || q.problemStatement || '',
-            options: q.options || [],
-            correctAnswer: q.correctAnswer || '',
-            explanation: q.explanation || '',
-            problemStatement: q.problemStatement || q.scenario || '',
-            candidateTask: q.candidateTask || '',
-            expectedAnswer: q.expectedAnswer || q.correctAnswer || '',
-            exampleInput: q.exampleInput || '',
-            exampleOutput: q.exampleOutput || '',
-            inputFormat: q.inputFormat || '',
-            outputFormat: q.outputFormat || '',
-            sampleInput: q.sampleInput || '',
-            sampleOutput: q.sampleOutput || '',
-            constraints: q.constraints || [],
-            marks: q.marks || (q.type === 'MCQ' ? 1 : 10),
-            estimatedTime: q.estimatedTime || (q.type === 'MCQ' ? '2 Minutes' : '15 Minutes')
-          }));
-          setGeneratedQuestions(formatted);
-          if (formatted.length > 0) setSelectedId(formatted[0].id);
+      const response = await api.get(`/api/assessment/${id}`);
+      if (response.data && response.data.questions) {
+        const mappedQuestions = response.data.questions.map((q, idx) => ({
+          id: idx + 1,
+          subject: q.subject || 'General',
+          topic: q.topic || 'General',
+          type: q.type || 'MCQ',
+          difficulty: q.difficulty || 'Medium',
+          scenario: q.scenario || q.problemStatement || '',
+          question: q.question,
+          q: q.question,
+          options: q.options || [],
+          correctAnswer: q.correctAnswer,
+          explanation: q.explanation || '',
+          problemStatement: q.problemStatement || q.scenario || '',
+          candidateTask: q.candidateTask || '',
+          expectedAnswer: q.expectedAnswer || q.correctAnswer || '',
+          evaluationCriteria: q.evaluationCriteria || '',
+          exampleInput: q.exampleInput || '',
+          exampleOutput: q.exampleOutput || '',
+          inputFormat: q.inputFormat || '',
+          outputFormat: q.outputFormat || '',
+          sampleInput: q.sampleInput || '',
+          sampleOutput: q.sampleOutput || '',
+          constraints: q.constraints || [],
+          hiddenTestCases: q.hiddenTestCases || [],
+          marks: q.marks || (q.type === 'MCQ' ? 1 : 10),
+          estimatedTime: q.estimatedTime || (q.type === 'MCQ' ? '2 Minutes' : '15 Minutes'),
+          databaseSchema: q.databaseSchema || null,
+          sampleData: q.sampleData || null
+        }));
+
+        setGeneratedQuestions(mappedQuestions);
+        if (mappedQuestions.length > 0) {
+          setSelectedId(mappedQuestions[0].id);
         }
       }
     } catch (err) {
-      console.error("Error fetching assessment details:", err);
-      setFetchError(err.response?.data?.detail || "Failed to load assessment data from server.");
+      console.error("Failed to fetch assessment questions:", err);
+      setFetchError(err.response?.data?.detail || err.message || "Failed to load assessment.");
     } finally {
       setLoading(false);
     }
   }, [setGeneratedQuestions]);
 
   useEffect(() => {
-    const targetId = previewAssessmentId || (savedAssessments && savedAssessments.length > 0 ? savedAssessments[0].id : null);
-    if (targetId) {
-      fetchAssessmentData(targetId);
-    } else if (generatedQuestions && generatedQuestions.length > 0 && !selectedId) {
-      setSelectedId(generatedQuestions[0].id);
+    if (previewAssessmentId) {
+      fetchAssessmentData(previewAssessmentId);
+    } else if (generatedQuestions && generatedQuestions.length > 0) {
+      if (!selectedId || !generatedQuestions.some(q => q.id === selectedId)) {
+        setSelectedId(generatedQuestions[0].id);
+      }
     }
-  }, [previewAssessmentId, fetchAssessmentData, savedAssessments, generatedQuestions, selectedId]);
+  }, [previewAssessmentId, fetchAssessmentData, generatedQuestions, selectedId]);
 
   // Edit form state
   const [editForm, setEditForm] = useState({
@@ -363,9 +374,9 @@ const PreviewQuestionsTab = ({
           exampleOutput: editForm.exampleOutput,
           constraints: editForm.constraints ? editForm.constraints.split(',').map(s => s.trim()).filter(Boolean) : [],
           expectedAnswer: editForm.expectedAnswer,
+          correctAnswer: editForm.correctAnswer || editForm.expectedAnswer,
           explanation: editForm.explanation,
           options: editForm.options ? editForm.options.split(',').map(s => s.trim()).filter(Boolean) : [],
-          correctAnswer: editForm.correctAnswer,
           inputFormat: editForm.inputFormat,
           outputFormat: editForm.outputFormat,
           sampleInput: editForm.sampleInput,
@@ -383,15 +394,15 @@ const PreviewQuestionsTab = ({
   // Loading state render
   if (loading) {
     return (
-      <div className="flex flex-col gap-6 w-full animate-fade-in">
-        <div className="bg-dash-white-card border border-dash-border-gray rounded-[24px] p-12 shadow-sm flex flex-col items-center justify-center text-center my-auto min-h-[420px]">
-          <div className="w-16 h-16 rounded-2xl bg-dash-primary-purple/10 border border-dash-primary-purple/20 flex items-center justify-center text-dash-primary-purple mb-4 shadow-sm">
-            <RefreshCw size={32} className="animate-spin" />
+      <div className="flex flex-col gap-6 w-full animate-fade-in text-slate-800 dark:text-slate-100">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-12 shadow-sm flex flex-col items-center justify-center text-center my-auto min-h-[380px]">
+          <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 dark:bg-indigo-500/20 border border-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-4 shadow-sm">
+            <RefreshCw size={28} className="animate-spin" />
           </div>
-          <h3 className="font-outfit font-extrabold text-lg sm:text-xl text-dash-dark-purple mb-2">
+          <h3 className="font-outfit font-extrabold text-lg text-slate-900 dark:text-slate-100 mb-2">
             Loading Assessment Preview...
           </h3>
-          <p className="text-xs sm:text-sm text-dash-light-purple font-semibold max-w-md leading-relaxed">
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium max-w-md leading-relaxed">
             Fetching latest assessment questions and configuration dynamically from the database.
           </p>
         </div>
@@ -402,22 +413,22 @@ const PreviewQuestionsTab = ({
   // Error state render
   if (fetchError) {
     return (
-      <div className="flex flex-col gap-6 w-full animate-fade-in">
-        <div className="bg-dash-white-card border border-red-200 rounded-[24px] p-12 shadow-sm flex flex-col items-center justify-center text-center my-auto min-h-[420px]">
-          <div className="w-16 h-16 rounded-2xl bg-red-50 border border-red-200 flex items-center justify-center text-red-500 mb-4 shadow-sm">
-            <AlertCircle size={32} />
+      <div className="flex flex-col gap-6 w-full animate-fade-in text-slate-800 dark:text-slate-100">
+        <div className="bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-900/60 rounded-3xl p-12 shadow-sm flex flex-col items-center justify-center text-center my-auto min-h-[380px]">
+          <div className="w-14 h-14 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 flex items-center justify-center text-rose-500 mb-4 shadow-sm">
+            <AlertCircle size={28} />
           </div>
-          <h3 className="font-outfit font-extrabold text-lg sm:text-xl text-red-900 mb-2">
-            Failed to Load Assessment
+          <h3 className="font-outfit font-extrabold text-lg text-rose-900 dark:text-rose-300 mb-2">
+            Unable to Load Assessment
           </h3>
-          <p className="text-xs sm:text-sm text-red-600 font-semibold max-w-md leading-relaxed mb-6">
+          <p className="text-xs text-rose-600 dark:text-rose-400 font-medium mb-5 max-w-md">
             {fetchError}
           </p>
           <button
             onClick={() => fetchAssessmentData(previewAssessmentId || savedAssessments?.[0]?.id)}
-            className="px-5 py-2.5 rounded-xl bg-dash-primary-purple text-white font-bold text-xs hover:bg-dash-dark-purple transition-all shadow-md flex items-center gap-2 cursor-pointer border-none"
+            className="px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 transition-all shadow-md flex items-center gap-2 cursor-pointer border-none"
           >
-            <RefreshCw size={15} />
+            <RefreshCw size={14} />
             <span>Retry Loading</span>
           </button>
         </div>
@@ -425,45 +436,28 @@ const PreviewQuestionsTab = ({
     );
   }
 
-  // Empty state when no questions/assessments exist
-  if (!generatedQuestions || generatedQuestions.length === 0) {
-    if (generationProgress && generationProgress.active) {
-      return (
-        <div className="flex flex-col gap-6 w-full animate-fade-in">
-          <ProgressiveGenerationBanner generationProgress={generationProgress} />
-          <div className="bg-dash-white-card border border-dash-border-gray rounded-[24px] p-12 shadow-[0_4px_20px_rgba(87,82,170,0.03)] flex flex-col items-center justify-center text-center my-auto min-h-[360px]">
-            <Loader2 size={40} className="animate-spin text-dash-primary-purple mb-4" />
-            <h3 className="font-outfit font-extrabold text-lg sm:text-xl text-dash-dark-purple mb-2">
-              Generating Initial Questions...
-            </h3>
-            <p className="text-xs sm:text-sm text-dash-light-purple font-semibold max-w-md leading-relaxed">
-              {generationProgress.statusMessage || "AI is generating the first topic's questions. Results will appear here instantly once ready..."}
-            </p>
-          </div>
-        </div>
-      );
-    }
-
+  // Empty state only when not actively generating and no questions exist
+  if ((!generatedQuestions || generatedQuestions.length === 0) && (!generationProgress || !generationProgress.active)) {
     return (
-      <div className="flex flex-col gap-6 w-full animate-fade-in">
-        <div className="bg-dash-white-card border border-dash-border-gray rounded-[24px] p-12 shadow-[0_4px_20px_rgba(87,82,170,0.03)] flex flex-col items-center justify-center text-center my-auto min-h-[420px]">
-          <div className="w-16 h-16 rounded-2xl bg-dash-primary-purple/10 border border-dash-primary-purple/20 flex items-center justify-center text-dash-primary-purple mb-4 shadow-sm">
+      <div className="flex flex-col gap-6 w-full animate-fade-in text-slate-800 dark:text-slate-100">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-12 shadow-sm flex flex-col items-center justify-center text-center my-auto min-h-[380px]">
+          <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 dark:bg-indigo-500/20 border border-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-4 shadow-sm">
             <FileText size={32} />
           </div>
-          <h3 className="font-outfit font-extrabold text-lg sm:text-xl text-dash-dark-purple mb-2">
-            No Assessment Preview
+          <h3 className="font-outfit font-extrabold text-lg text-slate-900 dark:text-slate-100 mb-2">
+            No Assessment Questions Yet
           </h3>
-          <p className="text-xs sm:text-sm text-dash-light-purple font-semibold max-w-md leading-relaxed">
-            No assessment created yet. Create and save an assessment to preview the generated questions.
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium max-w-md leading-relaxed">
+            Configure topics above and click 'Generate with AI' to stream questions here live.
           </p>
         </div>
       </div>
     );
   }
 
-  const totalMarks = generatedQuestions.reduce((sum, q) => sum + (q.marks || (q.type === 'MCQ' ? 1 : 10)), 0);
+  const totalMarks = (generatedQuestions || []).reduce((sum, q) => sum + (q.marks || (q.type === 'MCQ' ? 1 : 10)), 0);
 
-  const filteredQuestions = generatedQuestions.filter(q => {
+  const filteredQuestions = (generatedQuestions || []).filter(q => {
     const query = searchQuery.toLowerCase();
     const qText = (q.question || q.problemStatement || '').toLowerCase();
     const qSub = (q.subject || '').toLowerCase();
@@ -471,17 +465,34 @@ const PreviewQuestionsTab = ({
     return qText.includes(query) || qSub.includes(query) || qTopic.includes(query);
   });
 
+  const handleSaveAction = async (andAssign = false) => {
+    const saveFunc = onSaveAssessment || onSave;
+    if (saveFunc) {
+      if (andAssign) setIsSavingAndAssigning(true);
+      else setIsSaving(true);
+
+      try {
+        await saveFunc(andAssign);
+      } finally {
+        setIsSaving(false);
+        setIsSavingAndAssigning(false);
+      }
+    }
+  };
+
   return (
-    <div className="flex flex-col gap-6 w-full animate-fade-in">
+    <div className="flex flex-col gap-6 w-full animate-fade-in text-slate-800 dark:text-slate-100 transition-colors duration-200">
+      
       {generationProgress && generationProgress.active && (
         <ProgressiveGenerationBanner generationProgress={generationProgress} />
       )}
+
       {/* Assessment Question Pool Sub-Header */}
-      <div className="bg-dash-white-card border border-dash-border-gray rounded-[24px] p-5 px-6 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 px-6 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-[10px] font-extrabold text-dash-primary-purple bg-dash-primary-purple/10 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-              Assessment Preview Mode
+            <span className="text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+              Question Bank Preview
             </span>
             {savedAssessments && savedAssessments.length > 0 && (
               <select
@@ -490,7 +501,7 @@ const PreviewQuestionsTab = ({
                   if (onSelectAssessment) onSelectAssessment(e.target.value);
                   fetchAssessmentData(e.target.value);
                 }}
-                className="bg-dash-white-card border border-dash-border-gray/70 rounded-xl py-1 px-3 text-xs font-bold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple cursor-pointer"
+                className="bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl py-1 px-3 text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:border-indigo-500 cursor-pointer"
               >
                 {savedAssessments.map(asm => (
                   <option key={asm.id} value={asm.id}>
@@ -500,83 +511,77 @@ const PreviewQuestionsTab = ({
               </select>
             )}
           </div>
-          <h3 className="font-outfit font-extrabold text-base text-dash-dark-purple">
-            {activeAssessment?.name || 'Assessment Question Pool Preview'}
+          <h3 className="font-outfit font-extrabold text-base text-slate-900 dark:text-slate-50">
+            Generated Questions Pool ({generatedQuestions.length} Questions)
           </h3>
-          <div className="flex flex-wrap items-center gap-2 mt-2 text-[11px] font-semibold text-dash-light-purple">
-            <span className="flex items-center gap-1 bg-dash-light-blue-bg border border-dash-border-gray/40 px-2.5 py-0.5 rounded-lg text-dash-dark-purple font-bold">
-              <Clock size={12} className="text-dash-primary-purple" />
-              {activeAssessment?.duration || '60 minutes'}
+          <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">
+            <span className="flex items-center gap-1 font-mono">
+              <Award size={13} className="text-indigo-500" />
+              <span>{totalMarks} Total Marks</span>
             </span>
-            <span className="flex items-center gap-1 bg-dash-light-blue-bg border border-dash-border-gray/40 px-2.5 py-0.5 rounded-lg text-dash-dark-purple font-bold">
-              <FileText size={12} className="text-dash-primary-purple" />
-              {generatedQuestions.length} Questions
-            </span>
-            <span className="flex items-center gap-1 bg-dash-light-blue-bg border border-dash-border-gray/40 px-2.5 py-0.5 rounded-lg text-dash-dark-purple font-bold">
-              <Award size={12} className="text-dash-primary-purple" />
-              {totalMarks} Total Marks
-            </span>
+            <span>•</span>
+            <span>{generatedQuestions.filter(q => q.type === 'MCQ').length} MCQs</span>
+            <span>•</span>
+            <span>{generatedQuestions.filter(q => q.type !== 'MCQ').length} Scenarios</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
-          {onSave && (
-            <ActionButton
-              onClick={onSave}
-              disabled={generationProgress?.active}
-              title={generationProgress?.active ? 'Please wait until all topics are generated' : 'Save assessment'}
-              icon={Save}
-              iconSize={15}
-              className="px-4 py-2.5 rounded-xl border border-dash-border-gray bg-dash-white-card hover:bg-dash-soft-pink text-dash-dark-purple font-bold text-xs shadow-sm"
-            >
-              Save Assessment
-            </ActionButton>
-          )}
+        {/* Global Save Controls */}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <ActionButton
+            onClick={() => handleSaveAction(false)}
+            isLoading={isSaving}
+            loadingText="Saving..."
+            disabled={generatedQuestions.length === 0}
+            icon={Save}
+            className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold text-xs shadow-xs"
+          >
+            Save Assessment
+          </ActionButton>
 
-          {onSaveAndAssign && (
-            <ActionButton
-              onClick={onSaveAndAssign}
-              disabled={generationProgress?.active || generatedQuestions.length === 0}
-              isLoading={generationProgress?.active}
-              loadingText={`Generating (${generationProgress?.completedTopicsCount || 0}/${generationProgress?.totalTopicsCount || 0})...`}
-              title={generationProgress?.active ? 'Please wait until all selected topics have been generated successfully' : 'Save and assign assessment to candidates'}
-              icon={UserPlus}
-              iconSize={15}
-              className="px-4 py-2.5 rounded-xl bg-dash-primary-purple text-dash-white-card font-bold text-xs shadow-md hover:bg-dash-dark-purple border-none"
-            >
-              Save & Assign
-            </ActionButton>
-          )}
+          <ActionButton
+            onClick={() => handleSaveAction(true)}
+            isLoading={isSavingAndAssigning}
+            loadingText="Saving & Assigning..."
+            disabled={generatedQuestions.length === 0}
+            icon={UserPlus}
+            className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md border-none"
+          >
+            Save & Assign
+          </ActionButton>
         </div>
       </div>
 
+      {/* 2-Column Question Workspace */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch w-full">
-        {/* LEFT PANEL: QUESTION LIST POOL */}
-        <div className="lg:col-span-4 bg-dash-white-card border border-dash-border-gray rounded-[24px] p-5 shadow-[0_4px_20px_rgba(87,82,170,0.02)] flex flex-col gap-4 min-h-[450px] lg:h-[720px]">
-          <div className="flex items-center justify-between border-b border-dash-border-gray/25 pb-3">
+        
+        {/* LEFT PANEL: QUESTION LIST POOL (4 COLS) */}
+        <div className="lg:col-span-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 shadow-sm flex flex-col gap-4 min-h-[450px] lg:h-[740px]">
+          
+          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 pb-3">
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-dash-primary-purple animate-pulse" />
-              <h3 className="font-outfit font-extrabold text-sm text-dash-dark-purple uppercase tracking-wider">
-                Question Pool
+              <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+              <h3 className="font-outfit font-extrabold text-xs text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                Question Index
               </h3>
             </div>
-            <span className="text-xs font-bold text-dash-primary-purple bg-dash-primary-purple/10 px-2.5 py-0.5 rounded-full border border-dash-primary-purple/10">
-              {generatedQuestions.length} Questions
+            <span className="text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2.5 py-0.5 rounded-full border border-indigo-200 dark:border-indigo-800">
+              {generatedQuestions.length} Qs
             </span>
           </div>
 
           {/* Search Question Bar */}
           <div className="relative group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-dash-light-purple transition-colors duration-300 group-focus-within:text-dash-primary-purple" size={14} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 transition-colors duration-200 group-focus-within:text-indigo-500" size={14} />
             <input
               type="text"
-              placeholder="Search question pool..."
+              placeholder="Filter by question, topic..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 pl-9 pr-4 text-xs font-semibold text-dash-dark-purple placeholder-dash-light-purple/60 focus:outline-none focus:border-dash-primary-purple focus:ring-2 focus:ring-dash-primary-purple/5 transition-all"
+              className="w-full bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl py-2 pl-9 pr-4 text-xs font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 transition-all"
             />
             {searchQuery && (
-              <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-dash-light-purple hover:text-dash-dark-purple">
+              <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
                 <X size={12} />
               </button>
             )}
@@ -589,39 +594,40 @@ const PreviewQuestionsTab = ({
               const actualIndex = generatedQuestions.findIndex(item => item.id === q.id) + 1;
               const isCoding = q.type?.includes('CODING') || q.type === 'SCENARIO_CODING' || q.type === 'SCENARIO';
 
-              let diffColor = 'text-green-600 bg-green-50 border-green-200/50';
-              if (q.difficulty === 'Medium') diffColor = 'text-amber-600 bg-amber-50 border-amber-200/50';
-              else if (q.difficulty === 'Hard') diffColor = 'text-rose-600 bg-rose-50 border-rose-200/50';
+              let diffBadge = 'text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 border-emerald-500/20';
+              if (q.difficulty === 'Medium') diffBadge = 'text-amber-700 dark:text-amber-300 bg-amber-500/10 border-amber-500/20';
+              else if (q.difficulty === 'Hard') diffBadge = 'text-rose-700 dark:text-rose-300 bg-rose-500/10 border-rose-500/20';
 
               return (
                 <div
                   key={q.id}
                   onClick={() => setSelectedId(q.id)}
-                  className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all duration-300 group ${isSelected
-                    ? 'border-dash-primary-purple bg-dash-soft-pink shadow-[0_4px_12px_rgba(87,82,170,0.06)]'
-                    : 'border-dash-border-gray/60 bg-dash-white-card hover:bg-dash-soft-pink/50 hover:border-dash-primary-purple/30'
-                    }`}
+                  className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all duration-200 group ${
+                    isSelected
+                      ? 'border-indigo-500 dark:border-indigo-400 bg-indigo-50/50 dark:bg-indigo-950/40 shadow-xs ring-1 ring-indigo-500/20'
+                      : 'border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-950/40 hover:bg-slate-50 dark:hover:bg-slate-900/60 hover:border-slate-300 dark:hover:border-slate-700'
+                  }`}
                 >
                   <div className="flex items-start justify-between gap-2 mb-2">
-                    <span className={`text-[10px] font-extrabold font-outfit uppercase tracking-wider ${isSelected ? 'text-dash-primary-purple' : 'text-dash-light-purple'}`}>
-                      Question #{actualIndex} ({q.type || (isCoding ? 'Scenario' : 'MCQ')})
+                    <span className={`text-[10px] font-extrabold font-outfit uppercase tracking-wider ${isSelected ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500'}`}>
+                      #{actualIndex} ({q.type || (isCoding ? 'Scenario' : 'MCQ')})
                     </span>
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md border ${diffColor}`}>
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md border ${diffBadge}`}>
                         {q.difficulty || 'Medium'}
                       </span>
-                      <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-dash-primary-purple/10 text-dash-primary-purple">
-                        {q.marks || (q.type === 'MCQ' ? 1 : 10)} M
+                      <span className="text-[9px] font-mono font-extrabold px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                        {q.marks || (q.type === 'MCQ' ? 1 : 10)}M
                       </span>
                     </div>
                   </div>
 
-                  <h4 className={`text-xs font-bold leading-snug line-clamp-2 ${isSelected ? 'text-dash-dark-purple' : 'text-dash-dark-purple/80 group-hover:text-dash-primary-purple'} transition-colors`}>
+                  <h4 className={`text-xs font-bold leading-snug line-clamp-2 ${isSelected ? 'text-slate-900 dark:text-slate-50' : 'text-slate-700 dark:text-slate-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400'} transition-colors`}>
                     {q.question || q.problemStatement}
                   </h4>
 
-                  <div className="flex items-center gap-2 mt-3 text-[10px] font-bold text-dash-light-purple">
-                    <span className="px-1.5 py-0.5 rounded bg-dash-light-blue-bg border border-dash-border-gray/30 text-dash-dark-purple/70">
+                  <div className="flex items-center gap-2 mt-3 text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                    <span className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
                       {q.subject}
                     </span>
                     <span className="truncate">
@@ -632,27 +638,52 @@ const PreviewQuestionsTab = ({
               );
             })}
 
-            {filteredQuestions.length === 0 && (
-              <div className="py-12 text-center text-xs text-dash-light-purple font-medium flex flex-col items-center justify-center gap-2">
-                <HelpCircle size={28} className="text-dash-light-purple/60" />
-                <span>No questions found matching criteria.</span>
+            {/* Live Streaming Indicator Card */}
+            {generationProgress && generationProgress.active && (
+              <div className="p-3.5 rounded-2xl border border-dashed border-indigo-500/40 bg-indigo-500/5 dark:bg-indigo-500/10 flex items-center gap-3 animate-pulse">
+                <div className="w-7 h-7 rounded-xl bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                  <Loader2 size={15} className="animate-spin" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-wider block">
+                    Streaming in Progress
+                  </span>
+                  <p className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 truncate">
+                    {generationProgress.statusMessage || "AI is synthesizing next question..."}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {filteredQuestions.length === 0 && (!generationProgress || !generationProgress.active) && (
+              <div className="py-12 text-center text-xs text-slate-400 font-medium flex flex-col items-center justify-center gap-2">
+                <HelpCircle size={28} className="text-slate-400/60" />
+                <span>No questions matching search filter.</span>
               </div>
             )}
           </div>
         </div>
 
-        {/* RIGHT PANEL: QUESTION PREVIEW CARD & EDIT INTERFACE */}
-        <div className="lg:col-span-8 bg-dash-white-card border border-dash-border-gray rounded-[24px] p-6 shadow-[0_4px_20px_rgba(87,82,170,0.02)] flex flex-col min-h-[500px] lg:h-[720px] overflow-y-auto">
+        {/* RIGHT PANEL: QUESTION INSPECTOR & EDITOR (8 COLS) */}
+        <div className="lg:col-span-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm flex flex-col min-h-[500px] lg:h-[740px] overflow-y-auto">
           {!selectedQuestion ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-              <div className="w-16 h-16 rounded-full bg-dash-light-blue-bg flex items-center justify-center text-dash-primary-purple mb-4">
-                <Sparkles size={32} className="animate-pulse" />
+              <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-4">
+                {generationProgress && generationProgress.active ? (
+                  <Loader2 size={32} className="animate-spin" />
+                ) : (
+                  <Sparkles size={32} className="animate-pulse" />
+                )}
               </div>
-              <h3 className="font-plus-jakarta font-extrabold text-base text-dash-dark-purple">
-                No Question Selected
+              <h3 className="font-outfit font-extrabold text-base text-slate-900 dark:text-slate-100">
+                {generationProgress && generationProgress.active
+                  ? "Streaming AI Questions..."
+                  : "No Question Selected"}
               </h3>
-              <p className="text-xs text-dash-light-purple font-medium mt-1.5 max-w-xs">
-                Select a question from the pool on the left to preview and customize it.
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1.5 max-w-sm leading-relaxed">
+                {generationProgress && generationProgress.active
+                  ? (generationProgress.statusMessage || "Incoming questions will automatically appear on the left pool and open for live preview.")
+                  : "Select a question from the pool on the left to preview and customize it."}
               </p>
             </div>
           ) : isEditing ? (
@@ -660,10 +691,10 @@ const PreviewQuestionsTab = ({
             <form onSubmit={handleSaveChanges} className="flex-1 flex flex-col justify-between gap-5">
               <div className="space-y-4">
                 {/* Edit Header */}
-                <div className="flex items-center justify-between border-b border-dash-border-gray/25 pb-3">
+                <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
                   <div>
-                    <span className="text-[10px] text-dash-primary-purple font-extrabold tracking-wider uppercase">Editing Mode</span>
-                    <h3 className="font-outfit font-bold text-base text-dash-dark-purple mt-0.5">
+                    <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-extrabold tracking-wider uppercase">Editing Mode</span>
+                    <h3 className="font-outfit font-bold text-base text-slate-900 dark:text-slate-100 mt-0.5">
                       Customize Question #{generatedQuestions.findIndex(q => q.id === selectedId) + 1}
                     </h3>
                   </div>
@@ -671,13 +702,13 @@ const PreviewQuestionsTab = ({
                     <button
                       type="button"
                       onClick={() => setIsEditing(false)}
-                      className="px-3.5 py-1.5 rounded-xl border border-dash-border-gray text-xs font-bold text-dash-dark-purple hover:bg-dash-soft-pink transition-colors cursor-pointer"
+                      className="px-3.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
-                      className="px-3.5 py-1.5 rounded-xl bg-dash-primary-purple text-dash-white-card text-xs font-bold hover:bg-dash-dark-purple transition-colors cursor-pointer shadow-sm"
+                      className="px-3.5 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-colors cursor-pointer shadow-sm"
                     >
                       Save Changes
                     </button>
@@ -687,31 +718,31 @@ const PreviewQuestionsTab = ({
                 {/* Form inputs grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Category (Subject)</label>
+                    <label className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1">Category (Subject)</label>
                     <input
                       type="text"
                       value={editForm.subject}
                       onChange={(e) => setEditForm(prev => ({ ...prev, subject: e.target.value }))}
-                      className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
+                      className="w-full bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-xs font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
                       required
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Topic</label>
+                    <label className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1">Topic</label>
                     <input
                       type="text"
                       value={editForm.topic}
                       onChange={(e) => setEditForm(prev => ({ ...prev, topic: e.target.value }))}
-                      className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
+                      className="w-full bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-xs font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
                       required
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Question Type</label>
+                    <label className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1">Question Type</label>
                     <select
                       value={editForm.type}
                       onChange={(e) => setEditForm(prev => ({ ...prev, type: e.target.value }))}
-                      className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-bold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple"
+                      className="w-full bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-xs font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
                     >
                       <option value="MCQ">Multiple Choice (MCQ)</option>
                       <option value="SCENARIO">Scenario Q&A (Text)</option>
@@ -719,11 +750,11 @@ const PreviewQuestionsTab = ({
                     </select>
                   </div>
                   <div>
-                    <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Difficulty</label>
+                    <label className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1">Difficulty</label>
                     <select
                       value={editForm.difficulty}
                       onChange={(e) => setEditForm(prev => ({ ...prev, difficulty: e.target.value }))}
-                      className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-bold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple"
+                      className="w-full bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-xs font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
                     >
                       <option value="Easy">Easy</option>
                       <option value="Medium">Medium</option>
@@ -731,22 +762,22 @@ const PreviewQuestionsTab = ({
                     </select>
                   </div>
                   <div>
-                    <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Estimated Time</label>
+                    <label className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1">Estimated Time</label>
                     <input
                       type="text"
                       value={editForm.estimatedTime}
                       onChange={(e) => setEditForm(prev => ({ ...prev, estimatedTime: e.target.value }))}
-                      className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
+                      className="w-full bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-xs font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
                       placeholder="e.g. 15 Minutes"
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Marks</label>
+                    <label className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1">Marks</label>
                     <input
                       type="number"
                       value={editForm.marks}
                       onChange={(e) => setEditForm(prev => ({ ...prev, marks: parseInt(e.target.value, 10) || 0 }))}
-                      className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
+                      className="w-full bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-xs font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
                       min="1"
                       max="100"
                     />
@@ -755,12 +786,12 @@ const PreviewQuestionsTab = ({
 
                 {/* Problem statement / Question block */}
                 <div>
-                  <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Problem Statement / Question Context</label>
+                  <label className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1">Problem Statement / Question Context</label>
                   <textarea
                     rows="3"
                     value={editForm.problemStatement}
                     onChange={(e) => setEditForm(prev => ({ ...prev, problemStatement: e.target.value, question: e.target.value }))}
-                    className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10 resize-y"
+                    className="w-full bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-xs font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 resize-y"
                     required
                   />
                 </div>
@@ -769,90 +800,23 @@ const PreviewQuestionsTab = ({
                 {editForm.type === 'MCQ' ? (
                   <div className="space-y-4">
                     <div>
-                      <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Options (comma-separated list)</label>
+                      <label className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1">Options (comma-separated list)</label>
                       <input
                         type="text"
                         value={editForm.options}
                         onChange={(e) => setEditForm(prev => ({ ...prev, options: e.target.value }))}
-                        className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
+                        className="w-full bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-xs font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
                         placeholder="yield, return, async, lambda"
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Correct Answer</label>
+                      <label className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1">Correct Answer</label>
                       <input
                         type="text"
                         value={editForm.correctAnswer}
                         onChange={(e) => setEditForm(prev => ({ ...prev, correctAnswer: e.target.value }))}
-                        className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
+                        className="w-full bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-xs font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
                         required
-                      />
-                    </div>
-                  </div>
-                ) : editForm.type === 'PYTHON_CODING' ? (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Input Format</label>
-                        <input
-                          type="text"
-                          value={editForm.inputFormat}
-                          onChange={(e) => setEditForm(prev => ({ ...prev, inputFormat: e.target.value }))}
-                          className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
-                          placeholder="e.g. A single string of characters"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Output Format</label>
-                        <input
-                          type="text"
-                          value={editForm.outputFormat}
-                          onChange={(e) => setEditForm(prev => ({ ...prev, outputFormat: e.target.value }))}
-                          className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
-                          placeholder="e.g. Print True or False"
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Sample Input</label>
-                        <textarea
-                          rows="2"
-                          value={editForm.sampleInput}
-                          onChange={(e) => setEditForm(prev => ({ ...prev, sampleInput: e.target.value }))}
-                          className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10 resize-y"
-                          placeholder="madam"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Sample Output</label>
-                        <textarea
-                          rows="2"
-                          value={editForm.sampleOutput}
-                          onChange={(e) => setEditForm(prev => ({ ...prev, sampleOutput: e.target.value }))}
-                          className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10 resize-y"
-                          placeholder="True"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Constraints (comma-separated list)</label>
-                      <input
-                        type="text"
-                        value={editForm.constraints}
-                        onChange={(e) => setEditForm(prev => ({ ...prev, constraints: e.target.value }))}
-                        className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
-                        placeholder="e.g. Length <= 1000, ASCII only"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Expected Correct Code Solution</label>
-                      <textarea
-                        rows="4"
-                        value={editForm.expectedAnswer}
-                        onChange={(e) => setEditForm(prev => ({ ...prev, expectedAnswer: e.target.value, correctAnswer: e.target.value }))}
-                        className="w-full bg-[#1e1e1e] border border-zinc-800 rounded-xl py-2.5 px-4 text-xs font-mono text-zinc-100 focus:outline-none focus:border-dash-primary-purple transition-all resize-y"
-                        placeholder="def solution(): ..."
                       />
                     </div>
                   </div>
@@ -860,43 +824,34 @@ const PreviewQuestionsTab = ({
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Example Input</label>
+                        <label className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1">Example Input</label>
                         <input
                           type="text"
                           value={editForm.exampleInput}
                           onChange={(e) => setEditForm(prev => ({ ...prev, exampleInput: e.target.value }))}
-                          className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
+                          className="w-full bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-xs font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
                           placeholder="e.g. madam"
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Example Output</label>
+                        <label className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1">Example Output</label>
                         <input
                           type="text"
                           value={editForm.exampleOutput}
                           onChange={(e) => setEditForm(prev => ({ ...prev, exampleOutput: e.target.value }))}
-                          className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
+                          className="w-full bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-xs font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
                           placeholder="e.g. True"
                         />
                       </div>
                     </div>
                     <div>
-                      <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Constraints (comma-separated list)</label>
-                      <input
-                        type="text"
-                        value={editForm.constraints}
-                        onChange={(e) => setEditForm(prev => ({ ...prev, constraints: e.target.value }))}
-                        className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10"
-                        placeholder="e.g. Length <=1000, Ignore Case, Ignore Spaces"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Expected Answer (Code)</label>
+                      <label className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1">Expected Answer / Solution Code</label>
                       <textarea
-                        rows="3"
+                        rows="4"
                         value={editForm.expectedAnswer}
-                        onChange={(e) => setEditForm(prev => ({ ...prev, expectedAnswer: e.target.value }))}
-                        className="w-full bg-[#fafafc] border border-dash-border-gray rounded-xl py-2.5 px-4 text-xs font-mono text-[#0f172a] focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10 resize-y"
+                        onChange={(e) => setEditForm(prev => ({ ...prev, expectedAnswer: e.target.value, correctAnswer: e.target.value }))}
+                        className="w-full bg-slate-900 dark:bg-slate-950 border border-slate-800 rounded-xl py-2.5 px-4 text-xs font-mono text-emerald-400 focus:outline-none focus:border-indigo-500 resize-y"
+                        placeholder="SELECT ... or def solution(): ..."
                       />
                     </div>
                   </div>
@@ -904,28 +859,28 @@ const PreviewQuestionsTab = ({
 
                 {/* Explanation */}
                 <div>
-                  <label className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider block mb-1">Explanation</label>
+                  <label className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1">Explanation</label>
                   <textarea
                     rows="2"
                     value={editForm.explanation}
                     onChange={(e) => setEditForm(prev => ({ ...prev, explanation: e.target.value }))}
-                    className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple focus:ring-1 focus:ring-dash-primary-purple/10 resize-y"
+                    className="w-full bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-xs font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500 resize-y"
                   />
                 </div>
               </div>
 
               {/* Bottom edit buttons */}
-              <div className="flex items-center gap-3 border-t border-dash-border-gray/25 pt-4 mt-2">
+              <div className="flex items-center gap-3 border-t border-slate-100 dark:border-slate-800 pt-4 mt-2">
                 <button
                   type="button"
                   onClick={() => setIsEditing(false)}
-                  className="flex-1 py-3 rounded-xl border border-dash-border-gray text-xs font-bold text-dash-dark-purple hover:bg-dash-soft-pink transition-colors cursor-pointer"
+                  className="flex-1 py-3 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                 >
                   Discard Changes
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-3 rounded-xl bg-dash-primary-purple text-dash-white-card text-xs font-bold hover:bg-dash-dark-purple transition-colors cursor-pointer shadow-[0_4px_12px_rgba(87,82,170,0.15)]"
+                  className="flex-1 py-3 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-colors cursor-pointer shadow-md"
                 >
                   Save Question Changes
                 </button>
@@ -934,84 +889,74 @@ const PreviewQuestionsTab = ({
           ) : (
             /* HIGH-FIDELITY PREVIEW CARD VIEW */
             <div className="flex-1 flex flex-col justify-between">
-              <div className="space-y-5.5 relative">
+              <div className="space-y-5 relative">
+                
                 {/* Preview Header Row */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 border-b border-dash-border-gray/25 pb-3">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 border-b border-slate-100 dark:border-slate-800 pb-3">
                   <div>
-                    <span className="text-[10px] text-dash-primary-purple font-extrabold tracking-widest uppercase font-outfit">
+                    <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-extrabold tracking-widest uppercase font-outfit">
                       Question {generatedQuestions.findIndex(q => q.id === selectedId) + 1} of {generatedQuestions.length} ({selectedQuestion?.type || 'MCQ'})
                     </span>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="font-outfit font-extrabold text-base text-dash-dark-purple">
-                        Previewing Question Details
+                      <span className="font-outfit font-extrabold text-base text-slate-900 dark:text-slate-50">
+                        {selectedQuestion?.topic || 'Question Details'}
                       </span>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 text-xs font-bold text-dash-light-purple">
-                    <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-dash-dark-purple/80 bg-dash-light-blue-bg border border-dash-border-gray/30 px-2.5 py-1 rounded-xl">
-                      <BookOpen size={12} className="text-dash-primary-purple" />
+                  <div className="flex items-center gap-2 text-xs font-bold">
+                    <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2.5 py-1 rounded-xl">
+                      <BookOpen size={12} className="text-indigo-500" />
                       {selectedQuestion?.subject}
                     </span>
-                    <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-dash-dark-purple/80 bg-dash-light-blue-bg border border-dash-border-gray/30 px-2.5 py-1 rounded-xl">
-                      <Clock size={12} className="text-dash-primary-purple" />
+                    <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2.5 py-1 rounded-xl">
+                      <Clock size={12} className="text-indigo-500" />
                       {selectedQuestion?.estimatedTime || '15 Minutes'}
                     </span>
                   </div>
                 </div>
 
                 {/* Metadata Cards Grid */}
-                <div className="bg-dash-light-blue-bg/30 border border-dash-border-gray/40 rounded-2xl p-4.5 grid grid-cols-4 gap-4 items-center">
+                <div className="bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl p-4 grid grid-cols-2 sm:grid-cols-4 gap-4 items-center">
                   <div>
-                    <span className="text-[10px] font-bold text-dash-light-purple uppercase tracking-wider block mb-1">
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-0.5">
                       Question No
                     </span>
-                    <span className="text-xs font-extrabold text-dash-dark-purple font-outfit">
+                    <span className="text-xs font-mono font-extrabold text-slate-900 dark:text-slate-100">
                       #{generatedQuestions.findIndex(q => q.id === selectedId) + 1}
                     </span>
                   </div>
 
                   <div>
-                    <span className="text-[10px] font-bold text-dash-light-purple uppercase tracking-wider block mb-1">
-                      Question Type
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-0.5">
+                      Type
                     </span>
-                    <span className="text-xs font-extrabold text-dash-primary-purple font-outfit">
+                    <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">
                       {selectedQuestion?.type || 'MCQ'}
                     </span>
                   </div>
 
                   <div>
-                    <span className="text-[10px] font-bold text-dash-light-purple uppercase tracking-wider block mb-1">
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-0.5">
                       Marks
                     </span>
-                    <span className="text-xs font-extrabold text-dash-dark-purple font-outfit">
+                    <span className="text-xs font-mono font-extrabold text-slate-900 dark:text-slate-100">
                       {selectedQuestion?.marks || (selectedQuestion?.type === 'MCQ' ? 1 : 10)} Marks
                     </span>
                   </div>
 
                   <div>
-                    <span className="text-[10px] font-bold text-dash-light-purple uppercase tracking-wider block mb-1">
-                      Est. Duration
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-0.5">
+                      Difficulty
                     </span>
-                    <span className="text-xs font-extrabold text-dash-dark-purple font-outfit">
-                      {selectedQuestion?.estimatedTime || '5 Minutes'}
-                    </span>
-                  </div>
-
-                  <div className="col-span-4 pt-3.5 mt-1.5 border-t border-dash-border-gray/40 flex items-center justify-between">
-                    <span className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider">
-                      Difficulty Level
-                    </span>
-                    <div className="flex items-center gap-1 bg-dash-white-card border border-dash-border-gray/80 p-0.5 rounded-lg">
+                    <div className="flex items-center gap-1">
                       {['Easy', 'Medium', 'Hard'].map((lvl) => {
                         const isActive = selectedQuestion?.difficulty === lvl;
-                        let activeStyle = '';
+                        let activeStyle = 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200';
                         if (isActive) {
-                          if (lvl === 'Easy') activeStyle = 'bg-green-600 text-white shadow-sm';
-                          else if (lvl === 'Medium') activeStyle = 'bg-amber-500 text-white shadow-sm';
-                          else if (lvl === 'Hard') activeStyle = 'bg-rose-600 text-white shadow-sm';
-                        } else {
-                          activeStyle = 'text-dash-light-purple hover:bg-dash-soft-pink hover:text-dash-primary-purple';
+                          if (lvl === 'Easy') activeStyle = 'bg-emerald-500 text-white font-bold shadow-xs';
+                          else if (lvl === 'Medium') activeStyle = 'bg-amber-500 text-white font-bold shadow-xs';
+                          else if (lvl === 'Hard') activeStyle = 'bg-rose-500 text-white font-bold shadow-xs';
                         }
 
                         return (
@@ -1019,9 +964,9 @@ const PreviewQuestionsTab = ({
                             key={lvl}
                             type="button"
                             onClick={() => handleDifficultyChange(selectedQuestion?.id, lvl)}
-                            className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all border-none cursor-pointer ${activeStyle}`}
+                            className={`px-2 py-0.5 rounded-md text-[10px] transition-all border-none cursor-pointer ${activeStyle}`}
                           >
-                            {lvl}
+                            {lvl[0]}
                           </button>
                         );
                       })}
@@ -1030,13 +975,13 @@ const PreviewQuestionsTab = ({
                 </div>
 
                 {/* Main Content Area */}
-                <div className="space-y-4.5">
+                <div className="space-y-4">
                   {/* Problem Statement */}
                   <div className="space-y-1.5">
-                    <h4 className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
+                    <h4 className="text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
                       Question / Problem Statement
                     </h4>
-                    <p className="text-xs font-semibold text-dash-dark-purple leading-relaxed bg-dash-white-card border border-dash-border-gray/40 p-4 rounded-2xl shadow-[0_2px_8px_rgba(87,82,170,0.01)] select-text">
+                    <p className="text-xs font-semibold text-slate-900 dark:text-slate-100 leading-relaxed bg-slate-50/50 dark:bg-slate-950/40 border border-slate-200/80 dark:border-slate-800/80 p-4 rounded-2xl select-text">
                       {selectedQuestion?.problemStatement || selectedQuestion?.question || selectedQuestion?.scenario}
                     </p>
                   </div>
@@ -1044,8 +989,8 @@ const PreviewQuestionsTab = ({
                   {/* MCQ Options Display */}
                   {!(selectedQuestion?.type?.includes('CODING') || selectedQuestion?.type === 'SCENARIO_CODING' || selectedQuestion?.type === 'SCENARIO') && selectedQuestion?.options?.length > 0 && (
                     <div className="space-y-2">
-                      <h4 className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
-                        Options & Correct Answer
+                      <h4 className="text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
+                        Options & Answer Choices
                       </h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                         {selectedQuestion.options.map((opt, idx) => {
@@ -1054,15 +999,16 @@ const PreviewQuestionsTab = ({
                           return (
                             <div
                               key={idx}
-                              className={`p-3 rounded-xl border flex items-center gap-3 transition-all ${isCorrect
-                                ? 'border-green-500 bg-green-50/40 text-green-700 font-bold'
-                                : 'border-dash-border-gray/50 bg-dash-white-card/90 text-dash-dark-purple'
-                                }`}
+                              className={`p-3 rounded-xl border flex items-center gap-3 transition-all ${
+                                isCorrect
+                                  ? 'border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-bold'
+                                  : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/30 text-slate-800 dark:text-slate-200'
+                              }`}
                             >
                               {isCorrect ? (
-                                <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />
+                                <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
                               ) : (
-                                <div className="w-4 h-4 rounded-full border border-dash-light-purple/60 shrink-0 flex items-center justify-center font-bold text-[9px] text-dash-light-purple">
+                                <div className="w-4 h-4 rounded-full border border-slate-300 dark:border-slate-700 shrink-0 flex items-center justify-center font-mono font-bold text-[9px] text-slate-400">
                                   {label}
                                 </div>
                               )}
@@ -1076,24 +1022,24 @@ const PreviewQuestionsTab = ({
                     </div>
                   )}
 
-                  {/* Example Input / Output for Coding Questions Only */}
+                  {/* Example Input / Output for Coding / Scenario */}
                   {selectedQuestion?.subject?.toUpperCase() !== 'APTITUDE' && (selectedQuestion?.exampleInput || selectedQuestion?.exampleOutput || selectedQuestion?.sampleInput || selectedQuestion?.sampleOutput) && (
                     <div className="space-y-2">
-                      <h4 className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
+                      <h4 className="text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
                         Sample Input & Output
                       </h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1">
-                          <span className="text-[9px] font-bold text-dash-light-purple uppercase tracking-wider">Input</span>
-                          <div className="bg-[#fafafc] border border-dash-border-gray/50 rounded-xl p-3 font-mono text-[11px] text-dash-dark-purple flex items-center gap-2">
-                            <Terminal size={12} className="text-dash-light-purple shrink-0" />
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Input</span>
+                          <div className="bg-slate-900 dark:bg-slate-950 border border-slate-800 rounded-xl p-3 font-mono text-[11px] text-slate-200 flex items-center gap-2">
+                            <Terminal size={12} className="text-slate-500 shrink-0" />
                             <span className="select-text whitespace-pre-wrap">{selectedQuestion?.exampleInput || selectedQuestion?.sampleInput || 'N/A'}</span>
                           </div>
                         </div>
                         <div className="space-y-1">
-                          <span className="text-[9px] font-bold text-dash-light-purple uppercase tracking-wider">Output</span>
-                          <div className="bg-[#fafafc] border border-dash-border-gray/50 rounded-xl p-3 font-mono text-[11px] text-dash-dark-purple flex items-center gap-2">
-                            <Play size={12} className="text-dash-light-purple shrink-0" />
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Output</span>
+                          <div className="bg-slate-900 dark:bg-slate-950 border border-slate-800 rounded-xl p-3 font-mono text-[11px] text-emerald-400 flex items-center gap-2">
+                            <Play size={12} className="text-emerald-500 shrink-0" />
                             <span className="select-text whitespace-pre-wrap">{selectedQuestion?.exampleOutput || selectedQuestion?.sampleOutput || 'N/A'}</span>
                           </div>
                         </div>
@@ -1104,23 +1050,23 @@ const PreviewQuestionsTab = ({
                   {/* Expected Answer Details */}
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <h4 className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
-                        {selectedQuestion?.type === 'MCQ' ? 'Correct Answer Details' : (selectedQuestion?.subject?.toUpperCase() === 'APTITUDE' ? 'Expected Answer' : 'Expected Solution')}
+                      <h4 className="text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
+                        {selectedQuestion?.type === 'MCQ' ? 'Correct Answer' : 'Expected Solution / Query'}
                       </h4>
                       {selectedQuestion?.expectedAnswer && (
                         <button
                           onClick={() => handleCopyCode(selectedQuestion.expectedAnswer, selectedQuestion.id)}
-                          className="px-2.5 py-1 rounded-lg border border-dash-border-gray text-[9px] font-bold text-dash-primary-purple hover:bg-dash-soft-pink transition-all flex items-center gap-1 cursor-pointer"
+                          className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 transition-all flex items-center gap-1 cursor-pointer"
                         >
                           {copiedId === selectedQuestion?.id ? (
                             <>
-                              <Check size={10} strokeWidth={3} className="text-green-600" />
-                              <span className="text-green-600">Copied!</span>
+                              <Check size={11} strokeWidth={3} className="text-emerald-500" />
+                              <span className="text-emerald-500">Copied</span>
                             </>
                           ) : (
                             <>
-                              <Copy size={10} />
-                              <span>Copy Answer</span>
+                              <Copy size={11} />
+                              <span>Copy Code</span>
                             </>
                           )}
                         </button>
@@ -1128,18 +1074,18 @@ const PreviewQuestionsTab = ({
                     </div>
 
                     {selectedQuestion?.type === 'MCQ' ? (
-                      <div className="bg-green-50/40 border border-green-200 text-green-700 rounded-xl p-3.5 font-semibold text-xs flex items-center gap-2">
-                        <CheckCircle className="text-green-600 shrink-0" size={16} />
+                      <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded-xl p-3.5 font-semibold text-xs flex items-center gap-2">
+                        <CheckCircle className="text-emerald-500 shrink-0" size={16} />
                         <span>{selectedQuestion.correctAnswer}</span>
                       </div>
                     ) : selectedQuestion?.subject?.toUpperCase() === 'APTITUDE' ? (
-                      <div className="bg-indigo-50/40 border border-indigo-200 text-indigo-900 rounded-xl p-4 font-bold text-sm flex items-center gap-2.5">
-                        <CheckCircle className="text-indigo-600 shrink-0" size={18} />
+                      <div className="bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-indigo-900 dark:text-indigo-200 rounded-xl p-4 font-bold text-sm flex items-center gap-2.5">
+                        <CheckCircle className="text-indigo-600 dark:text-indigo-400 shrink-0" size={18} />
                         <span className="select-text">{selectedQuestion?.expectedAnswer || selectedQuestion?.correctAnswer}</span>
                       </div>
                     ) : (
-                      <div className="bg-[#fafafc] border border-dash-border-gray/50 rounded-2xl p-4.5 overflow-hidden shadow-inner border-l-4 border-l-dash-primary-purple relative">
-                        <div className="absolute right-3.5 top-3.5 text-[9px] font-bold text-dash-light-purple/60 font-mono uppercase tracking-wider select-none">
+                      <div className="bg-slate-900 dark:bg-slate-950 border border-slate-800 rounded-2xl p-4 overflow-hidden shadow-inner border-l-4 border-l-indigo-500 relative">
+                        <div className="absolute right-3.5 top-3.5 text-[9px] font-bold text-slate-500 font-mono uppercase tracking-wider select-none">
                           {selectedQuestion?.subject?.toLowerCase() === 'sql' ? 'sql' : 'python'}
                         </div>
                         <SyntaxHighlighter
@@ -1153,10 +1099,10 @@ const PreviewQuestionsTab = ({
                   {/* Explanation */}
                   {selectedQuestion?.explanation && (
                     <div className="space-y-1.5 pb-2">
-                      <h4 className="text-[10px] font-extrabold text-dash-primary-purple uppercase tracking-wider">
-                        Explanation
+                      <h4 className="text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
+                        Explanation & Rationale
                       </h4>
-                      <p className="text-xs font-medium text-dash-light-purple leading-relaxed bg-[#f8fafc]/50 p-4 rounded-2xl border border-dash-border-gray/30 shadow-[0_1px_5px_rgba(0,0,0,0.01)] select-text">
+                      <p className="text-xs font-medium text-slate-600 dark:text-slate-400 leading-relaxed bg-slate-50/50 dark:bg-slate-950/40 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 select-text">
                         {selectedQuestion.explanation}
                       </p>
                     </div>
@@ -1165,11 +1111,11 @@ const PreviewQuestionsTab = ({
               </div>
 
               {/* Action buttons footer */}
-              <div className="flex items-center gap-3 border-t border-dash-border-gray/25 pt-4 mt-4">
+              <div className="flex items-center gap-3 border-t border-slate-100 dark:border-slate-800 pt-4 mt-4">
                 <button
                   type="button"
                   onClick={() => setIsEditing(true)}
-                  className="flex-1 py-3 rounded-xl border border-dash-border-gray/80 hover:bg-dash-soft-pink text-dash-dark-purple font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer bg-dash-white-card"
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer bg-white dark:bg-slate-900"
                 >
                   <Edit3 size={13} />
                   <span>Edit Question</span>
@@ -1178,7 +1124,7 @@ const PreviewQuestionsTab = ({
                 <button
                   type="button"
                   onClick={() => handleDeleteQuestion(selectedQuestion?.id)}
-                  className="flex-1 py-3 rounded-xl border border-red-200 hover:border-red-300 bg-red-50/50 hover:bg-red-50 text-red-600 font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="flex-1 py-2.5 rounded-xl border border-rose-200 dark:border-rose-900/60 hover:border-rose-300 bg-rose-50/40 dark:bg-rose-950/30 hover:bg-rose-50 text-rose-600 dark:text-rose-400 font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer"
                   title="Delete Question"
                 >
                   <Trash2 size={13} />

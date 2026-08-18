@@ -1,22 +1,39 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Clock,
   BookOpen,
   Calendar,
   Eye,
-  UserPlus,
   Trash2,
-  Users,
   Search,
   X,
   SlidersHorizontal,
-  User,
-  Mail,
-  Phone,
   AlertCircle,
   RefreshCw,
-  Loader2
+  Loader2,
+  PlusCircle,
+  CheckCircle2,
+  Code2,
+  Database,
+  Brain,
+  ShieldCheck,
+  ChevronRight,
+  Layers,
+  Copy,
+  Check,
+  Terminal,
+  FileCode2,
+  Sparkles,
+  LayoutGrid,
+  List,
+  Edit2,
+  Download,
+  Send,
+  HelpCircle,
+  ExternalLink,
+  Tag,
+  ArrowUpDown
 } from 'lucide-react';
 import api from '../../api';
 
@@ -37,418 +54,581 @@ const ActionButton = ({ onClick, disabled, isLoading, loadingText, title, icon: 
     ) : (
       <>
         {Icon && <Icon size={iconSize} />}
-        <span>{children}</span>
+        {children && <span>{children}</span>}
       </>
     )}
   </button>
 );
 
-// CANDIDATE DETAILS MODAL COMPONENT
-const CandidateDetailsModal = ({ item, onClose }) => {
-  if (!item) return null;
+// High-fidelity syntax highlighter for code snippets in Side Sheet
+const SyntaxHighlighter = ({ code, language = 'python' }) => {
+  if (!code) return null;
+  const lang = language.toLowerCase();
+
+  if (lang === 'python') {
+    const combinedRegex = new RegExp(
+      `(?<comment>#.*)|(?<string>'(?:\\\\.|[^'\\\\])*'|"(?:\\\\.|[^"\\\\])*")|(?<keyword>\\b(?:def|class|if|elif|else|for|while|return|import|from|as|try|except|finally|with|in|is|not|and|or|lambda|yield|pass|break|continue|None|True|False)\\b)|(?<func>\\b[a-zA-Z_]\\w*(?=\\s*\\())|(?<number>\\b\\d+(?:\\.\\d+)?\\b)|(?<other>[\\s\\S])`,
+      'g'
+    );
+
+    const tokens = [];
+    let match;
+    while ((match = combinedRegex.exec(code)) !== null) {
+      const groups = match.groups;
+      if (groups.comment) {
+        tokens.push(<span key={match.index} className="text-slate-400 dark:text-slate-500 italic">{groups.comment}</span>);
+      } else if (groups.string) {
+        tokens.push(<span key={match.index} className="text-emerald-600 dark:text-emerald-400 font-medium">{groups.string}</span>);
+      } else if (groups.keyword) {
+        tokens.push(<span key={match.index} className="text-purple-600 dark:text-purple-400 font-bold">{groups.keyword}</span>);
+      } else if (groups.func) {
+        tokens.push(<span key={match.index} className="text-blue-600 dark:text-blue-400 font-semibold">{groups.func}</span>);
+      } else if (groups.number) {
+        tokens.push(<span key={match.index} className="text-amber-600 dark:text-amber-400 font-medium">{groups.number}</span>);
+      } else {
+        tokens.push(groups.other);
+      }
+    }
+    return <pre className="font-mono text-xs leading-relaxed overflow-x-auto whitespace-pre-wrap text-slate-800 dark:text-slate-200">{tokens}</pre>;
+  }
+
+  if (lang === 'sql') {
+    const combinedRegex = new RegExp(
+      `(?<comment>--.*)|(?<string>'(?:\\\\.|[^'\\\\])*')|(?<keyword>\\b(?:SELECT|FROM|WHERE|GROUP\\s+BY|HAVING|ORDER\\s+BY|JOIN|LEFT|RIGHT|INNER|OUTER|ON|AND|OR|NOT|AS|IN|LIKE|IS|NULL|LIMIT|OFFSET|TOP|INSERT|INTO|VALUES|UPDATE|DELETE|CREATE|TABLE|ALTER)\\b)|(?<func>\\b(?:COUNT|SUM|AVG|MIN|MAX|COALESCE|CONCAT|NOW|DATE|ROW_NUMBER|DENSE_RANK|ISNULL|CAST|CONVERT)\\b)|(?<number>\\b\\d+\\b)|(?<other>[\\s\\S])`,
+      'gi'
+    );
+
+    const tokens = [];
+    let match;
+    while ((match = combinedRegex.exec(code)) !== null) {
+      const groups = match.groups;
+      if (groups.comment) {
+        tokens.push(<span key={match.index} className="text-slate-400 dark:text-slate-500 italic">{groups.comment}</span>);
+      } else if (groups.string) {
+        tokens.push(<span key={match.index} className="text-emerald-600 dark:text-emerald-400 font-medium">{groups.string}</span>);
+      } else if (groups.keyword) {
+        tokens.push(<span key={match.index} className="text-sky-600 dark:text-sky-400 font-bold uppercase">{groups.keyword}</span>);
+      } else if (groups.func) {
+        tokens.push(<span key={match.index} className="text-amber-600 dark:text-amber-400 font-semibold">{groups.func}</span>);
+      } else if (groups.number) {
+        tokens.push(<span key={match.index} className="text-indigo-600 dark:text-indigo-400 font-medium">{groups.number}</span>);
+      } else {
+        tokens.push(groups.other);
+      }
+    }
+    return <pre className="font-mono text-xs leading-relaxed overflow-x-auto whitespace-pre-wrap text-slate-800 dark:text-slate-200">{tokens}</pre>;
+  }
+
+  return <pre className="font-mono text-xs leading-relaxed overflow-x-auto whitespace-pre-wrap text-slate-800 dark:text-slate-200">{code}</pre>;
+};
+
+// ==========================================
+// 1. SLIDE-OVER SIDE SHEET FOR PREVIEWING
+// ==========================================
+export const PreviewQuestionsSideSheet = ({
+  assessment,
+  onClose,
+  onAssignClick,
+  onOpenInStudio,
+  showToast
+}) => {
+  const [selectedQuestionIndex, setSelectedQuestionIndex] = useState(0);
+  const [copiedCodeIndex, setCopiedCodeIndex] = useState(null);
+  const [filterQuery, setFilterQuery] = useState('');
+
+  const questions = useMemo(() => {
+    return Array.isArray(assessment?.questions) ? assessment.questions : [];
+  }, [assessment]);
+
+  const filteredQuestions = useMemo(() => {
+    if (!filterQuery) return questions;
+    const q = filterQuery.toLowerCase();
+    return questions.filter(item => {
+      const title = (item.title || item.question || '').toLowerCase();
+      const sub = (item.subject || '').toLowerCase();
+      return title.includes(q) || sub.includes(q);
+    });
+  }, [questions, filterQuery]);
+
+  const activeQuestion = filteredQuestions[selectedQuestionIndex] || questions[0];
+
+  const handleCopyCode = (code, index) => {
+    if (!code) return;
+    navigator.clipboard.writeText(code);
+    setCopiedCodeIndex(index);
+    if (showToast) showToast('Solution snippet copied to clipboard');
+    setTimeout(() => setCopiedCodeIndex(null), 2000);
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  if (!assessment) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-dash-dark-purple/60 backdrop-blur-md">
+    <div className="fixed inset-0 z-[150] overflow-hidden flex justify-end">
+      {/* Backdrop */}
       <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.9 }}
-        className="bg-white rounded-[24px] border border-dash-border-gray shadow-2xl w-full max-w-lg p-6 flex flex-col gap-5"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm transition-opacity"
+      />
+
+      {/* Slide-Over Drawer */}
+      <motion.div
+        initial={{ x: '100%' }}
+        animate={{ x: 0 }}
+        exit={{ x: '100%' }}
+        transition={{ type: 'spring', damping: 28, stiffness: 280 }}
+        className="relative w-full max-w-4xl bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col h-full z-10 text-slate-800 dark:text-slate-100"
       >
-        <div className="flex items-center justify-between border-b border-dash-border-gray/30 pb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-dash-primary-purple text-white flex items-center justify-center font-extrabold text-base shadow-sm">
-              {item.candidateName ? item.candidateName[0] : 'C'}
-            </div>
-            <div>
-              <h3 className="font-outfit font-extrabold text-base text-dash-dark-purple">
-                {item.candidateName || 'Candidate Information'}
-              </h3>
-              <span className="text-xs text-dash-light-purple font-medium">
-                Candidate ID: {item.candidateId}
+        {/* Header */}
+        <div className="p-5 sm:p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4 bg-slate-50/60 dark:bg-slate-950/40 shrink-0">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 px-2.5 py-0.5 rounded-full">
+                Question Inspector
+              </span>
+              <span className="text-xs font-mono font-bold text-slate-400">
+                {questions.length} Total Questions
               </span>
             </div>
+            <h3 className="font-outfit font-extrabold text-lg sm:text-xl text-slate-900 dark:text-slate-100 truncate" title={assessment.name}>
+              {assessment.name}
+            </h3>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-xl text-dash-light-purple hover:bg-dash-soft-pink hover:text-dash-dark-purple transition-colors cursor-pointer border-none bg-transparent"
-          >
-            <X size={18} />
-          </button>
-        </div>
 
-        {/* Section 1: Candidate Info */}
-        <div className="bg-dash-light-blue-bg/30 border border-dash-border-gray/40 rounded-2xl p-4 flex flex-col gap-2.5">
-          <h4 className="text-[10px] font-extrabold uppercase tracking-widest text-dash-primary-purple">
-            Candidate Details
-          </h4>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-            <div>
-              <p className="text-[10px] font-bold text-dash-light-purple">Full Name</p>
-              <p className="font-bold text-dash-dark-purple">{item.candidateName || 'N/A'}</p>
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-dash-light-purple">Email Address</p>
-              <p className="font-bold text-dash-dark-purple">{item.candidateEmail || 'N/A'}</p>
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-dash-light-purple">Phone Number</p>
-              <p className="font-bold text-dash-dark-purple">{item.candidatePhone || 'Not Provided'}</p>
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-dash-light-purple">Candidate ID</p>
-              <p className="font-mono text-[11px] font-semibold text-dash-dark-purple truncate">{item.candidateId}</p>
-            </div>
-          </div>
-        </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {onOpenInStudio && (
+              <button
+                type="button"
+                onClick={() => onOpenInStudio(assessment)}
+                className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 font-bold text-xs text-slate-700 dark:text-slate-300 transition-all cursor-pointer shadow-2xs"
+              >
+                <Sparkles size={13} className="text-indigo-500" />
+                <span>Open in Studio</span>
+              </button>
+            )}
 
-        {/* Section 2: Assessment Info */}
-        <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-4 flex flex-col gap-2.5">
-          <h4 className="text-[10px] font-extrabold uppercase tracking-widest text-dash-primary-purple">
-            Assessment Information
-          </h4>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-            <div>
-              <p className="text-[10px] font-bold text-dash-light-purple">Assessment Name</p>
-              <p className="font-bold text-dash-dark-purple">{item.assessmentName || 'N/A'}</p>
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-dash-light-purple">Assessment ID</p>
-              <p className="font-mono text-[11px] font-semibold text-dash-dark-purple truncate">{item.assessmentId}</p>
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-dash-light-purple">Assigned Date & Time</p>
-              <p className="font-bold text-dash-dark-purple">
-                {item.assignedAt ? new Date(item.assignedAt).toLocaleString() : 'N/A'}
-              </p>
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-dash-light-purple">Due Date</p>
-              <p className="font-bold text-dash-dark-purple">
-                {item.dueDate ? new Date(item.dueDate).toLocaleDateString() : 'No Due Date'}
-              </p>
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-dash-light-purple">Current Status</p>
-              <span className="font-bold text-dash-primary-purple uppercase text-[11px]">{item.status}</span>
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-dash-light-purple">Score</p>
-              <p className="font-bold text-dash-dark-purple">
-                {item.score !== null && item.score !== undefined ? `${item.score}%` : 'Pending Completion'}
-              </p>
-            </div>
+            {onAssignClick && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onAssignClick(assessment);
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition-all cursor-pointer border-none"
+              >
+                <Send size={13} />
+                <span>Assign</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition-all cursor-pointer"
+            >
+              <X size={16} />
+            </button>
           </div>
         </div>
 
-        <div className="flex justify-end pt-2">
-          <button
-            onClick={onClose}
-            className="px-5 py-2 rounded-xl bg-dash-dark-purple text-white font-bold text-xs hover:bg-dash-primary-purple transition-all cursor-pointer border-none"
-          >
-            Close
-          </button>
+        {/* Body Content: 2-Column Split */}
+        <div className="flex-1 overflow-hidden grid grid-cols-1 md:grid-cols-12">
+          
+          {/* Left Column: Questions List Navigation (4 cols) */}
+          <div className="md:col-span-4 border-r border-slate-200 dark:border-slate-800 flex flex-col h-full bg-slate-50/40 dark:bg-slate-950/20">
+            {/* Question Filter */}
+            <div className="p-3 border-b border-slate-200 dark:border-slate-800">
+              <div className="relative">
+                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Filter questions..."
+                  value={filterQuery}
+                  onChange={(e) => {
+                    setFilterQuery(e.target.value);
+                    setSelectedQuestionIndex(0);
+                  }}
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-1.5 pl-8 pr-3 text-xs font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+
+            {/* Questions Index */}
+            <div className="flex-1 overflow-y-auto p-2 space-y-1.5 dashboard-scrollbar">
+              {filteredQuestions.length === 0 ? (
+                <div className="py-8 text-center text-xs text-slate-400">
+                  No questions match your filter.
+                </div>
+              ) : (
+                filteredQuestions.map((q, idx) => {
+                  const isSelected = activeQuestion === q;
+                  const subject = q.subject || 'Technical';
+                  return (
+                    <button
+                      key={q.id || idx}
+                      type="button"
+                      onClick={() => setSelectedQuestionIndex(idx)}
+                      className={`w-full p-3 rounded-2xl text-left transition-all flex items-start justify-between gap-2 cursor-pointer border ${
+                        isSelected
+                          ? 'border-indigo-500 bg-indigo-50/80 dark:bg-indigo-950/50 shadow-xs ring-1 ring-indigo-500/20'
+                          : 'border-transparent hover:bg-slate-100 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300'
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                            isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                          }`}>
+                            Q{idx + 1}
+                          </span>
+                          <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider truncate">
+                            {subject}
+                          </span>
+                        </div>
+                        <p className="text-xs font-bold text-slate-900 dark:text-slate-100 line-clamp-2 leading-snug">
+                          {q.title || q.question || 'Technical Problem'}
+                        </p>
+                      </div>
+                      <span className="text-[9px] font-bold font-mono px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 shrink-0">
+                        {q.marks || 10}m
+                      </span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* Right Column: Question Details Inspector (8 cols) */}
+          <div className="md:col-span-8 flex flex-col h-full overflow-y-auto p-6 space-y-6 dashboard-scrollbar">
+            {activeQuestion ? (
+              <>
+                {/* Question Header */}
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-black text-sm px-2.5 py-1 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                      Question {questions.indexOf(activeQuestion) + 1}
+                    </span>
+                    <span className="text-xs font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                      {activeQuestion.subject || 'General'}
+                    </span>
+                    <span className="text-xs font-bold px-2.5 py-1 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                      {activeQuestion.difficulty || 'Medium'}
+                    </span>
+                  </div>
+
+                  <span className="text-xs font-mono font-bold text-slate-500 dark:text-slate-400">
+                    Marks: <strong className="text-slate-900 dark:text-slate-100">{activeQuestion.marks || 10} pts</strong>
+                  </span>
+                </div>
+
+                {/* Problem Statement */}
+                <div className="space-y-2">
+                  <h4 className="font-outfit font-extrabold text-base text-slate-900 dark:text-slate-100">
+                    {activeQuestion.title || activeQuestion.question || 'Problem Statement'}
+                  </h4>
+                  {activeQuestion.description && activeQuestion.description !== activeQuestion.title && (
+                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-wrap bg-slate-50 dark:bg-slate-950/50 p-4 rounded-2xl border border-slate-200/70 dark:border-slate-800/70">
+                      {activeQuestion.description}
+                    </p>
+                  )}
+                </div>
+
+                {/* MCQ Options (if format is MCQ) */}
+                {Array.isArray(activeQuestion.options) && activeQuestion.options.length > 0 && (
+                  <div className="space-y-3">
+                    <h5 className="font-outfit font-extrabold text-xs uppercase tracking-wider text-slate-400">
+                      Answer Choices
+                    </h5>
+                    <div className="grid grid-cols-1 gap-2">
+                      {activeQuestion.options.map((opt, i) => {
+                        const isCorrect = (
+                          activeQuestion.correctAnswer === opt ||
+                          activeQuestion.answer === opt ||
+                          activeQuestion.correct_option === opt ||
+                          (typeof activeQuestion.correctAnswerIndex === 'number' && activeQuestion.correctAnswerIndex === i)
+                        );
+                        return (
+                          <div
+                            key={i}
+                            className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 text-xs font-semibold ${
+                              isCorrect
+                                ? 'bg-emerald-50/70 dark:bg-emerald-950/40 border-emerald-500/40 text-emerald-900 dark:text-emerald-200 shadow-2xs'
+                                : 'bg-slate-50/50 dark:bg-slate-950/30 border-slate-200/80 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <span className={`w-6 h-6 rounded-lg flex items-center justify-center font-mono font-bold text-[11px] ${
+                                isCorrect ? 'bg-emerald-600 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                              }`}>
+                                {String.fromCharCode(65 + i)}
+                              </span>
+                              <span>{typeof opt === 'string' ? opt : JSON.stringify(opt)}</span>
+                            </div>
+                            {isCorrect && (
+                              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-emerald-600 text-white flex items-center gap-1">
+                                <Check size={11} strokeWidth={3} />
+                                <span>Correct Answer</span>
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Sample Test Cases (if coding question) */}
+                {Array.isArray(activeQuestion.testCases) && activeQuestion.testCases.length > 0 && (
+                  <div className="space-y-3">
+                    <h5 className="font-outfit font-extrabold text-xs uppercase tracking-wider text-slate-400">
+                      Sample Test Cases
+                    </h5>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {activeQuestion.testCases.map((tc, idx) => (
+                        <div key={idx} className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-2 text-xs font-mono">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-extrabold uppercase text-slate-400">Case {idx + 1}</span>
+                            {tc.is_hidden && <span className="text-[9px] font-bold text-amber-500">Hidden</span>}
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 block font-sans">Input:</span>
+                            <code className="text-slate-800 dark:text-slate-200 font-bold block">{tc.input || 'None'}</code>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 block font-sans">Expected Output:</span>
+                            <code className="text-emerald-600 dark:text-emerald-400 font-bold block">{tc.expected_output || tc.output || 'None'}</code>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Solution Code / Starter Code */}
+                {(activeQuestion.solutionCode || activeQuestion.code || activeQuestion.starterCode) && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h5 className="font-outfit font-extrabold text-xs uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                        <Code2 size={13} className="text-indigo-500" />
+                        <span>Solution / Code Reference</span>
+                      </h5>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyCode(activeQuestion.solutionCode || activeQuestion.code || activeQuestion.starterCode, selectedQuestionIndex)}
+                        className="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold text-[10px] flex items-center gap-1 transition-all cursor-pointer"
+                      >
+                        {copiedCodeIndex === selectedQuestionIndex ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} />}
+                        <span>{copiedCodeIndex === selectedQuestionIndex ? 'Copied' : 'Copy Code'}</span>
+                      </button>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-inner overflow-hidden">
+                      <SyntaxHighlighter
+                        code={activeQuestion.solutionCode || activeQuestion.code || activeQuestion.starterCode}
+                        language={activeQuestion.subject === 'SQL' ? 'sql' : 'python'}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Explanation */}
+                {activeQuestion.explanation && (
+                  <div className="p-4 rounded-2xl bg-indigo-50/60 dark:bg-indigo-950/40 border border-indigo-200/60 dark:border-indigo-800/60 space-y-1.5">
+                    <h5 className="font-outfit font-extrabold text-xs uppercase tracking-wider text-indigo-700 dark:text-indigo-300 flex items-center gap-1.5">
+                      <HelpCircle size={13} />
+                      <span>Explanation & Criteria</span>
+                    </h5>
+                    <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+                      {activeQuestion.explanation}
+                    </p>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="h-full flex items-center justify-center text-slate-400 text-xs">
+                Select a question from the left sidebar to inspect details.
+              </div>
+            )}
+          </div>
         </div>
       </motion.div>
     </div>
   );
 };
 
-// ASSIGNED CANDIDATES MODAL COMPONENT
-const AssignedCandidatesModal = ({
+// ==========================================
+// 2. QUICK EDIT ASSESSMENT MODAL
+// ==========================================
+const QuickEditAssessmentModal = ({
   assessment,
-  assignments = [],
   onClose,
-  fetchAssignments,
-  showToast,
-  onAssignClick
+  onSave,
+  showToast
 }) => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('ALL');
-  const [selectedCandidateDetail, setSelectedCandidateDetail] = useState(null);
+  const [name, setName] = useState(assessment?.name || '');
+  const [duration, setDuration] = useState(assessment?.duration || '60 minutes');
+  const [difficulty, setDifficulty] = useState(assessment?.difficulty || 'Medium');
+  const [isSaving, setIsSaving] = useState(false);
 
-  if (!assessment) return null;
-
-  const asmAssignments = assignments.filter(
-    (a) => String(a.assessmentId) === String(assessment.id) || String(a.assessment_id) === String(assessment.id)
-  );
-
-  const filtered = asmAssignments.filter((a) => {
-    const name = (a.candidateName || '').toLowerCase();
-    const email = (a.candidateEmail || '').toLowerCase();
-    const q = searchQuery.toLowerCase();
-    const matchesSearch = name.includes(q) || email.includes(q);
-
-    if (!matchesSearch) return false;
-    if (statusFilter !== 'ALL' && (a.status || '').toUpperCase() !== statusFilter) {
-      return false;
+  const handleSave = async (e) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      if (showToast) showToast('Please enter an assessment title.');
+      return;
     }
-    return true;
-  });
 
-  const getStatusBadge = (status) => {
-    const s = (status || '').toUpperCase();
-    switch (s) {
-      case 'COMPLETED':
-        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-      case 'IN_PROGRESS':
-        return 'bg-amber-50 text-amber-700 border-amber-200';
-      case 'EXPIRED':
-        return 'bg-rose-50 text-rose-700 border-rose-200';
-      case 'SCHEDULED':
-        return 'bg-blue-50 text-blue-700 border-blue-200';
-      default:
-        return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+    setIsSaving(true);
+    try {
+      const payload = {
+        name: name.trim(),
+        duration: duration,
+        difficulty: difficulty
+      };
+      const res = await api.put(`/api/assessment/${assessment.id}`, payload);
+      if (res.data) {
+        if (showToast) showToast('Assessment updated successfully.');
+        onSave(res.data);
+        onClose();
+      }
+    } catch (err) {
+      console.error('Failed to update assessment:', err);
+      if (showToast) showToast('Failed to update assessment.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
   return (
-    <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-dash-dark-purple/50 backdrop-blur-sm">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.95 }}
-          className="bg-white rounded-[24px] border border-dash-border-gray shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden"
-        >
-          {/* Header */}
-          <div className="p-6 border-b border-dash-border-gray/40 flex items-center justify-between bg-dash-light-blue-bg/20">
+    <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-2xl space-y-6"
+      >
+        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold">
+              <Edit2 size={16} />
+            </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded-md bg-dash-primary-purple/10 text-dash-primary-purple border border-dash-primary-purple/20">
-                  Assigned Candidate Details
-                </span>
-                <span className="text-xs text-dash-light-purple font-semibold">
-                  Assessment ID: {assessment.id}
-                </span>
-              </div>
-              <h2 className="font-outfit font-extrabold text-xl text-dash-dark-purple mt-1">
-                {assessment.name}
-              </h2>
+              <h3 className="font-outfit font-extrabold text-base text-slate-900 dark:text-slate-100">
+                Edit Assessment Details
+              </h3>
+              <p className="text-[11px] text-slate-400">Update title, duration, and difficulty level.</p>
             </div>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 cursor-pointer">
+            <X size={16} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSave} className="space-y-4 text-xs font-semibold">
+          <div className="space-y-1.5">
+            <label className="text-slate-700 dark:text-slate-300 font-bold">Assessment Title</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl py-2.5 px-3.5 text-xs font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-slate-700 dark:text-slate-300 font-bold">Duration</label>
+              <select
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl py-2.5 px-3.5 text-xs font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
+              >
+                <option value="30 minutes">30 minutes</option>
+                <option value="45 minutes">45 minutes</option>
+                <option value="60 minutes">60 minutes</option>
+                <option value="90 minutes">90 minutes</option>
+                <option value="120 minutes">120 minutes</option>
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-slate-700 dark:text-slate-300 font-bold">Difficulty</label>
+              <select
+                value={difficulty}
+                onChange={(e) => setDifficulty(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl py-2.5 px-3.5 text-xs font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
+              >
+                <option value="Easy">Easy (Junior)</option>
+                <option value="Medium">Medium (Mid-level)</option>
+                <option value="Hard">Hard (Senior)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
             <button
+              type="button"
               onClick={onClose}
-              className="p-2 rounded-xl text-dash-light-purple hover:bg-dash-soft-pink hover:text-dash-dark-purple transition-all cursor-pointer border-none bg-transparent"
+              className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-bold hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
             >
-              <X size={20} />
+              Cancel
             </button>
+            <ActionButton
+              onClick={handleSave}
+              isLoading={isSaving}
+              loadingText="Saving..."
+              className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-xs cursor-pointer border-none"
+            >
+              Save Changes
+            </ActionButton>
           </div>
-
-          {/* Body */}
-          <div className="p-6 overflow-y-auto flex flex-col gap-5">
-            {/* Stats bar */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="p-3.5 rounded-2xl bg-dash-light-blue-bg/30 border border-dash-border-gray/40">
-                <p className="text-[10px] font-bold text-dash-light-purple uppercase tracking-wider">Total Assigned</p>
-                <p className="text-xl font-extrabold text-dash-dark-purple mt-0.5">{asmAssignments.length}</p>
-              </div>
-              <div className="p-3.5 rounded-2xl bg-amber-50/50 border border-amber-200/50">
-                <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">In Progress</p>
-                <p className="text-xl font-extrabold text-amber-700 mt-0.5">
-                  {asmAssignments.filter(a => a.status === 'IN_PROGRESS').length}
-                </p>
-              </div>
-              <div className="p-3.5 rounded-2xl bg-emerald-50/50 border border-emerald-200/50">
-                <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Completed</p>
-                <p className="text-xl font-extrabold text-emerald-700 mt-0.5">
-                  {asmAssignments.filter(a => a.status === 'COMPLETED').length}
-                </p>
-              </div>
-              <div className="p-3.5 rounded-2xl bg-rose-50/50 border border-rose-200/50">
-                <p className="text-[10px] font-bold text-rose-600 uppercase tracking-wider">Expired / Locked</p>
-                <p className="text-xl font-extrabold text-rose-700 mt-0.5">
-                  {asmAssignments.filter(a => a.status === 'EXPIRED').length}
-                </p>
-              </div>
-            </div>
-
-            {/* Search & Filter Toolbar */}
-            <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-slate-50 border border-slate-200/60 p-3 rounded-2xl">
-              <div className="relative w-full sm:w-72">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-dash-light-purple" />
-                <input
-                  type="text"
-                  placeholder="Search candidate name or email..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-white border border-dash-border-gray rounded-xl py-2 pl-9 pr-3 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple"
-                />
-              </div>
-
-              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                <SlidersHorizontal size={14} className="text-dash-light-purple" />
-                <span className="text-xs font-bold text-dash-light-purple">Status:</span>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="bg-white border border-dash-border-gray rounded-xl py-2 px-3 text-xs font-bold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple cursor-pointer"
-                >
-                  <option value="ALL">All Statuses</option>
-                  <option value="ASSIGNED">Assigned</option>
-                  <option value="IN_PROGRESS">In Progress</option>
-                  <option value="COMPLETED">Completed</option>
-                  <option value="EXPIRED">Expired</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Candidates Table */}
-            {filtered.length === 0 ? (
-              <div className="p-12 text-center border border-dash-border-gray/50 rounded-2xl bg-slate-50/50">
-                <User size={32} className="mx-auto text-dash-light-purple/50 mb-2" />
-                <p className="font-bold text-sm text-dash-dark-purple">
-                  No candidate has been assigned to this assessment.
-                </p>
-                <p className="text-xs text-dash-light-purple mt-1">
-                  Assign this assessment to candidates using the "Assign" button.
-                </p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto border border-dash-border-gray/60 rounded-2xl shadow-sm">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-slate-100/70 border-b border-dash-border-gray/50 text-[11px] font-extrabold text-dash-light-purple uppercase tracking-wider">
-                      <th className="py-3 px-4">Candidate Details</th>
-                      <th className="py-3 px-4">Status</th>
-                      <th className="py-3 px-4">Assigned On</th>
-                      <th className="py-3 px-4">Due Date</th>
-                      <th className="py-3 px-4">Score</th>
-                      <th className="py-3 px-4 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-dash-border-gray/30 text-xs font-semibold text-dash-dark-purple">
-                    {filtered.map((item) => (
-                      <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="py-3.5 px-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-dash-primary-purple/15 text-dash-primary-purple flex items-center justify-center font-bold text-xs shrink-0">
-                              {item.candidateName ? item.candidateName[0] : 'C'}
-                            </div>
-                            <div>
-                              <p className="font-bold text-dash-dark-purple">{item.candidateName || 'Candidate'}</p>
-                              <p className="text-[11px] text-dash-light-purple font-medium flex items-center gap-1.5 mt-0.5">
-                                <Mail size={11} /> {item.candidateEmail}
-                              </p>
-                              {item.candidatePhone && (
-                                <p className="text-[10px] text-dash-light-purple/80 font-medium flex items-center gap-1.5">
-                                  <Phone size={10} /> {item.candidatePhone}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded-md border uppercase tracking-wider ${getStatusBadge(item.status)}`}>
-                            {item.status}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 text-dash-light-purple">
-                          {item.assignedAt ? new Date(item.assignedAt).toLocaleString() : 'N/A'}
-                        </td>
-                        <td className="py-3.5 px-4 text-dash-light-purple">
-                          {item.dueDate ? new Date(item.dueDate).toLocaleDateString() : 'None'}
-                        </td>
-                        <td className="py-3.5 px-4">
-                          {item.score !== null && item.score !== undefined ? (
-                            <span className="font-extrabold text-dash-primary-purple bg-dash-primary-purple/10 px-2 py-0.5 rounded-md">
-                              {item.score}%
-                            </span>
-                          ) : (
-                            <span className="text-dash-light-purple/60 text-[11px]">—</span>
-                          )}
-                        </td>
-                        <td className="py-3.5 px-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => setSelectedCandidateDetail(item)}
-                              className="px-2.5 py-1.5 rounded-xl bg-dash-primary-purple/10 border border-dash-primary-purple/30 text-dash-primary-purple font-bold text-xs hover:bg-dash-primary-purple hover:text-white transition-all cursor-pointer"
-                            >
-                              Details
-                            </button>
-                            <ActionButton
-                              onClick={async () => {
-                                try {
-                                  await api.delete(`/api/assignments/${item.id}`);
-                                  if (showToast) showToast('Assignment deleted successfully.');
-                                  if (fetchAssignments) await fetchAssignments();
-                                } catch (err) {
-                                  console.error('Failed to delete assignment:', err);
-                                  if (showToast) showToast('Failed to delete assignment.');
-                                }
-                              }}
-                              loadingText="Deleting..."
-                              icon={Trash2}
-                              iconSize={12}
-                              className="px-2.5 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-600 font-bold text-xs hover:bg-rose-600 hover:text-white transition-all cursor-pointer"
-                              title="Delete Assignment"
-                            >
-                              Delete
-                            </ActionButton>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </motion.div>
-      </div>
-
-      {/* Candidate Details Panel Modal */}
-      {selectedCandidateDetail && (
-        <CandidateDetailsModal
-          item={selectedCandidateDetail}
-          onClose={() => setSelectedCandidateDetail(null)}
-        />
-      )}
-    </AnimatePresence>
+        </form>
+      </motion.div>
+    </div>
   );
 };
 
-// ACTIVE ASSESSMENTS TAB COMPONENT
+// ==========================================
+// 3. MAIN REDESIGNED ACTIVE ASSESSMENTS TAB
+// ==========================================
 export const ActiveAssessmentsTab = ({
-  savedAssessments,
+  savedAssessments = [],
   setSavedAssessments,
   setGeneratedQuestions,
-  assignments = [],
-  fetchAssignments,
   showToast,
   setActiveTab,
   onAssignClick
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewingAssignedModalAssessment, setViewingAssignedModalAssessment] = useState(null);
+  const [subjectFilter, setSubjectFilter] = useState('ALL');
+  const [difficultyFilter, setDifficultyFilter] = useState('ALL');
+  const [viewMode, setViewMode] = useState('GRID'); // 'GRID' or 'TABLE'
+  const [sortBy, setSortBy] = useState('NEWEST'); // 'NEWEST', 'QUESTIONS', 'DURATION', 'TITLE'
 
-  const handlePreviewAssessment = (asm) => {
-    if (setGeneratedQuestions) {
-      setGeneratedQuestions(asm.questions || []);
-    }
-    setActiveTab('preview-questions');
-    showToast(`Loaded question preview for "${asm.name}".`);
-  };
+  // Side sheet & modals
+  const [previewingSideSheetAssessment, setPreviewingSideSheetAssessment] = useState(null);
+  const [editingAssessment, setEditingAssessment] = useState(null);
 
-  const handleDeleteAssessment = async (id, name) => {
-    const confirmDelete = window.confirm(`Are you sure you want to delete "${name}"?`);
-    if (!confirmDelete) return;
-
-    try {
-      await api.delete(`/api/assessment/${id}`);
-      setSavedAssessments(prev => prev.filter(asm => asm.id !== id));
-      showToast(`Assessment "${name}" deleted successfully.`);
-    } catch (err) {
-      console.error("Failed to delete assessment from backend:", err);
-      showToast("Error deleting assessment.");
-    }
-  };
-
-  const validActiveAssessments = (() => {
-    const raw = (Array.isArray(savedAssessments) ? savedAssessments : []).filter(asm => {
-      if (!asm || !asm.id || !asm.name) return false;
-      const st = (asm.status || 'Active').toUpperCase();
-      return st === 'ACTIVE' || st === 'CREATED';
+  // Deduplicate and sanitize assessments
+  const validAssessments = useMemo(() => {
+    const raw = (savedAssessments || []).filter(asm => {
+      if (!asm) return false;
+      const hasId = Boolean(asm.id);
+      const hasName = Boolean(asm.name && asm.name.trim());
+      const hasQuestions = Array.isArray(asm.questions) ? asm.questions.length > 0 : (asm.questionsCount > 0);
+      return (hasId || hasName) && hasQuestions;
     });
+
     const seenIds = new Set();
     const seenNames = new Set();
     return raw.filter(asm => {
@@ -460,232 +640,445 @@ export const ActiveAssessmentsTab = ({
       if (nameKey) seenNames.add(nameKey);
       return true;
     });
-  })();
+  }, [savedAssessments]);
 
-  const filteredAssessments = validActiveAssessments.filter(asm => {
-    const query = searchQuery.toLowerCase();
-    const nameMatch = asm.name && asm.name.toLowerCase().includes(query);
-    const subjectMatch = Array.isArray(asm.subjects) && asm.subjects.some(sub => sub.toLowerCase().includes(query));
-    return nameMatch || subjectMatch;
-  });
+  // Derived telemetry metrics
+  const telemetry = useMemo(() => {
+    const totalAssessments = validAssessments.length;
+    const totalQuestions = validAssessments.reduce((acc, a) => acc + (a.questionsCount || a.questions?.length || 0), 0);
+    
+    // Unique subjects
+    const allSubjects = new Set();
+    validAssessments.forEach(a => {
+      if (Array.isArray(a.subjects)) {
+        a.subjects.forEach(s => allSubjects.add(s));
+      }
+    });
 
-  const getSubjectBadgeClass = (subject) => {
-    switch (subject.toLowerCase()) {
-      case 'python':
-        return 'bg-dash-primary-purple/10 text-dash-primary-purple border-dash-primary-purple/20';
-      case 'sql':
-        return 'bg-blue-50 text-blue-600 border-blue-200/50';
-      case 'aptitude':
-        return 'bg-amber-50 text-amber-600 border-amber-200/50';
-      default:
-        return 'bg-gray-50 text-gray-600 border-gray-200';
+    return {
+      totalAssessments,
+      totalQuestions,
+      uniqueSubjectsCount: allSubjects.size,
+      avgDuration: totalAssessments > 0 ? '60m' : '0m'
+    };
+  }, [validAssessments]);
+
+  // Filtered & sorted assessments
+  const filteredAssessments = useMemo(() => {
+    let result = validAssessments.filter(asm => {
+      const query = searchQuery.toLowerCase();
+      const nameMatch = asm.name && asm.name.toLowerCase().includes(query);
+      const subjectMatch = Array.isArray(asm.subjects) && asm.subjects.some(sub => sub.toLowerCase().includes(query));
+      
+      const passesSearch = !searchQuery || nameMatch || subjectMatch;
+      
+      let passesSubject = true;
+      if (subjectFilter !== 'ALL') {
+        passesSubject = Array.isArray(asm.subjects) && asm.subjects.some(s => s.toLowerCase() === subjectFilter.toLowerCase());
+      }
+
+      let passesDiff = true;
+      if (difficultyFilter !== 'ALL') {
+        passesDiff = (asm.difficulty || 'Medium').toLowerCase() === difficultyFilter.toLowerCase();
+      }
+
+      return passesSearch && passesSubject && passesDiff;
+    });
+
+    // Sorting
+    return result.sort((a, b) => {
+      if (sortBy === 'QUESTIONS') {
+        const countA = a.questionsCount || a.questions?.length || 0;
+        const countB = b.questionsCount || b.questions?.length || 0;
+        return countB - countA;
+      }
+      if (sortBy === 'TITLE') {
+        return (a.name || '').localeCompare(b.name || '');
+      }
+      if (sortBy === 'DURATION') {
+        return (b.duration || '').localeCompare(a.duration || '');
+      }
+      // Default: NEWEST
+      return (b.createdDate || '').localeCompare(a.createdDate || '');
+    });
+  }, [validAssessments, searchQuery, subjectFilter, difficultyFilter, sortBy]);
+
+  // Open in Studio for remixing
+  const handleOpenInStudio = (asm) => {
+    if (asm.questions && setGeneratedQuestions) {
+      setGeneratedQuestions(asm.questions);
+    }
+    if (setActiveTab) {
+      setActiveTab('create-assessment');
+      if (showToast) showToast(`Loaded "${asm.name}" into Studio.`);
     }
   };
 
-  const getDifficultyColor = (diff) => {
+  // 1-Click Duplicate Assessment
+  const handleDuplicateAssessment = async (asm) => {
+    try {
+      const payload = {
+        name: `${asm.name} (Copy)`,
+        subjects: asm.subjects || ['General'],
+        difficulty: asm.difficulty || 'Medium',
+        duration: asm.duration || '60 minutes',
+        questionsCount: asm.questionsCount || asm.questions?.length || 0,
+        createdDate: new Date().toISOString().split('T')[0],
+        status: 'Active',
+        candidatesAssigned: 0,
+        questions: asm.questions || []
+      };
+
+      const res = await api.post('/api/assessment', payload);
+      if (res.data && setSavedAssessments) {
+        setSavedAssessments(prev => [res.data, ...prev]);
+        if (showToast) showToast(`Duplicated "${asm.name}" as new blueprint.`);
+      }
+    } catch (err) {
+      console.error('Failed to duplicate assessment:', err);
+      if (showToast) showToast('Failed to duplicate assessment.');
+    }
+  };
+
+  // Export Question Bank to JSON
+  const handleExportJSON = (asm) => {
+    try {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(asm, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `${asm.name.replace(/\s+/g, '_')}_questions.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      if (showToast) showToast(`Exported "${asm.name}" question bank.`);
+    } catch (err) {
+      console.error('Failed to export JSON:', err);
+    }
+  };
+
+  // Delete Assessment
+  const handleDeleteAssessment = async (assessmentId, assessmentName) => {
+    if (!window.confirm(`Are you sure you want to delete "${assessmentName}"? This will remove this assessment and its questions.`)) {
+      return;
+    }
+
+    try {
+      await api.delete(`/api/assessment/${assessmentId}`);
+      if (setSavedAssessments) {
+        setSavedAssessments(prev => prev.filter(asm => asm.id !== assessmentId));
+      }
+      if (showToast) showToast(`Assessment "${assessmentName}" deleted successfully.`);
+      if (previewingSideSheetAssessment?.id === assessmentId) {
+        setPreviewingSideSheetAssessment(null);
+      }
+    } catch (err) {
+      console.error("Failed to delete assessment from backend:", err);
+      if (showToast) showToast("Error deleting assessment.");
+    }
+  };
+
+  // Subject Badge Color Mapping
+  const getSubjectBadge = (subject) => {
+    switch (subject.toLowerCase()) {
+      case 'python':
+        return 'text-amber-700 dark:text-amber-300 bg-amber-500/10 border-amber-500/20';
+      case 'sql':
+        return 'text-sky-700 dark:text-sky-300 bg-sky-500/10 border-sky-500/20';
+      case 'aptitude':
+        return 'text-purple-700 dark:text-purple-300 bg-purple-500/10 border-purple-500/20';
+      default:
+        return 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700';
+    }
+  };
+
+  const getDifficultyBadge = (diff) => {
     switch (diff) {
       case 'Easy':
-        return 'text-green-600 bg-green-50 border-green-200/50';
+        return 'text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 border-emerald-500/20';
       case 'Medium':
-        return 'text-amber-600 bg-amber-50 border-amber-200/50';
+        return 'text-amber-700 dark:text-amber-300 bg-amber-500/10 border-amber-500/20';
       case 'Hard':
-        return 'text-rose-600 bg-rose-50 border-rose-200/50';
+        return 'text-rose-700 dark:text-rose-300 bg-rose-500/10 border-rose-500/20';
       default:
-        return 'text-gray-600 bg-gray-50 border-gray-200';
+        return 'text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700';
     }
   };
 
   return (
-    <div className="flex flex-col gap-6 w-full animate-fade-in">
-      {/* Search & Actions Bar */}
-      <div className="bg-dash-white-card border border-dash-border-gray rounded-[24px] p-5 shadow-sm flex flex-col sm:flex-row gap-4 items-center justify-between">
-        <div className="relative w-full sm:max-w-md group">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-dash-light-purple transition-colors duration-300 group-focus-within:text-dash-primary-purple" size={16} />
-          <input
-            type="text"
-            placeholder="Search active assessments by name or subject..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-dash-white-card border border-dash-border-gray rounded-xl py-2.5 pl-10 pr-4 text-xs font-semibold text-dash-dark-purple placeholder-dash-light-purple/60 focus:outline-none focus:border-dash-primary-purple transition-all"
-          />
-          {searchQuery && (
-            <button onClick={() => setSearchQuery('')} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-dash-light-purple hover:text-dash-dark-purple">
-              <X size={14} />
-            </button>
-          )}
+    <div className="flex flex-col gap-8 w-full animate-fade-in text-slate-800 dark:text-slate-100 transition-colors duration-200">
+      
+      {/* Top Banner Ribbon */}
+      <div className="bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800/80 rounded-3xl p-6 shadow-xs backdrop-blur-md flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+        <div>
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 px-2.5 py-0.5 rounded-full">
+              Assessment Catalog & Question Bank
+            </span>
+          </div>
+          <h2 className="font-outfit font-extrabold text-2xl text-slate-900 dark:text-slate-50 tracking-tight">
+            Manage Assessments
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">
+            Inspect question repositories, edit blueprints, clone drafts, and export test banks.
+          </p>
+        </div>
+
+        {/* Global Telemetry & Creation Actions */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="grid grid-cols-3 gap-2 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-2xl p-2 px-3 text-center">
+            <div className="px-2">
+              <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider block">Assessments</span>
+              <span className="text-sm font-mono font-black text-slate-900 dark:text-slate-100">{telemetry.totalAssessments}</span>
+            </div>
+            <div className="px-2 border-x border-slate-200 dark:border-slate-800">
+              <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider block">Questions</span>
+              <span className="text-sm font-mono font-black text-indigo-600 dark:text-indigo-400">{telemetry.totalQuestions}</span>
+            </div>
+            <div className="px-2">
+              <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider block">Topics</span>
+              <span className="text-sm font-mono font-black text-purple-600 dark:text-purple-400">{telemetry.uniqueSubjectsCount}</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('create-assessment')}
+            className="px-4 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-500/20 flex items-center gap-2 transition-all cursor-pointer border-none"
+          >
+            <PlusCircle size={15} />
+            <span>Create Assessment</span>
+          </button>
         </div>
       </div>
 
-      {/* Grid of Saved Assessments */}
-      {filteredAssessments.length === 0 ? (
-        <div className="bg-dash-white-card border border-dash-border-gray rounded-[24px] p-12 text-center flex flex-col items-center justify-center min-h-[350px] shadow-sm">
-          <div className="p-4 rounded-full bg-dash-light-blue-bg text-dash-primary-purple mb-4">
-            <BookOpen size={36} className="animate-pulse" />
-          </div>
-          <h3 className="font-plus-jakarta font-extrabold text-base text-dash-dark-purple">
-            {searchQuery ? "No Assessments Found" : "No active assessments available."}
-          </h3>
-          <p className="text-xs text-dash-light-purple font-medium mt-2 max-w-sm leading-relaxed">
-            {searchQuery
-              ? `No active assessments match "${searchQuery}". Try refining your search query.`
-              : 'No active assessments have been found in the system.'}
-          </p>
+      {/* Search, Filter, Sort & View Mode Bar */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 shadow-sm flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between">
+        
+        {/* Search Input */}
+        <div className="relative flex-1 max-w-lg group">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 transition-colors duration-200 group-focus-within:text-indigo-500" size={15} />
+          <input
+            type="text"
+            placeholder="Search assessments by title or topic..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl py-2.5 pl-10 pr-8 text-xs font-semibold text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 transition-all"
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery('')} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+              <X size={13} />
+            </button>
+          )}
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {filteredAssessments.map((asm) => {
-            const asmAssignments = assignments.filter(
-              (a) => String(a.assessmentId) === String(asm.id) || String(a.assessment_id) === String(asm.id)
-            );
 
+        {/* Filters, Sorters & View Mode */}
+        <div className="flex items-center gap-3 flex-wrap justify-between lg:justify-end">
+          
+          {/* Subject Pills */}
+          <div className="flex items-center p-0.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700">
+            {['ALL', 'Python', 'SQL', 'Aptitude'].map((sub) => {
+              const isActive = subjectFilter === sub;
+              return (
+                <button
+                  key={sub}
+                  type="button"
+                  onClick={() => setSubjectFilter(sub)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border-none ${
+                    isActive
+                      ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 bg-transparent'
+                  }`}
+                >
+                  {sub === 'ALL' ? 'All' : sub}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Difficulty Filter */}
+          <select
+            value={difficultyFilter}
+            onChange={(e) => setDifficultyFilter(e.target.value)}
+            className="bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-xs font-bold text-slate-700 dark:text-slate-300 focus:outline-none focus:border-indigo-500"
+          >
+            <option value="ALL">All Difficulties</option>
+            <option value="Easy">Easy (Junior)</option>
+            <option value="Medium">Medium (Mid)</option>
+            <option value="Hard">Hard (Senior)</option>
+          </select>
+
+          {/* Sort Selector */}
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-xs font-bold text-slate-700 dark:text-slate-300 focus:outline-none focus:border-indigo-500"
+          >
+            <option value="NEWEST">Newest First</option>
+            <option value="QUESTIONS">Most Questions</option>
+            <option value="TITLE">Title (A-Z)</option>
+            <option value="DURATION">Duration</option>
+          </select>
+
+          {/* View Mode Switcher (Grid vs Table) */}
+          <div className="flex items-center p-0.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700">
+            <button
+              type="button"
+              onClick={() => setViewMode('GRID')}
+              className={`p-1.5 rounded-lg transition-all cursor-pointer border-none ${
+                viewMode === 'GRID'
+                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                  : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 bg-transparent'
+              }`}
+              title="Grid View"
+            >
+              <LayoutGrid size={15} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('TABLE')}
+              className={`p-1.5 rounded-lg transition-all cursor-pointer border-none ${
+                viewMode === 'TABLE'
+                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                  : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 bg-transparent'
+              }`}
+              title="Table View"
+            >
+              <List size={15} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      {filteredAssessments.length === 0 ? (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-12 text-center flex flex-col items-center justify-center min-h-[350px] shadow-sm">
+          <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-4">
+            <BookOpen size={32} />
+          </div>
+          <h3 className="font-outfit font-extrabold text-base text-slate-900 dark:text-slate-100">
+            {searchQuery ? "No Matching Assessments" : "No Assessments Created Yet"}
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1.5 max-w-sm leading-relaxed">
+            {searchQuery
+              ? `No assessments match "${searchQuery}". Try adjusting your keywords or filters.`
+              : 'Create your first custom technical assessment blueprint using the AI Assessment Studio.'}
+          </p>
+          {!searchQuery && (
+            <button
+              onClick={() => setActiveTab('create-assessment')}
+              className="mt-5 px-5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-all shadow-md cursor-pointer border-none"
+            >
+              Launch Assessment Studio
+            </button>
+          )}
+        </div>
+      ) : viewMode === 'GRID' ? (
+        /* ======================== GRID VIEW ======================== */
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 items-stretch">
+          {filteredAssessments.map((asm) => {
+            const questionCount = asm.questionsCount || asm.questions?.length || 0;
             return (
               <motion.div
                 key={asm.id}
                 layout
-                initial={{ opacity: 0, scale: 0.96 }}
+                initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="bg-dash-white-card border border-dash-border-gray hover:border-dash-primary-purple/40 rounded-[24px] p-6 shadow-sm flex flex-col justify-between gap-5 transition-all duration-300 relative group"
+                className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800/90 hover:border-indigo-500/40 dark:hover:border-indigo-400/40 rounded-3xl p-6 shadow-sm flex flex-col justify-between gap-5 transition-all duration-200 group"
               >
                 <div>
-                  {/* Card Header */}
-                  <div className="flex items-start justify-between gap-3 mb-2.5">
-                    <h4 className="font-outfit font-extrabold text-base text-dash-dark-purple leading-snug group-hover:text-dash-primary-purple transition-colors duration-200 truncate max-w-[200px]" title={asm.name}>
+                  {/* Card Header: Title & Difficulty Badge */}
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <h4
+                      className="font-outfit font-extrabold text-base text-slate-900 dark:text-slate-50 leading-snug group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors truncate max-w-[220px]"
+                      title={asm.name}
+                    >
                       {asm.name}
                     </h4>
-                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md border shrink-0 uppercase tracking-wider ${getDifficultyColor(asm.difficulty)}`}>
-                      {asm.difficulty}
+                    <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-md border shrink-0 uppercase tracking-wider ${getDifficultyBadge(asm.difficulty)}`}>
+                      {asm.difficulty || 'Medium'}
                     </span>
                   </div>
 
                   {/* Creation Date */}
-                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-dash-light-purple mb-4">
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-4 font-mono">
                     <Calendar size={12} />
-                    <span>Created: {asm.createdDate}</span>
+                    <span>Created: {asm.createdDate || 'Recent'}</span>
                   </div>
 
                   {/* Subject Badges */}
-                  <div className="flex flex-wrap gap-1.5 mb-4.5">
-                    {asm.subjects.map(sub => (
-                      <span key={sub} className={`text-[9px] font-extrabold uppercase tracking-widest px-2.5 py-1 rounded-full border ${getSubjectBadgeClass(sub)}`}>
+                  <div className="flex flex-wrap gap-1.5 mb-4">
+                    {Array.isArray(asm.subjects) && asm.subjects.map(sub => (
+                      <span key={sub} className={`text-[9px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${getSubjectBadge(sub)}`}>
                         {sub}
                       </span>
                     ))}
                   </div>
 
-                  {/* Meta items */}
-                  <div className="grid grid-cols-2 gap-3.5 bg-dash-light-blue-bg/25 border border-dash-border-gray/30 p-3 rounded-xl mb-3 text-xs font-semibold text-dash-dark-purple">
+                  {/* Metadata block */}
+                  <div className="grid grid-cols-2 gap-3 bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/80 p-3 rounded-2xl mb-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
                     <div className="flex items-center gap-2">
-                      <Clock size={14} className="text-dash-primary-purple" />
+                      <Clock size={14} className="text-indigo-500" />
                       <span>{asm.duration}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <BookOpen size={14} className="text-dash-primary-purple" />
-                      <span>{asm.questionsCount} Questions</span>
+                      <BookOpen size={14} className="text-indigo-500" />
+                      <span>{questionCount} Questions</span>
                     </div>
                   </div>
-
-                  {/* Candidates Assigned Details Section */}
-                  {(() => {
-                    if (asmAssignments.length === 0) {
-                      return (
-                        <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-3 my-2 text-center">
-                          <p className="text-[11px] text-slate-500 font-medium">
-                            No candidate has been assigned to this assessment.
-                          </p>
-                        </div>
-                      );
-                    }
-
-                    if (asmAssignments.length === 1) {
-                      const singleAssigned = asmAssignments[0];
-                      return (
-                        <div className="bg-dash-light-blue-bg/40 border border-dash-primary-purple/20 rounded-xl p-3 my-2 flex flex-col gap-2">
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <div className="w-7 h-7 rounded-full bg-dash-primary-purple/15 text-dash-primary-purple flex items-center justify-center font-bold text-xs shrink-0">
-                                <User size={13} />
-                              </div>
-                              <div className="min-w-0">
-                                <p className="text-xs font-bold text-dash-dark-purple truncate" title={singleAssigned.candidateName}>
-                                  {singleAssigned.candidateName || 'Assigned Candidate'}
-                                </p>
-                                <p className="text-[10px] text-dash-light-purple font-medium truncate" title={singleAssigned.candidateEmail}>
-                                  {singleAssigned.candidateEmail}
-                                </p>
-                              </div>
-                            </div>
-                            <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-md border uppercase tracking-wider shrink-0 ${singleAssigned.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
-                              singleAssigned.status === 'IN_PROGRESS' ? 'bg-amber-50 text-amber-600 border-amber-200' :
-                                singleAssigned.status === 'EXPIRED' ? 'bg-rose-50 text-rose-600 border-rose-200' :
-                                  'bg-indigo-50 text-indigo-600 border-indigo-200'
-                              }`}>
-                              {singleAssigned.status}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between text-[10px] text-dash-light-purple border-t border-dash-border-gray/30 pt-1.5 mt-1">
-                            <span>Assigned: {singleAssigned.assignedAt ? new Date(singleAssigned.assignedAt).toLocaleDateString() : 'Recent'}</span>
-                            <button
-                              onClick={() => setViewingAssignedModalAssessment(asm)}
-                              className="text-dash-primary-purple font-bold hover:underline cursor-pointer border-none bg-transparent"
-                            >
-                              View Details &rarr;
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    return (
-                      <div className="bg-dash-primary-purple/10 border border-dash-primary-purple/20 rounded-xl p-3 my-2 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="p-1.5 rounded-lg bg-dash-primary-purple text-white">
-                            <Users size={14} />
-                          </div>
-                          <div>
-                            <p className="text-xs font-bold text-dash-dark-purple">
-                              Assigned Candidates: {asmAssignments.length}
-                            </p>
-                            <p className="text-[10px] text-dash-light-purple font-medium">
-                              {asmAssignments.filter(a => a.status === 'COMPLETED').length} Completed, {asmAssignments.filter(a => a.status === 'IN_PROGRESS').length} In Progress
-                            </p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => setViewingAssignedModalAssessment(asm)}
-                          className="px-2.5 py-1.5 rounded-lg bg-dash-primary-purple text-white font-bold text-[10px] hover:bg-dash-dark-purple transition-colors cursor-pointer border-none shadow-sm"
-                        >
-                          View List &rarr;
-                        </button>
-                      </div>
-                    );
-                  })()}
                 </div>
 
-                {/* Card Actions */}
-                <div className="border-t border-dash-border-gray/30 pt-4 mt-1">
-                  <div className="flex items-center justify-between gap-2.5 w-full">
+                {/* Card Actions Footer */}
+                <div className="border-t border-slate-100 dark:border-slate-800 pt-4 mt-1 flex flex-col gap-2.5">
+                  {/* Primary Action: Inspect Questions (Opens Side Sheet) */}
+                  <button
+                    type="button"
+                    onClick={() => setPreviewingSideSheetAssessment(asm)}
+                    className="w-full py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 hover:border-indigo-300 dark:hover:border-indigo-800 text-slate-800 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <Eye size={13} />
+                    <span>Inspect Questions</span>
+                  </button>
+
+                  {/* Secondary Actions Toolbar */}
+                  <div className="grid grid-cols-4 gap-1.5">
                     <button
-                      onClick={() => handlePreviewAssessment(asm)}
-                      className="flex-1 py-2.5 rounded-xl border border-dash-primary-purple/30 bg-dash-primary-purple/10 hover:bg-dash-primary-purple/20 text-dash-primary-purple font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer"
+                      type="button"
+                      onClick={() => setEditingAssessment(asm)}
+                      className="py-1.5 px-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold text-[11px] flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                      title="Edit Assessment Details"
                     >
-                      <Eye size={13} />
-                      <span>Preview Questions</span>
+                      <Edit2 size={12} />
+                      <span className="hidden sm:inline">Edit</span>
                     </button>
 
                     <button
-                      onClick={() => onAssignClick(asm)}
-                      className="flex-1 py-2.5 rounded-xl bg-dash-primary-purple/10 border border-dash-primary-purple/20 hover:bg-dash-primary-purple/20 text-dash-primary-purple font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer"
+                      type="button"
+                      onClick={() => handleDuplicateAssessment(asm)}
+                      className="py-1.5 px-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold text-[11px] flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                      title="Clone / Duplicate Assessment"
                     >
-                      <UserPlus size={13} />
-                      <span>Assign</span>
+                      <Copy size={12} />
+                      <span className="hidden sm:inline">Clone</span>
                     </button>
 
                     <button
+                      type="button"
+                      onClick={() => handleExportJSON(asm)}
+                      className="py-1.5 px-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold text-[11px] flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                      title="Export Question Bank to JSON"
+                    >
+                      <Download size={12} />
+                      <span className="hidden sm:inline">JSON</span>
+                    </button>
+
+                    <button
+                      type="button"
                       onClick={() => handleDeleteAssessment(asm.id, asm.name)}
-                      className="p-2.5 rounded-xl border border-red-100 hover:border-red-200 bg-red-50/30 hover:bg-red-50 text-red-600 transition-all duration-200 flex items-center justify-center cursor-pointer"
+                      className="py-1.5 px-2 rounded-xl border border-rose-200/80 dark:border-rose-900/60 bg-rose-50/40 dark:bg-rose-950/20 hover:bg-rose-50 dark:hover:bg-rose-900/40 text-rose-600 dark:text-rose-400 font-bold text-[11px] flex items-center justify-center gap-1 cursor-pointer transition-colors"
                       title="Delete Assessment"
                     >
-                      <Trash2 size={13} />
+                      <Trash2 size={12} />
+                      <span className="hidden sm:inline">Delete</span>
                     </button>
                   </div>
                 </div>
@@ -693,188 +1086,131 @@ export const ActiveAssessmentsTab = ({
             );
           })}
         </div>
-      )}
-
-      {/* Modal for viewing all assigned candidates */}
-      {viewingAssignedModalAssessment && (
-        <AssignedCandidatesModal
-          assessment={viewingAssignedModalAssessment}
-          assignments={assignments}
-          onClose={() => setViewingAssignedModalAssessment(null)}
-          fetchAssignments={fetchAssignments}
-          showToast={showToast}
-          onAssignClick={onAssignClick}
-        />
-      )}
-    </div>
-  );
-};
-
-export const ExpiredAssessmentsTab = ({
-  assignments = [],
-  fetchAssignments,
-  showToast,
-  savedAssessments = [],
-  onAssignClick
-}) => {
-  const [searchQuery, setSearchQuery] = useState('');
-
-  const expiredAssignments = useMemo(() => {
-    const list = Array.isArray(assignments) ? assignments : [];
-    const now = Date.now();
-    return list.filter(a => {
-      if (!a) return false;
-      const st = (a.status || '').toUpperCase();
-      if (st === 'EXPIRED') return true;
-
-      if (st !== 'COMPLETED' && st !== 'SUBMITTED') {
-        const endTimeVal = a.endTime || a.end_time || a.dueDate || a.due_date;
-        if (endTimeVal && new Date(endTimeVal).getTime() < now) {
-          return true;
-        }
-      }
-      return false;
-    });
-  }, [assignments]);
-
-  const filteredExpired = expiredAssignments.filter(a => {
-    const q = searchQuery.toLowerCase();
-    const candName = (a.candidateName || a.candidate?.full_name || a.candidate?.name || '').toLowerCase();
-    const candEmail = (a.candidateEmail || a.candidate?.email || '').toLowerCase();
-    const asmName = (a.assessmentName || a.assessment?.name || '').toLowerCase();
-    return candName.includes(q) || candEmail.includes(q) || asmName.includes(q);
-  });
-
-  return (
-    <div className="flex flex-col gap-6 animate-fade-in w-full">
-      {/* Tab Header */}
-      <div className="flex items-center justify-between bg-dash-white-card border border-dash-border-gray/50 rounded-[20px] p-5 shadow-sm">
-        <div>
-          <h2 className="font-outfit font-bold text-lg text-dash-dark-purple leading-tight flex items-center gap-2">
-            <Clock size={20} className="text-rose-500" />
-            <span>Expired Candidates & Assessments</span>
-          </h2>
-          <p className="text-xs text-dash-light-purple font-semibold mt-1">
-            Track candidates whose assigned assessments have passed their expiration window or due date.
-          </p>
-        </div>
-        <button
-          onClick={fetchAssignments}
-          className="p-2 border border-dash-border-gray hover:bg-dash-light-blue-bg/40 rounded-xl text-dash-dark-purple font-semibold text-xs transition-all flex items-center gap-1.5 cursor-pointer bg-white"
-        >
-          <RefreshCw size={13} />
-          <span>Refresh</span>
-        </button>
-      </div>
-
-      {/* Main Table Card */}
-      <div className="bg-dash-white-card border border-dash-border-gray/50 rounded-[28px] p-6 shadow-sm overflow-hidden flex flex-col gap-5">
-        {/* Search */}
-        <div className="relative w-full sm:max-w-md">
-          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-dash-light-purple" />
-          <input
-            type="text"
-            placeholder="Search candidate name, email, or assessment..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-white border border-dash-border-gray rounded-xl py-2.5 pl-10 pr-4 text-xs font-semibold text-dash-dark-purple focus:outline-none focus:border-dash-primary-purple"
-          />
-        </div>
-
-        {/* Content */}
-        {filteredExpired.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center gap-2">
-            <AlertCircle size={36} className="text-dash-light-purple/40" />
-            <h4 className="font-plus-jakarta font-extrabold text-sm text-dash-dark-purple">No Expired Assessments</h4>
-            <p className="text-xs text-dash-light-purple font-medium max-w-xs">
-              {searchQuery ? `No expired assessments match "${searchQuery}".` : 'There are currently no expired candidate assessments.'}
-            </p>
-          </div>
-        ) : (
-          <div className="w-full overflow-x-auto">
+      ) : (
+        /* ======================== TABLE VIEW ======================== */
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-dash-border-gray/25 text-[10px] text-dash-light-purple font-extrabold uppercase tracking-wider">
-                  <th className="pb-3.5 pl-2">Candidate Name</th>
-                  <th className="pb-3.5">Assessment Name</th>
-                  <th className="pb-3.5">Assigned Date</th>
-                  <th className="pb-3.5">Expiration Date</th>
-                  <th className="pb-3.5">Status</th>
-                  <th className="pb-3.5 text-right pr-2">Actions</th>
+                <tr className="bg-slate-50 dark:bg-slate-950/80 border-b border-slate-200 dark:border-slate-800 text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                  <th className="py-3.5 px-5">Assessment Name</th>
+                  <th className="py-3.5 px-4">Topics</th>
+                  <th className="py-3.5 px-4">Difficulty</th>
+                  <th className="py-3.5 px-4">Duration</th>
+                  <th className="py-3.5 px-4">Questions</th>
+                  <th className="py-3.5 px-4">Created Date</th>
+                  <th className="py-3.5 px-5 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-dash-border-gray/10 text-xs font-semibold">
-                {filteredExpired.map((a) => {
-                  const candidateName = a.candidateName || a.candidate?.full_name || a.candidate?.name || 'Candidate';
-                  const candidateEmail = a.candidateEmail || a.candidate?.email || '';
-                  const assessmentName = a.assessmentName || a.assessment?.name || 'Assessment';
-                  const rawAssigned = a.assignedAt || a.assigned_at || a.created_at;
-                  const rawExp = a.dueDate || a.due_date || a.endTime || a.end_time;
-
-                  const assignedFormatted = rawAssigned ? new Date(rawAssigned).toLocaleString(undefined, {
-                    year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                  }) : 'N/A';
-
-                  const expFormatted = rawExp ? new Date(rawExp).toLocaleString(undefined, {
-                    year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                  }) : 'Expired';
-
-                  return (
-                    <tr key={a.id} className="hover:bg-rose-50/20 transition-colors">
-                      <td className="py-4 pl-2">
-                        <div className="flex flex-col">
-                          <span className="text-dash-dark-purple font-bold text-xs">{candidateName}</span>
-                          {candidateEmail && <span className="text-[10px] text-dash-light-purple font-medium">{candidateEmail}</span>}
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs font-semibold text-slate-800 dark:text-slate-200">
+                {filteredAssessments.map((asm) => (
+                  <tr key={asm.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
+                    <td className="py-3.5 px-5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs shrink-0">
+                          <BookOpen size={14} />
                         </div>
-                      </td>
-                      <td className="py-4">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-dash-light-blue-bg/60 border border-dash-border-gray text-dash-primary-purple font-bold text-xs">
-                          {assessmentName}
-                        </span>
-                      </td>
-                      <td className="py-4 text-dash-light-purple">
-                        {assignedFormatted}
-                      </td>
-                      <td className="py-4 text-rose-600 font-bold">
-                        {expFormatted}
-                      </td>
-                      <td className="py-4">
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wide bg-rose-50 border border-rose-200 text-rose-700">
-                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                          Expired
-                        </span>
-                      </td>
-                      <td className="py-4 text-right pr-2">
-                        <div className="flex items-center justify-end gap-2">
-                          <ActionButton
-                            onClick={async () => {
-                              try {
-                                await api.delete(`/api/assignments/${a.id}`);
-                                if (showToast) showToast('Expired assignment deleted successfully.');
-                                if (fetchAssignments) await fetchAssignments();
-                              } catch (err) {
-                                console.error('Failed to delete expired assignment:', err);
-                                if (showToast) showToast('Failed to delete assignment.');
-                              }
-                            }}
-                            loadingText="Deleting..."
-                            icon={Trash2}
-                            iconSize={12}
-                            className="px-2.5 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-600 font-bold text-xs hover:bg-rose-600 hover:text-white transition-all cursor-pointer"
-                            title="Delete Assignment"
-                          >
-                            Delete
-                          </ActionButton>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                        <span className="font-bold text-slate-900 dark:text-slate-100">{asm.name}</span>
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <div className="flex flex-wrap gap-1">
+                        {Array.isArray(asm.subjects) && asm.subjects.map(s => (
+                          <span key={s} className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full border ${getSubjectBadge(s)}`}>
+                            {s}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-md border uppercase tracking-wider ${getDifficultyBadge(asm.difficulty)}`}>
+                        {asm.difficulty || 'Medium'}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4 font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                      {asm.duration}
+                    </td>
+                    <td className="py-3.5 px-4 font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                      {asm.questionsCount || asm.questions?.length || 0} Qs
+                    </td>
+                    <td className="py-3.5 px-4 text-slate-400 font-mono text-[11px]">
+                      {asm.createdDate || 'Recent'}
+                    </td>
+                    <td className="py-3.5 px-5 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setPreviewingSideSheetAssessment(asm)}
+                          className="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-slate-700 dark:text-slate-300 font-bold text-xs transition-all cursor-pointer flex items-center gap-1"
+                          title="Inspect Questions"
+                        >
+                          <Eye size={12} />
+                          <span>Inspect</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setEditingAssessment(asm)}
+                          className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                          title="Edit"
+                        >
+                          <Edit2 size={12} />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDuplicateAssessment(asm)}
+                          className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                          title="Clone"
+                        >
+                          <Copy size={12} />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteAssessment(asm.id, asm.name)}
+                          className="p-1.5 rounded-xl border border-rose-200/80 dark:border-rose-900/60 bg-rose-50/40 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/40 cursor-pointer"
+                          title="Delete"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* Slide-Over Side Sheet for Previewing Questions */}
+      <AnimatePresence>
+        {previewingSideSheetAssessment && (
+          <PreviewQuestionsSideSheet
+            assessment={previewingSideSheetAssessment}
+            onClose={() => setPreviewingSideSheetAssessment(null)}
+            onAssignClick={onAssignClick}
+            onOpenInStudio={handleOpenInStudio}
+            showToast={showToast}
+          />
         )}
-      </div>
+      </AnimatePresence>
+
+      {/* Quick Edit Modal */}
+      {editingAssessment && (
+        <QuickEditAssessmentModal
+          assessment={editingAssessment}
+          onClose={() => setEditingAssessment(null)}
+          onSave={(updated) => {
+            if (setSavedAssessments) {
+              setSavedAssessments(prev => prev.map(a => a.id === updated.id ? updated : a));
+            }
+          }}
+          showToast={showToast}
+        />
+      )}
+
     </div>
   );
 };

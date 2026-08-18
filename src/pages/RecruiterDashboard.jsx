@@ -16,7 +16,8 @@ import DashboardOverviewTab from './recruiter/DashboardOverviewTab';
 import CandidatesManagementTab from './recruiter/CandidatesManagementTab';
 import CreateAssessmentTab from './recruiter/CreateAssessmentTab';
 import PreviewQuestionsTab from './recruiter/PreviewQuestionsTab';
-import { ActiveAssessmentsTab, ExpiredAssessmentsTab } from './recruiter/ActiveAssessmentsTab';
+import { ActiveAssessmentsTab } from './recruiter/ActiveAssessmentsTab';
+import AssignAssessmentTab from './recruiter/AssignAssessmentTab';
 import CandidateGroupsTab from './recruiter/CandidateGroupsTab';
 import TechnicalResultsTab from './recruiter/TechnicalResultsTab';
 import EnglishResultsTab from './recruiter/EnglishResultsTab';
@@ -117,6 +118,11 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
 
   // AI Assessment creation & preview states
   const [selectedSubjects, setSelectedSubjects] = useState(['Python', 'SQL']);
+  const [subjectQuestionCounts, setSubjectQuestionCounts] = useState({
+    Python: 10,
+    SQL: 10,
+    Aptitude: 5
+  });
   const [assessmentTitle, setAssessmentTitle] = useState('Python & SQL Technical Assessment');
   const [durationInput, setDurationInput] = useState('60 minutes');
   const [questionDist, setQuestionDist] = useState({ mcq: 70, scenario: 30 });
@@ -339,7 +345,107 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
     }
   };
 
-  // AI Assessment Generation
+  // SSE Stream Consumer Helper
+  const streamAssessmentFromBackend = async (payload, onQuestionReceived, onStatusUpdate) => {
+    const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+    const token = localStorage.getItem('recruitai_access_token');
+    const endpoint = `${baseURL}/api/assessment/generate-stream`;
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      let parsedDetail = errText;
+      try {
+        const jsonErr = JSON.parse(errText);
+        parsedDetail = jsonErr.detail || errText;
+      } catch (_) {}
+      throw new Error(parsedDetail || `Server error: ${response.status}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const blocks = buffer.split('\n\n');
+      buffer = blocks.pop();
+
+      for (const block of blocks) {
+        if (!block.trim()) continue;
+
+        let eventType = 'message';
+        let eventData = '';
+
+        const lines = block.split('\n');
+        for (const l of lines) {
+          if (l.startsWith('event:')) {
+            eventType = l.slice(6).trim();
+          } else if (l.startsWith('data:')) {
+            eventData = l.slice(5).trim();
+          }
+        }
+
+        if (!eventData) continue;
+
+        try {
+          const parsed = JSON.parse(eventData);
+          if (eventType === 'status') {
+            if (onStatusUpdate) onStatusUpdate(parsed);
+          } else if (eventType === 'question') {
+            if (onQuestionReceived) onQuestionReceived(parsed);
+          } else if (eventType === 'error') {
+            throw new Error(parsed.detail || 'Streaming generation error.');
+          }
+        } catch (e) {
+          if (eventType === 'error') throw e;
+          console.warn("Could not parse SSE payload:", e, eventData);
+        }
+      }
+    }
+  };
+
+  const formatRawQuestion = (q, index, fallbackSubject) => ({
+    id: index,
+    subject: q.subject || fallbackSubject || 'General',
+    topic: q.topic || 'General',
+    type: q.type,
+    difficulty: q.difficulty,
+    scenario: q.scenario || q.problemStatement || '',
+    question: q.question,
+    q: q.question,
+    options: q.options,
+    correctAnswer: q.correctAnswer,
+    explanation: q.explanation || '',
+    problemStatement: q.problemStatement || q.scenario || '',
+    candidateTask: q.candidateTask || '',
+    expectedAnswer: q.expectedAnswer || q.correctAnswer || '',
+    evaluationCriteria: q.evaluationCriteria || '',
+    exampleInput: q.exampleInput || '',
+    exampleOutput: q.exampleOutput || '',
+    databaseSchema: q.databaseSchema || null,
+    sampleData: q.sampleData || null,
+    inputFormat: q.inputFormat || '',
+    outputFormat: q.outputFormat || '',
+    sampleInput: q.sampleInput || '',
+    sampleOutput: q.sampleOutput || '',
+    constraints: q.constraints || [],
+    marks: q.marks || (q.type === 'MCQ' ? 1 : 10),
+    estimatedTime: q.estimatedTime || (q.type === 'MCQ' ? '2 Minutes' : '15 Minutes')
+  });
+
+  // AI Assessment Generation with Real-Time Streaming
   const handleGenerateAssessment = async () => {
     const topicsList = [...selectedSubjects];
     if (topicsList.length === 0) {
@@ -348,13 +454,20 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
     }
 
     setIsGenerating(true);
+    setGeneratedQuestions([]);
+
+    // Scroll to preview container smoothly
+    setTimeout(() => {
+      document.getElementById('assessment-preview-section')?.scrollIntoView({ behavior: 'smooth' });
+    }, 200);
 
     if (topicsList.length === 1) {
       const singleTopic = topicsList[0];
+      const targetCount = Math.max(1, parseInt(subjectQuestionCounts[singleTopic], 10) || 10);
       const payload = {
         title: assessmentTitle || `${singleTopic} Technical Assessment`,
         subjects: [singleTopic],
-        totalQuestions: 15,
+        totalQuestions: targetCount,
         questionDistribution: {
           mcq: questionDist.mcq,
           scenario: questionDist.scenario
@@ -367,44 +480,59 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
         duration: durationInput
       };
 
-      showToast("Generating assessment with AI... Please wait.");
-      setGenerationProgress({ active: false, topics: [], currentTopicName: '', statusMessage: '', overallPercent: 0, completedTopicsCount: 0, totalTopicsCount: 0 });
+      setGenerationProgress({
+        active: true,
+        topics: [{ name: singleTopic, status: 'generating', count: 0, targetCount }],
+        currentTopicName: singleTopic,
+        statusMessage: `Streaming AI generation for ${singleTopic}...`,
+        overallPercent: 10,
+        completedTopicsCount: 0,
+        totalTopicsCount: 1
+      });
+
+      let accumulated = [];
 
       try {
-        const response = await api.post('/api/assessment/generate', payload);
+        await streamAssessmentFromBackend(
+          payload,
+          (newQ) => {
+            const formatted = formatRawQuestion(newQ, accumulated.length + 1, singleTopic);
+            accumulated = [...accumulated, formatted];
+            setGeneratedQuestions([...accumulated]);
 
-        if (response.data && response.data.questions) {
-          const data = response.data;
-          const formatted = data.questions.map((q, idx) => ({
-            id: idx + 1,
-            subject: q.subject || singleTopic,
-            topic: q.topic || 'General',
-            type: q.type,
-            difficulty: q.difficulty,
-            scenario: q.scenario || q.problemStatement || '',
-            question: q.question,
-            q: q.question,
-            options: q.options,
-            correctAnswer: q.correctAnswer,
-            explanation: q.explanation || '',
-            problemStatement: q.problemStatement || q.scenario || '',
-            candidateTask: q.candidateTask || '',
-            expectedAnswer: q.expectedAnswer || q.correctAnswer || '',
-            evaluationCriteria: q.evaluationCriteria || '',
-            exampleInput: q.exampleInput || '',
-            exampleOutput: q.exampleOutput || '',
-            databaseSchema: q.databaseSchema || null,
-            sampleData: q.sampleData || null
-          }));
+            const currentCount = accumulated.length;
+            const progressPercent = Math.min(95, Math.round((currentCount / targetCount) * 100));
 
-          setGeneratedQuestions(formatted);
-          showToast(`Generated ${formatted.length} questions! Click 'Save Assessment' or 'Save & Assign' to save.`);
-          setActiveTab('preview-questions');
-        } else {
-          throw new Error('Invalid questions format returned from backend');
-        }
+            setGenerationProgress(prev => ({
+              ...prev,
+              overallPercent: progressPercent,
+              statusMessage: `Received question ${currentCount} of ${targetCount} (${newQ.type})...`,
+              topics: [{ name: singleTopic, status: 'generating', count: currentCount, targetCount }]
+            }));
+          },
+          (statusObj) => {
+            if (statusObj.message) {
+              setGenerationProgress(prev => ({
+                ...prev,
+                statusMessage: statusObj.message
+              }));
+            }
+          }
+        );
+
+        setGenerationProgress({
+          active: false,
+          topics: [{ name: singleTopic, status: 'completed', count: accumulated.length, targetCount }],
+          currentTopicName: singleTopic,
+          statusMessage: `Generated ${accumulated.length} questions successfully!`,
+          overallPercent: 100,
+          completedTopicsCount: 1,
+          totalTopicsCount: 1
+        });
+
+        showToast(`Successfully generated ${accumulated.length} questions!`);
       } catch (err) {
-        console.error("AI assessment generation failed:", err);
+        console.error("AI assessment streaming failed:", err);
         const errMsg = err.response?.data?.detail || err.message || err;
         showToast(`Error: ${errMsg}`);
       } finally {
@@ -413,12 +541,12 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
       return;
     }
 
-    // Multi-topic Progressive Batching
-    setGeneratedQuestions([]);
+    // Multi-topic Progressive Streaming Batching
     const initialTopics = topicsList.map(t => ({
       name: t,
       status: 'pending',
       count: 0,
+      targetCount: Math.max(1, parseInt(subjectQuestionCounts[t], 10) || 10),
       error: null
     }));
 
@@ -426,21 +554,18 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
       active: true,
       topics: initialTopics,
       currentTopicName: topicsList[0],
-      statusMessage: `Starting AI Generation for ${topicsList.join(', ')}...`,
+      statusMessage: `Starting Real-Time AI Generation for ${topicsList.join(', ')}...`,
       overallPercent: 0,
       completedTopicsCount: 0,
       totalTopicsCount: topicsList.length
     });
 
-    setActiveTab('preview-questions');
-
     let allQuestions = [];
     let completedCount = 0;
-    const totalTargetQs = (topicsList.length === 2 ? 20 : 25);
-    const perTopicTarget = Math.max(1, Math.round(totalTargetQs / topicsList.length));
 
     for (let i = 0; i < topicsList.length; i++) {
       const currentTopic = topicsList[i];
+      const perTopicTarget = Math.max(1, parseInt(subjectQuestionCounts[currentTopic], 10) || 10);
 
       setGenerationProgress(prev => {
         const updatedTopics = prev.topics.map((t, idx) =>
@@ -451,9 +576,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
           ...prev,
           topics: updatedTopics,
           currentTopicName: currentTopic,
-          statusMessage: i === 0
-            ? `Generating ${currentTopic} Questions...`
-            : `${topicsList[i - 1]} Completed. Generating ${currentTopic}...`,
+          statusMessage: `Generating questions for ${currentTopic}...`,
           overallPercent: percent
         };
       });
@@ -474,58 +597,62 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
         duration: durationInput
       };
 
+      let topicQs = [];
+
       try {
-        const response = await api.post('/api/assessment/generate', topicPayload);
-        if (response.data && response.data.questions) {
-          const topicQs = response.data.questions.map((q) => ({
-            subject: q.subject || currentTopic,
-            topic: q.topic || 'General',
-            type: q.type,
-            difficulty: q.difficulty,
-            scenario: q.scenario || q.problemStatement || '',
-            question: q.question,
-            q: q.question,
-            options: q.options,
-            correctAnswer: q.correctAnswer,
-            explanation: q.explanation || '',
-            problemStatement: q.problemStatement || q.scenario || '',
-            candidateTask: q.candidateTask || '',
-            expectedAnswer: q.expectedAnswer || q.correctAnswer || '',
-            evaluationCriteria: q.evaluationCriteria || '',
-            exampleInput: q.exampleInput || '',
-            exampleOutput: q.exampleOutput || '',
-            databaseSchema: q.databaseSchema || null,
-            sampleData: q.sampleData || null
-          }));
+        await streamAssessmentFromBackend(
+          topicPayload,
+          (newQ) => {
+            const formatted = formatRawQuestion(newQ, allQuestions.length + topicQs.length + 1, currentTopic);
+            topicQs = [...topicQs, formatted];
+            const combined = [...allQuestions, ...topicQs].map((q, idx) => ({ ...q, id: idx + 1 }));
+            setGeneratedQuestions(combined);
 
-          allQuestions = [...allQuestions, ...topicQs];
-          const indexedQuestions = allQuestions.map((q, idx) => ({ ...q, id: idx + 1 }));
+            setGenerationProgress(prev => {
+              const updatedTopics = prev.topics.map((t, idx) =>
+                idx === i ? { ...t, count: topicQs.length } : t
+              );
+              return {
+                ...prev,
+                topics: updatedTopics,
+                statusMessage: `Received ${currentTopic} question (${newQ.type})...`
+              };
+            });
+          },
+          (statusObj) => {
+            if (statusObj.message) {
+              setGenerationProgress(prev => ({
+                ...prev,
+                statusMessage: statusObj.message
+              }));
+            }
+          }
+        );
 
-          setGeneratedQuestions(indexedQuestions);
-          completedCount++;
+        allQuestions = [...allQuestions, ...topicQs];
+        completedCount++;
 
-          setGenerationProgress(prev => {
-            const updatedTopics = prev.topics.map((t, idx) =>
-              idx === i ? { ...t, status: 'completed', count: topicQs.length } : t
-            );
-            const nextTopic = topicsList[i + 1];
-            const percent = Math.round(((i + 1) / topicsList.length) * 100);
-            return {
-              ...prev,
-              topics: updatedTopics,
-              completedTopicsCount: completedCount,
-              overallPercent: percent,
-              statusMessage: nextTopic
-                ? `${currentTopic} Completed (${topicQs.length} Qs). Generating ${nextTopic}...`
-                : `${currentTopic} Completed (${topicQs.length} Qs). Generation complete.`
-            };
-          });
+        setGenerationProgress(prev => {
+          const updatedTopics = prev.topics.map((t, idx) =>
+            idx === i ? { ...t, status: 'completed', count: topicQs.length } : t
+          );
+          const nextTopic = topicsList[i + 1];
+          const percent = Math.round(((i + 1) / topicsList.length) * 100);
+          return {
+            ...prev,
+            topics: updatedTopics,
+            completedTopicsCount: completedCount,
+            overallPercent: percent,
+            statusMessage: nextTopic
+              ? `${currentTopic} Completed (${topicQs.length} Qs). Generating ${nextTopic}...`
+              : `${currentTopic} Completed (${topicQs.length} Qs). Generation complete.`
+          };
+        });
 
-          showToast(`Generated ${topicQs.length} questions for ${currentTopic}!`);
-        }
+        showToast(`Generated ${topicQs.length} questions for ${currentTopic}!`);
       } catch (err) {
-        console.error(`Failed to generate ${currentTopic} questions:`, err);
-        const errMsg = err.response?.data?.detail || err.message || 'Generation failed';
+        console.error(`Failed to stream ${currentTopic} questions:`, err);
+        const errMsg = err.message || 'Generation failed';
         showToast(`Warning: Failed to generate questions for ${currentTopic}. Continuing remaining topics...`);
 
         setGenerationProgress(prev => {
@@ -544,7 +671,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
 
     setGenerationProgress(prev => ({
       ...prev,
-      statusMessage: "Generation Complete! Click 'Save Assessment' or 'Save & Assign' to save.",
+      statusMessage: "Generation Complete! Review your questions and click 'Save Assessment'.",
       overallPercent: 100
     }));
 
@@ -556,10 +683,38 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
     }, 1500);
   };
 
+  const resetAssessmentCreationForm = () => {
+    setAssessmentTitle('');
+    setDurationInput('60 minutes');
+    setSelectedSubjects(['Python']);
+    setSubjectQuestionCounts({
+      Python: 10,
+      SQL: 10,
+      Aptitude: 5
+    });
+    setQuestionDist({ mcq: 70, scenario: 30 });
+    setDifficultyDist({ easy: 20, medium: 50, hard: 30 });
+    setGeneratedQuestions([]);
+    setGenerationProgress({
+      active: false,
+      topics: [],
+      currentTopicName: '',
+      statusMessage: '',
+      overallPercent: 0,
+      completedTopicsCount: 0,
+      totalTopicsCount: 0
+    });
+  };
+
   const handleSaveAssessment = async (andAssign = false) => {
+    if (!generatedQuestions || generatedQuestions.length === 0) {
+      showToast("No questions to save. Please generate questions first.");
+      return;
+    }
+
     const subjectsInQuestions = [...new Set(generatedQuestions.map(q => q.subject))].filter(Boolean);
     const activeSubjects = subjectsInQuestions.length > 0 ? subjectsInQuestions : (selectedSubjects.length > 0 ? selectedSubjects : ['General']);
-    const name = assessmentTitle || `${activeSubjects.join(' & ')} Technical Assessment`;
+    const name = assessmentTitle.trim() || `${activeSubjects.join(' & ')} Technical Assessment`;
 
     const payload = {
       name: name,
@@ -578,14 +733,18 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
       if (response.data) {
         const savedAsm = response.data;
         setSavedAssessments(prev => deduplicateAssessments([savedAsm, ...prev]));
-        showToast('Assessment saved successfully!');
         setActiveAssessmentsCount(prev => prev + 1);
+
+        // Clear the creation form state so a fresh assessment can be configured
+        resetAssessmentCreationForm();
 
         if (andAssign) {
           setAssigningAssessment(savedAsm);
-          setActiveTab('assessments');
+          setActiveTab('assign-assessment');
+          showToast('Assessment saved! Select candidates to assign.');
         } else {
-          setActiveTab('preview-questions');
+          setActiveTab('assessments');
+          showToast(`Assessment '${name}' created and saved successfully!`);
         }
       }
     } catch (err) {
@@ -594,62 +753,12 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
     }
   };
 
-  const handleConfirmAssign = async (email, dueDate, startTime, skipReset = false) => {
-    if (!assigningAssessment) return;
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      alert('Please enter a valid email address.');
-      return;
-    }
-    if (!startTime) {
-      alert('Please set a start time.');
-      return;
-    }
-
-    try {
-      const payload = {
-        assessmentId: assigningAssessment.id,
-        candidateEmail: email,
-        dueDate: dueDate ? new Date(dueDate).toISOString() : null,
-        startDate: startTime.split('T')[0],
-        startTime: startTime.split('T')[1]
-      };
-
-      const response = await api.post('/api/assignments', payload);
-      if (response.data && !skipReset) {
-        showToast("Assessment assigned successfully.");
-        const assessmentsRes = await api.get('/api/assessment');
-        if (assessmentsRes.data) {
-          setSavedAssessments(deduplicateAssessments(assessmentsRes.data));
-        }
-        await fetchAssignments();
-      }
-    } catch (err) {
-      console.error("Failed to assign assessment:", err);
-      const errMsg = err.response?.data?.detail || "Error assigning assessment. Verify candidate exists.";
-      if (!skipReset) {
-        showToast(errMsg);
-      } else {
-        throw new Error(errMsg);
-      }
-    } finally {
-      if (!skipReset) {
-        setAssigningAssessment(null);
-      }
-    }
-  };
-
-  // Open Assign Modal helper
-  const handleOpenAssignModal = (asm, group = null) => {
-    setAssigningAssessment(asm);
-    setAssigningGroup(group);
-    if (group) {
-      setAssignType('group');
-      setSelectedAssignGroup(group);
-    } else {
-      setAssignType('individual');
-      setSelectedAssignGroup(null);
-    }
+  // Assign assessment helper: navigates to dedicated assign-assessment tab
+  const [assigningCandidate, setAssigningCandidate] = useState(null);
+  const handleOpenAssignModal = (asm, group = null, cand = null) => {
+    setAssigningAssessment(asm || null);
+    setAssigningCandidate(cand || null);
+    setActiveTab('assign-assessment');
   };
 
   return (
@@ -716,6 +825,9 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
             durationInput={durationInput}
             setDurationInput={setDurationInput}
             selectedSubjects={selectedSubjects}
+            setSelectedSubjects={setSelectedSubjects}
+            subjectQuestionCounts={subjectQuestionCounts}
+            setSubjectQuestionCounts={setSubjectQuestionCounts}
             toggleSubject={(sub) => {
               setSelectedSubjects(prev =>
                 prev.includes(sub) ? prev.filter(s => s !== sub) : [...prev, sub]
@@ -727,6 +839,13 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
             setDifficultyDist={setDifficultyDist}
             isGenerating={isGenerating}
             onGenerate={handleGenerateAssessment}
+            handleGenerateAssessment={handleGenerateAssessment}
+            generatedQuestions={generatedQuestions}
+            setGeneratedQuestions={setGeneratedQuestions}
+            generationProgress={generationProgress}
+            onSave={handleSaveAssessment}
+            onSaveAssessment={handleSaveAssessment}
+            onSaveAndAssign={() => handleSaveAssessment(true)}
             showToast={showToast}
           />
         )}
@@ -734,9 +853,13 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
         {activeTab === 'preview-questions' && (
           <PreviewQuestionsTab
             questions={generatedQuestions}
+            generatedQuestions={generatedQuestions}
             setQuestions={setGeneratedQuestions}
+            setGeneratedQuestions={setGeneratedQuestions}
             generationProgress={generationProgress}
+            onSave={handleSaveAssessment}
             onSaveAssessment={handleSaveAssessment}
+            onSaveAndAssign={() => handleSaveAssessment(true)}
             showToast={showToast}
           />
         )}
@@ -754,13 +877,17 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
           />
         )}
 
-        {activeTab === 'expired-assessments' && (
-          <ExpiredAssessmentsTab
+        {activeTab === 'assign-assessment' && (
+          <AssignAssessmentTab
+            savedAssessments={savedAssessments}
+            candidates={candidates}
+            candidateGroups={candidateGroups}
             assignments={assignments}
             fetchAssignments={fetchAssignments}
             showToast={showToast}
-            savedAssessments={savedAssessments}
-            onAssignClick={(asm) => handleOpenAssignModal(asm)}
+            setActiveTab={setActiveTab}
+            initialSelectedAssessment={assigningAssessment}
+            initialSelectedCandidate={assigningCandidate}
           />
         )}
 
