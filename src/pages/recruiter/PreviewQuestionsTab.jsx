@@ -534,20 +534,9 @@ const PreviewQuestionsTab = ({
             loadingText="Saving..."
             disabled={generatedQuestions.length === 0}
             icon={Save}
-            className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold text-xs shadow-xs"
+            className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md border-none cursor-pointer"
           >
             Save Assessment
-          </ActionButton>
-
-          <ActionButton
-            onClick={() => handleSaveAction(true)}
-            isLoading={isSavingAndAssigning}
-            loadingText="Saving & Assigning..."
-            disabled={generatedQuestions.length === 0}
-            icon={UserPlus}
-            className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md border-none"
-          >
-            Save & Assign
           </ActionButton>
         </div>
       </div>

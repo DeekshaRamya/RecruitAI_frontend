@@ -169,15 +169,9 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
   const [groupName, setGroupName] = useState('');
 
-  // Assign Assessment modal state
-  const [assigningAssessment, setAssigningAssessment] = useState(null);
-  const [assigningGroup, setAssigningGroup] = useState(null);
-  const [assignType, setAssignType] = useState('individual'); // 'individual' | 'group'
-  const [selectedAssignGroup, setSelectedAssignGroup] = useState(null);
-  const [selectedAssignCandidate, setSelectedAssignCandidate] = useState(null);
-  const [assignSearch, setAssignSearch] = useState('');
-  const [showAssignDropdown, setShowAssignDropdown] = useState(false);
-  const [isSubmittingAssign, setIsSubmittingAssign] = useState(false);
+  // Assign Assessment navigation state
+  const [selectedAssignAssessment, setSelectedAssignAssessment] = useState(null);
+  const [assigningCandidate, setAssigningCandidate] = useState(null);
 
   // English report visualizer states
   const [englishReport, setEnglishReport] = useState(null);
@@ -681,7 +675,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
       overallPercent: 100
     }));
 
-    showToast(`All topics generated successfully! Click 'Save Assessment' or 'Save & Assign' to save.`);
+    showToast(`All topics generated successfully! Click 'Save Assessment' to save.`);
 
     setTimeout(() => {
       setIsGenerating(false);
@@ -744,14 +738,10 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
         // Clear the creation form state so a fresh assessment can be configured
         resetAssessmentCreationForm();
 
-        if (andAssign) {
-          setAssigningAssessment(savedAsm);
-          setActiveTab('assign-assessment');
-          showToast('Assessment saved! Select candidates to assign.');
-        } else {
-          setActiveTab('assessments');
-          showToast(`Assessment '${name}' created and saved successfully!`);
-        }
+        // Pre-select the newly saved assessment and navigate to assign-assessment tab
+        setSelectedAssignAssessment(savedAsm);
+        setActiveTab('assign-assessment');
+        showToast(`Assessment '${name}' saved! Redirecting to assign candidates...`);
       }
     } catch (err) {
       console.error("Failed to save assessment to backend:", err);
@@ -760,9 +750,8 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
   };
 
   // Assign assessment helper: navigates to dedicated assign-assessment tab
-  const [assigningCandidate, setAssigningCandidate] = useState(null);
   const handleOpenAssignModal = (asm, group = null, cand = null) => {
-    setAssigningAssessment(asm || null);
+    setSelectedAssignAssessment(asm || null);
     setAssigningCandidate(cand || null);
     setActiveTab('assign-assessment');
   };
@@ -904,7 +893,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
             showToast={showToast}
             setActiveTab={setActiveTab}
             currentUser={currentUser}
-            initialSelectedAssessment={assigningAssessment}
+            initialSelectedAssessment={selectedAssignAssessment}
             initialSelectedCandidate={assigningCandidate}
           />
         )}
@@ -1372,272 +1361,6 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
         )}
       </AnimatePresence>
 
-      {/* Modal for Assigning Assessment */}
-      <AnimatePresence>
-        {assigningAssessment && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 0.4 }}
-              exit={{ opacity: 0 }}
-              onClick={() => {
-                setAssigningAssessment(null);
-                setAssigningGroup(null);
-              }}
-              className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              className="fixed inset-0 m-auto w-full max-w-md h-fit bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 p-6 flex flex-col gap-4"
-            >
-              <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-                <div>
-                  <span className="text-[10px] text-indigo-600 font-semibold tracking-wider uppercase">
-                    Test Deployment
-                  </span>
-                  <h3 className="text-base font-bold text-slate-900 mt-0.5 truncate max-w-[280px]">
-                    {assigningAssessment.name}
-                  </h3>
-                </div>
-                <button
-                  onClick={() => {
-                    setAssigningAssessment(null);
-                    setAssigningGroup(null);
-                  }}
-                  className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer border-none bg-transparent"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/80">
-                <button
-                  type="button"
-                  onClick={() => setAssignType('individual')}
-                  className={`flex-1 py-1 text-xs rounded-md cursor-pointer border-none transition-colors ${
-                    assignType === 'individual' ? 'bg-white text-slate-900 font-medium shadow-2xs' : 'bg-transparent text-slate-500'
-                  }`}
-                >
-                  Individual Candidate
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAssignType('group')}
-                  className={`flex-1 py-1 text-xs rounded-md cursor-pointer border-none transition-colors ${
-                    assignType === 'group' ? 'bg-white text-slate-900 font-medium shadow-2xs' : 'bg-transparent text-slate-500'
-                  }`}
-                >
-                  Candidate Group
-                </button>
-              </div>
-
-              <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  if (isSubmittingAssign) return;
-                  setIsSubmittingAssign(true);
-                  try {
-                    const dueDate = e.target.dueDate.value;
-                    const startTime = e.target.startTime.value;
-
-                    if (assignType === 'group') {
-                      if (!selectedAssignGroup) {
-                        alert('Please select a candidate group.');
-                        return;
-                      }
-
-                      const groupMemberEmails = (Array.isArray(candidates) ? candidates : [])
-                        .filter(c => selectedAssignGroup.candidateIds.includes(c.id))
-                        .map(c => c.email);
-
-                      if (groupMemberEmails.length === 0) {
-                        alert('This group has no members.');
-                        return;
-                      }
-
-                      let successCount = 0;
-                      let failedCount = 0;
-                      for (const email of groupMemberEmails) {
-                        try {
-                          await handleConfirmAssign(email, dueDate, startTime, true);
-                          successCount++;
-                        } catch (err) {
-                          failedCount++;
-                          console.error(`Failed to assign to ${email}:`, err);
-                        }
-                      }
-
-                      showToast(`Successfully assigned to ${successCount} candidates. ${failedCount > 0 ? `Failed: ${failedCount}.` : ''}`);
-
-                      try {
-                        const assessmentsRes = await api.get('/api/assessment');
-                        if (assessmentsRes.data) {
-                          setSavedAssessments(deduplicateAssessments(assessmentsRes.data));
-                        }
-                      } catch (err) {
-                        console.error(err);
-                      }
-
-                      setAssigningAssessment(null);
-                      setAssigningGroup(null);
-                    } else {
-                      if (!selectedAssignCandidate) {
-                        alert('Please select a candidate from the dropdown.');
-                        return;
-                      }
-                      const email = selectedAssignCandidate.email;
-                      await handleConfirmAssign(email, dueDate, startTime);
-                    }
-                  } catch (err) {
-                    console.error("Assign submit error:", err);
-                  } finally {
-                    setIsSubmittingAssign(false);
-                  }
-                }}
-                className="flex flex-col gap-3.5"
-              >
-                {assignType === 'individual' ? (
-                  <div className="flex flex-col gap-1 relative">
-                    <label className="text-xs font-semibold text-slate-700">
-                      Select Candidate *
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="Search candidate by name or email..."
-                        value={assignSearch}
-                        onChange={(e) => {
-                          setAssignSearch(e.target.value);
-                          setSelectedAssignCandidate(null);
-                          setShowAssignDropdown(true);
-                        }}
-                        onFocus={() => setShowAssignDropdown(true)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 px-3 text-xs text-slate-900 focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
-                        required={assignType === 'individual' && !selectedAssignCandidate}
-                      />
-                      {selectedAssignCandidate && (
-                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
-                          Selected
-                        </span>
-                      )}
-                    </div>
-
-                    <AnimatePresence>
-                      {showAssignDropdown && (
-                        <>
-                          <div className="fixed inset-0 z-40" onClick={() => setShowAssignDropdown(false)} />
-                          <motion.div
-                            initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                            transition={{ duration: 0.15 }}
-                            className="absolute left-0 right-0 top-full mt-1 max-h-48 overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-xl z-50 p-1 flex flex-col gap-0.5"
-                          >
-                            {(Array.isArray(candidates) ? candidates : [])
-                              .filter(c => {
-                                const nameStr = (c.full_name || c.name || '').toLowerCase();
-                                const emailStr = (c.email || '').toLowerCase();
-                                const query = assignSearch.toLowerCase();
-                                return nameStr.includes(query) || emailStr.includes(query);
-                              })
-                              .map(c => (
-                                <button
-                                  key={c.id}
-                                  type="button"
-                                  onClick={() => {
-                                    setSelectedAssignCandidate(c);
-                                    setAssignSearch(`${c.full_name || c.name} (${c.email})`);
-                                    setShowAssignDropdown(false);
-                                  }}
-                                  className="w-full text-left px-3 py-2 rounded-md hover:bg-slate-50 text-xs flex flex-col border-none bg-transparent cursor-pointer"
-                                >
-                                  <span className="font-semibold text-slate-900">{c.full_name || c.name}</span>
-                                  <span className="text-[11px] text-slate-500">{c.email}</span>
-                                </button>
-                              ))}
-                          </motion.div>
-                        </>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs font-semibold text-slate-700">
-                      Select Group *
-                    </label>
-                    <select
-                      value={selectedAssignGroup?.id || ''}
-                      onChange={(e) => {
-                        const grp = candidateGroups.find(g => g.id === e.target.value);
-                        setSelectedAssignGroup(grp);
-                      }}
-                      required
-                      className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 px-3 text-xs text-slate-900 focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
-                    >
-                      <option value="" disabled>Choose candidate group...</option>
-                      {candidateGroups.map(g => (
-                        <option key={g.id} value={g.id}>
-                          {g.name} ({g.candidateIds?.length || 0} candidates)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs font-semibold text-slate-700">
-                      Start Time *
-                    </label>
-                    <input
-                      type="datetime-local"
-                      name="startTime"
-                      required
-                      defaultValue={new Date(Date.now() + 5 * 60000).toISOString().slice(0, 16)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 px-3 text-xs text-slate-900 focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs font-semibold text-slate-700">
-                      Due Date *
-                    </label>
-                    <input
-                      type="datetime-local"
-                      name="dueDate"
-                      required
-                      defaultValue={new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 16)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 px-3 text-xs text-slate-900 focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex gap-2.5 mt-2 pt-2 border-t border-slate-100">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setAssigningAssessment(null);
-                      setAssigningGroup(null);
-                    }}
-                    className="flex-1 h-9 rounded-lg border-slate-200 text-slate-700 text-xs font-medium"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={isSubmittingAssign}
-                    className="flex-1 h-9 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium shadow-xs"
-                  >
-                    {isSubmittingAssign ? 'Assigning...' : 'Confirm Assignment'}
-                  </Button>
-                </div>
-              </form>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
     </div>
   );
 };
