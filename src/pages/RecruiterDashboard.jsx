@@ -25,6 +25,7 @@ import OverallResultsTab from './recruiter/OverallResultsTab';
 import InternalUsersManagementTab from './recruiter/InternalUsersManagementTab';
 import LoginHistoryAuditTab from './recruiter/LoginHistoryAuditTab';
 import AdminOverviewTab from './recruiter/AdminOverviewTab';
+import AiUsageTrackingTab from './recruiter/AiUsageTrackingTab';
 
 const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
   const { tab: urlTab } = useParams();
@@ -943,6 +944,12 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
 
         {activeTab === 'login-history' && (
           <LoginHistoryAuditTab
+            showToast={showToast}
+          />
+        )}
+
+        {activeTab === 'ai-usage' && (
+          <AiUsageTrackingTab
             showToast={showToast}
           />
         )}

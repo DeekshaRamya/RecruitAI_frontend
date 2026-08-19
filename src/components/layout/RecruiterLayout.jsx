@@ -23,7 +23,8 @@ import {
   ShieldCheck,
   History,
   UserCog,
-  Settings
+  Settings,
+  Cpu
 } from 'lucide-react';
 import logo from '../../assets/systech.jpg';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
@@ -65,6 +66,7 @@ export const RECRUITER_TABS = {
   'results': { label: 'Technical Evaluations', category: 'Analytics', description: 'Detailed coding performance, SQL execution, and test cases' },
   'english-results': { label: 'Communication Reports', category: 'Analytics', description: 'Language fluency, pronunciation, and spoken English evaluation' },
   'overall-results': { label: 'Hiring Decision Matrix', category: 'Analytics', description: 'Composite candidate scores and final hiring recommendations' },
+  'ai-usage': { label: 'AI Usage & Tracking', category: 'Administration', description: 'Real-time audit log of AI model requests, latencies, and token consumption' },
   'users': { label: 'Internal Users & Roles', category: 'Administration', description: 'Manage staff access, team roles, and administrative permissions' },
   'login-history': { label: 'Login & Audit Logs', category: 'Administration', description: 'Security audit trail, IP addresses, and authentication history' }
 };
@@ -128,6 +130,7 @@ const RecruiterLayout = ({
       title: 'Administration',
       items: [
         { id: 'dashboard', label: 'Admin Overview', icon: LayoutDashboard },
+        { id: 'ai-usage', label: 'AI Usage & Tracking', icon: Cpu },
         { id: 'users', label: 'Internal Users & Roles', icon: UserCog },
         { id: 'login-history', label: 'Login & Audit Logs', icon: History },
       ]
