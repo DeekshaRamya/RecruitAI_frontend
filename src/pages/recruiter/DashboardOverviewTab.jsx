@@ -59,9 +59,11 @@ const DashboardOverviewTab = ({
   onCreateCandidateClick,
   onCreateGroupClick,
   onOpenEnglishReport,
-  setActiveTab
+  setActiveTab,
+  user
 }) => {
   const { resolvedTheme } = useTheme();
+  const isAdmin = (user?.role || '').toLowerCase() === 'admin';
   const isDark = resolvedTheme === 'dark';
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -270,17 +272,42 @@ const DashboardOverviewTab = ({
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-              Recruitment Analytics & Operations
+              {isAdmin ? 'Admin Operations & System Overview' : 'Recruitment Analytics & Operations'}
             </h1>
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Live Workspace
+              {isAdmin ? 'Admin Console Active' : 'Live Workspace'}
             </span>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Real-time pipeline metrics, technical assessment competency breakdown, and candidate evaluation insights.
+            {isAdmin 
+              ? 'Complete platform oversight, team access configuration, security audit logs, and candidate pipeline tracking.' 
+              : 'Real-time pipeline metrics, technical assessment competency breakdown, and candidate evaluation insights.'}
           </p>
         </div>
+
+        {isAdmin && setActiveTab && (
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setActiveTab('users')}
+              className="text-xs border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 h-8 gap-1.5"
+            >
+              <Users size={13} />
+              <span>Manage Roles</span>
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setActiveTab('login-history')}
+              className="text-xs border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 h-8 gap-1.5"
+            >
+              <Clock size={13} />
+              <span>Audit Logs</span>
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* 2. TOP TIER KPI MATRIX (4 CARDS) */}

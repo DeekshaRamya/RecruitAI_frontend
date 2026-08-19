@@ -21,10 +21,12 @@ const Login = () => {
     if (token && userStr) {
       try {
         const user = JSON.parse(userStr);
-        if (user.role === 'candidate') {
-          navigate('/candidate/dashboard', { replace: true });
-        } else if (user.role === 'admin' || user.role === 'recruiter') {
+        if (user.role === 'admin') {
+          navigate('/admin/dashboard', { replace: true });
+        } else if (user.role === 'recruiter') {
           navigate('/recruiter/dashboard', { replace: true });
+        } else if (user.role === 'candidate') {
+          navigate('/candidate/dashboard', { replace: true });
         }
       } catch {
         // Ignore parse error
@@ -33,10 +35,12 @@ const Login = () => {
   }, [navigate]);
 
   const handleLoginSuccess = (userRole) => {
-    if (userRole === 'candidate') {
-      navigate('/candidate/dashboard', { replace: true });
-    } else if (userRole === 'admin' || userRole === 'recruiter') {
+    if (userRole === 'admin') {
+      navigate('/admin/dashboard', { replace: true });
+    } else if (userRole === 'recruiter') {
       navigate('/recruiter/dashboard', { replace: true });
+    } else if (userRole === 'candidate') {
+      navigate('/candidate/dashboard', { replace: true });
     }
   };
 

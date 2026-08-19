@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
@@ -22,10 +22,16 @@ import CandidateGroupsTab from './recruiter/CandidateGroupsTab';
 import TechnicalResultsTab from './recruiter/TechnicalResultsTab';
 import EnglishResultsTab from './recruiter/EnglishResultsTab';
 import OverallResultsTab from './recruiter/OverallResultsTab';
+import InternalUsersManagementTab from './recruiter/InternalUsersManagementTab';
+import LoginHistoryAuditTab from './recruiter/LoginHistoryAuditTab';
+import AdminOverviewTab from './recruiter/AdminOverviewTab';
 
 const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
   const { tab: urlTab } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const basePath = location.pathname.startsWith('/admin') ? '/admin' : '/recruiter';
 
   // Navigation state
   const [activeTab, setActiveTabState] = useState(urlTab || initialTab);
@@ -38,8 +44,8 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
 
   const setActiveTab = useCallback((newTab) => {
     setActiveTabState(newTab);
-    navigate(`/recruiter/${newTab}`);
-  }, [navigate]);
+    navigate(`${basePath}/${newTab}`);
+  }, [navigate, basePath]);
 
   const [toastMessage, setToastMessage] = useState('');
 
@@ -786,21 +792,31 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
         user={currentUser}
       >
         {activeTab === 'dashboard' && (
-          <DashboardOverviewTab
-            candidates={candidates}
-            savedAssessments={savedAssessments}
-            activeAssessmentsCount={activeAssessmentsCount}
-            assignments={assignments}
-            candidateGroups={candidateGroups}
-            selectedCandidateIds={selectedCandidateIds}
-            setSelectedCandidateIds={setSelectedCandidateIds}
-            onCandidateClick={(cand) => setSelectedCandidate(cand)}
-            onDeleteCandidate={handleDeleteCandidate}
-            onBulkDeleteCandidates={handleBulkDeleteCandidates}
-            onCreateCandidateClick={() => setShowCreateCandidateModal(true)}
-            onCreateGroupClick={() => setShowCreateGroupModal(true)}
-            onOpenEnglishReport={handleOpenEnglishReport}
-          />
+          (currentUser?.role || '').toLowerCase() === 'admin' ? (
+            <AdminOverviewTab
+              showToast={showToast}
+              setActiveTab={setActiveTab}
+              currentUser={currentUser}
+            />
+          ) : (
+            <DashboardOverviewTab
+              candidates={candidates}
+              savedAssessments={savedAssessments}
+              activeAssessmentsCount={activeAssessmentsCount}
+              assignments={assignments}
+              candidateGroups={candidateGroups}
+              selectedCandidateIds={selectedCandidateIds}
+              setSelectedCandidateIds={setSelectedCandidateIds}
+              onCandidateClick={(cand) => setSelectedCandidate(cand)}
+              onDeleteCandidate={handleDeleteCandidate}
+              onBulkDeleteCandidates={handleBulkDeleteCandidates}
+              onCreateCandidateClick={() => setShowCreateCandidateModal(true)}
+              onCreateGroupClick={() => setShowCreateGroupModal(true)}
+              onOpenEnglishReport={handleOpenEnglishReport}
+              setActiveTab={setActiveTab}
+              user={currentUser}
+            />
+          )
         )}
 
         {activeTab === 'candidates' && (
@@ -873,6 +889,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
             fetchAssignments={fetchAssignments}
             showToast={showToast}
             setActiveTab={setActiveTab}
+            currentUser={currentUser}
             onAssignClick={(asm) => handleOpenAssignModal(asm)}
           />
         )}
@@ -886,6 +903,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
             fetchAssignments={fetchAssignments}
             showToast={showToast}
             setActiveTab={setActiveTab}
+            currentUser={currentUser}
             initialSelectedAssessment={assigningAssessment}
             initialSelectedCandidate={assigningCandidate}
           />
@@ -898,6 +916,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
             candidates={candidates}
             savedAssessments={savedAssessments}
             showToast={showToast}
+            currentUser={currentUser}
             onAssignGroupClick={(group) => {
               if (savedAssessments.length === 0) {
                 showToast("Please create an assessment first.");
@@ -913,6 +932,8 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
             showToast={showToast}
             candidateGroups={candidateGroups}
             candidates={candidates}
+            savedAssessments={savedAssessments}
+            currentUser={currentUser}
           />
         )}
 
@@ -920,12 +941,27 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
           <EnglishResultsTab
             candidates={candidates}
             showToast={showToast}
+            currentUser={currentUser}
+          />
+        )}
+
+        {activeTab === 'users' && (
+          <InternalUsersManagementTab
+            showToast={showToast}
+            currentUser={currentUser}
+          />
+        )}
+
+        {activeTab === 'login-history' && (
+          <LoginHistoryAuditTab
+            showToast={showToast}
           />
         )}
 
         {activeTab === 'overall-results' && (
           <OverallResultsTab
             showToast={showToast}
+            currentUser={currentUser}
           />
         )}
       </RecruiterLayout>

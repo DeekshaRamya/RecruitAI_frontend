@@ -607,6 +607,7 @@ export const ActiveAssessmentsTab = ({
   setGeneratedQuestions,
   showToast,
   setActiveTab,
+  currentUser,
   onAssignClick
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -999,10 +1000,14 @@ export const ActiveAssessmentsTab = ({
                     </span>
                   </div>
 
-                  {/* Creation Date */}
+                  {/* Creation Date & Author */}
                   <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-4 font-mono">
                     <Calendar size={12} />
                     <span>Created: {asm.createdDate || 'Recent'}</span>
+                    <span className="text-slate-300 dark:text-slate-700">•</span>
+                    <span className="text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 rounded font-sans text-[9px] font-bold">
+                      By {asm.created_by ? (currentUser?.id === asm.created_by ? 'You' : (currentUser?.name || 'Recruiter')) : (currentUser?.name || 'You')}
+                    </span>
                   </div>
 
                   {/* Subject Badges */}
@@ -1098,6 +1103,7 @@ export const ActiveAssessmentsTab = ({
                   <th className="py-3.5 px-4">Difficulty</th>
                   <th className="py-3.5 px-4">Duration</th>
                   <th className="py-3.5 px-4">Questions</th>
+                  <th className="py-3.5 px-4">Created By</th>
                   <th className="py-3.5 px-4">Created Date</th>
                   <th className="py-3.5 px-5 text-right">Actions</th>
                 </tr>
@@ -1132,6 +1138,11 @@ export const ActiveAssessmentsTab = ({
                     </td>
                     <td className="py-3.5 px-4 font-mono font-bold text-indigo-600 dark:text-indigo-400">
                       {asm.questionsCount || asm.questions?.length || 0} Qs
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/40">
+                        {asm.created_by ? (currentUser?.id === asm.created_by ? 'You' : (currentUser?.name || 'Recruiter')) : (currentUser?.name || 'You')}
+                      </span>
                     </td>
                     <td className="py-3.5 px-4 text-slate-400 font-mono text-[11px]">
                       {asm.createdDate || 'Recent'}

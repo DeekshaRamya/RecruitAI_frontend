@@ -129,7 +129,9 @@ const OAuthCallback = () => {
       }
 
       // Navigate based on user role
-      if (userObj.role === 'admin' || userObj.role === 'recruiter') {
+      if (userObj.role === 'admin') {
+        navigate('/admin/dashboard', { replace: true });
+      } else if (userObj.role === 'recruiter') {
         navigate('/recruiter/dashboard', { replace: true });
       } else {
         navigate('/candidate/dashboard', { replace: true });
@@ -208,7 +210,7 @@ function App() {
               path="/admin" 
               element={
                 <ProtectedRoute allowedRole="admin">
-                  <Navigate to="/recruiter/dashboard" replace />
+                  <Navigate to="/admin/dashboard" replace />
                 </ProtectedRoute>
               } 
             />

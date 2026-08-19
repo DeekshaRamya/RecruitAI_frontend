@@ -18,7 +18,12 @@ import {
   SlidersHorizontal,
   FolderOpen,
   UserCheck,
-  UserPlus
+  UserPlus,
+  ShieldAlert,
+  ShieldCheck,
+  History,
+  UserCog,
+  Settings
 } from 'lucide-react';
 import logo from '../../assets/systech.jpg';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
@@ -59,7 +64,9 @@ export const RECRUITER_TABS = {
   'groups': { label: 'Candidate Groups', category: 'Candidates', description: 'Organize candidate cohorts, departments, and bulk invitations' },
   'results': { label: 'Technical Evaluations', category: 'Analytics', description: 'Detailed coding performance, SQL execution, and test cases' },
   'english-results': { label: 'Communication Reports', category: 'Analytics', description: 'Language fluency, pronunciation, and spoken English evaluation' },
-  'overall-results': { label: 'Hiring Decision Matrix', category: 'Analytics', description: 'Composite candidate scores and final hiring recommendations' }
+  'overall-results': { label: 'Hiring Decision Matrix', category: 'Analytics', description: 'Composite candidate scores and final hiring recommendations' },
+  'users': { label: 'Internal Users & Roles', category: 'Administration', description: 'Manage staff access, team roles, and administrative permissions' },
+  'login-history': { label: 'Login & Audit Logs', category: 'Administration', description: 'Security audit trail, IP addresses, and authentication history' }
 };
 
 const RecruiterLayout = ({
@@ -73,8 +80,11 @@ const RecruiterLayout = ({
   const location = useLocation();
 
   // Extract current tab from path or fallback to prop
+  const basePath = location.pathname.startsWith('/admin') ? '/admin' : '/recruiter';
   const currentPathTab = location.pathname.startsWith('/recruiter/')
     ? location.pathname.replace('/recruiter/', '').split('/')[0]
+    : location.pathname.startsWith('/admin/')
+    ? location.pathname.replace('/admin/', '').split('/')[0]
     : location.pathname === '/results'
     ? 'results'
     : 'dashboard';
@@ -85,7 +95,7 @@ const RecruiterLayout = ({
     if (controlledSetActiveTab) {
       controlledSetActiveTab(tabId);
     } else {
-      navigate(`/recruiter/${tabId}`);
+      navigate(`${basePath}/${tabId}`);
     }
   };
 
@@ -113,7 +123,16 @@ const RecruiterLayout = ({
 
   const avatarUrl = user?.photo || user?.avatar || user?.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=334155&color=f8fafc&bold=true`;
 
-  const navSections = [
+  const navSections = userRole === 'admin' ? [
+    {
+      title: 'Administration',
+      items: [
+        { id: 'dashboard', label: 'Admin Overview', icon: LayoutDashboard },
+        { id: 'users', label: 'Internal Users & Roles', icon: UserCog },
+        { id: 'login-history', label: 'Login & Audit Logs', icon: History },
+      ]
+    }
+  ] : [
     {
       title: 'Platform',
       items: [
@@ -377,7 +396,7 @@ const RecruiterLayout = ({
                         onClick={() => handleTabChange('dashboard')}
                         className="cursor-pointer text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
                       >
-                        Recruiter Portal
+                        {userRole === 'admin' ? 'Admin Portal' : 'Recruiter Portal'}
                       </BreadcrumbLink>
                     </BreadcrumbItem>
                     <BreadcrumbSeparator className="text-slate-400 dark:text-slate-600" />
