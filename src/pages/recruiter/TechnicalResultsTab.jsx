@@ -14,7 +14,9 @@ import {
   X,
   RefreshCw,
   ShieldAlert,
-  Eye
+  Eye,
+  Video,
+  Play
 } from 'lucide-react';
 import api from '../../api';
 
@@ -185,7 +187,16 @@ const TechnicalResultsTab = ({
     try {
       setLoadingDetailId(targetId);
       const response = await api.get(`/api/results/${targetId}`);
-      setSelectedResult(response.data || {});
+      const resultData = response.data || {};
+      if (!resultData.recording) {
+        try {
+          const recRes = await api.get(`/api/recordings/by-assignment/${targetId}`);
+          if (recRes.data) {
+            resultData.recording = recRes.data;
+          }
+        } catch (_recErr) {}
+      }
+      setSelectedResult(resultData);
       const initialExpanded = {};
       if (response.data?.questionsAnalysis) {
         response.data.questionsAnalysis.forEach((q, idx) => {
@@ -1271,6 +1282,83 @@ const TechnicalResultsTab = ({
                     <RefreshCw size={13} className={recalculating ? "animate-spin" : ""} />
                     <span>{recalculating ? "Re-grading..." : "Re-run AI Evaluation"}</span>
                   </button>
+                </div>
+
+                
+                {/* Proctoring Session Recording */}
+                <div className="mb-6 bg-dash-white-card border border-dash-border-gray/60 rounded-2xl p-4 sm:p-5 shadow-2xs">
+                  <div className="flex items-center justify-between border-b border-dash-border-gray/50 pb-3 mb-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+                        <Video size={16} />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-extrabold text-dash-dark-purple uppercase tracking-wider">
+                          Candidate Proctoring Recording
+                        </h4>
+                        <p className="text-[11px] text-slate-500 font-medium">
+                          Combined synchronized candidate screen and camera session video
+                        </p>
+                      </div>
+                    </div>
+                    {selectedResult.recording?.status && (
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${
+                        selectedResult.recording.status === 'COMPLETED'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : selectedResult.recording.status === 'UPLOADING'
+                          ? 'bg-amber-50 text-amber-700 border-amber-200'
+                          : 'bg-slate-100 text-slate-700 border-slate-200'
+                      }`}>
+                        {selectedResult.recording.status}
+                      </span>
+                    )}
+                  </div>
+
+                  {selectedResult.recording?.videoUrl || selectedResult.recording?.cloudinaryUrl ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-xs text-slate-600 px-1">
+                        <div className="flex items-center gap-4 text-[11px] font-semibold">
+                          <span>
+                            <strong>Duration:</strong> {Math.floor((selectedResult.recording.duration || 0) / 60)}m {((selectedResult.recording.duration || 0) % 60)}s
+                          </span>
+                          <span>
+                            <strong>Storage:</strong> {selectedResult.recording.storageProvider || 'Cloudinary'}
+                          </span>
+                        </div>
+                        {selectedResult.recording.videoUrl && (
+                          <a
+                            href={selectedResult.recording.videoUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                          >
+                            <span>Open in new tab</span>
+                            <ChevronRight size={12} />
+                          </a>
+                        )}
+                      </div>
+
+                      <div className="relative rounded-2xl overflow-hidden bg-black border border-slate-800 shadow-lg aspect-video max-h-[380px] flex items-center justify-center">
+                        <video
+                          src={selectedResult.recording.secure_url || selectedResult.recording.cloudinaryUrl || selectedResult.recording.videoUrl}
+                          controls
+                          playsInline
+                          preload="metadata"
+                          className="w-full h-full object-contain rounded-lg"
+                        >
+                          Your browser does not support the video tag.
+                        </video>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-6 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200 text-slate-500 text-xs">
+                      <Video size={24} className="mx-auto mb-2 text-slate-400" />
+                      <p className="font-bold text-slate-700">No session recording available</p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        Recording was not enabled or is still processing for this assessment attempt.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-4">

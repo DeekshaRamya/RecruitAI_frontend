@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Shield, 
-  ShieldAlert, 
-  AlertTriangle, 
-  Lock, 
-  Maximize2, 
-  Activity, 
+import {
+  Shield,
+  ShieldAlert,
+  AlertTriangle,
+  Lock,
+  Maximize2,
+  Activity,
   CheckCircle,
   AlertCircle,
   FileText
@@ -72,13 +72,13 @@ export const ExamSecurityMonitor = ({
           title: "Assessment Instructions & Safe Exam Rules",
           titleColor: "text-indigo-400",
           message: "To ensure a fair testing environment, this assessment runs in Safe Exam Mode. Please read the following rules carefully:\n\n" +
-                   "🚫 DO NOT press Alt+Tab or switch windows/tabs.\n" +
-                   "🚫 DO NOT exit full-screen mode (Escape key is disabled).\n" +
-                   "🚫 DO NOT open Developer Tools (F12 or inspect shortcuts).\n" +
-                   "🚫 DO NOT copy, cut, or paste content.\n" +
-                   "🚫 DO NOT right-click on the page.\n" +
-                   "🚫 DO NOT connect multiple monitors (dual screens).\n\n" +
-                   "You are allowed a maximum of 3 warnings. Exiting full-screen a 4th time will result in automatic submission. Please click below to enter full-screen and begin your assessment.",
+            "🚫 DO NOT press Alt+Tab or switch windows/tabs.\n" +
+            "🚫 DO NOT exit full-screen mode (Escape key is disabled).\n" +
+            "🚫 DO NOT open Developer Tools (F12 or inspect shortcuts).\n" +
+            "🚫 DO NOT copy, cut, or paste content.\n" +
+            "🚫 DO NOT right-click on the page.\n" +
+            "🚫 DO NOT connect multiple monitors (dual screens).\n\n" +
+            "You are allowed a maximum of 3 warnings. Exiting full-screen a 4th time will result in automatic submission. Please click below to enter full-screen and begin your assessment.",
           buttonText: "Start Assessment in Fullscreen"
         };
       case 1:
@@ -86,9 +86,9 @@ export const ExamSecurityMonitor = ({
           title: "Warning (1 of 3)",
           titleColor: "text-amber-400",
           message: "You have exited full-screen mode.\n\n" +
-                   "🚫 DO NOT switch windows/tabs (Alt+Tab).\n" +
-                   "🚫 DO NOT exit full-screen mode.\n\n" +
-                   "Please return to full-screen to continue your assessment. Repeated violations will result in automatic submission.",
+            "🚫 DO NOT switch windows/tabs (Alt+Tab).\n" +
+            "🚫 DO NOT exit full-screen mode.\n\n" +
+            "Please return to full-screen to continue your assessment. Repeated violations will result in automatic submission.",
           buttonText: "Return to Exam"
         };
       case 2:
@@ -96,9 +96,9 @@ export const ExamSecurityMonitor = ({
           title: "Warning (2 of 3)",
           titleColor: "text-orange-400",
           message: "This is your second warning.\n\n" +
-                   "🚫 DO NOT switch windows/tabs (Alt+Tab).\n" +
-                   "🚫 DO NOT exit full-screen mode.\n\n" +
-                   "Please return to full-screen immediately. One more violation will result in automatic submission.",
+            "🚫 DO NOT switch windows/tabs (Alt+Tab).\n" +
+            "🚫 DO NOT exit full-screen mode.\n\n" +
+            "Please return to full-screen immediately. One more violation will result in automatic submission.",
           buttonText: "Return to Exam"
         };
       case 3:
@@ -106,9 +106,9 @@ export const ExamSecurityMonitor = ({
           title: "Final Warning (3 of 3)",
           titleColor: "text-rose-500",
           message: "This is your final warning.\n\n" +
-                   "🚫 DO NOT switch windows/tabs (Alt+Tab).\n" +
-                   "🚫 DO NOT exit full-screen mode.\n\n" +
-                   "If you exit full-screen once again, your assessment will be submitted automatically.",
+            "🚫 DO NOT switch windows/tabs (Alt+Tab).\n" +
+            "🚫 DO NOT exit full-screen mode.\n\n" +
+            "If you exit full-screen once again, your assessment will be submitted automatically.",
           buttonText: "Return to Exam"
         };
       default:
@@ -137,7 +137,7 @@ export const ExamSecurityMonitor = ({
       {/* 1. Header Security Widget (Floating Dashboard) */}
       {!isExamLocked && !is4thViolation && (
         <div className="fixed top-4 right-4 z-40 flex items-center gap-3">
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             className={`flex items-center gap-4 px-4 py-2 bg-[#121214]/90 backdrop-blur-md rounded-2xl border ${scoreTheme.border} shadow-lg shadow-black/30`}
@@ -183,7 +183,7 @@ export const ExamSecurityMonitor = ({
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-[#0B0B0D]/98 z-50 flex items-center justify-center p-6 select-none"
           >
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.9, y: 20 }}
@@ -199,7 +199,7 @@ export const ExamSecurityMonitor = ({
               <h2 className={`font-plus-jakarta font-black text-xl mb-4 ${warningContent.titleColor}`}>
                 {warningContent.title}
               </h2>
-              
+
               <p className="text-zinc-300 text-xs leading-relaxed mb-6 font-medium whitespace-pre-line text-left bg-zinc-900/40 p-5 rounded-2xl border border-zinc-800/50">
                 {warningContent.message}
               </p>
@@ -244,7 +244,7 @@ export const ExamSecurityMonitor = ({
             >
               {/* Alert red glow overlay */}
               <div className="absolute inset-0 bg-gradient-to-b from-rose-500/10 to-transparent pointer-events-none" />
-              
+
               <div className="w-20 h-20 bg-rose-500/15 rounded-full flex items-center justify-center mx-auto mb-5 text-rose-500 border border-rose-500/30">
                 <Lock size={34} />
               </div>
@@ -252,12 +252,12 @@ export const ExamSecurityMonitor = ({
               <h2 className="font-plus-jakarta font-black text-2xl text-rose-500 mb-2">
                 Assessment Auto Submission
               </h2>
-              
+
               <p className="text-zinc-300 text-sm leading-relaxed mb-6 font-medium whitespace-pre-line">
                 You have exited full-screen mode more than the allowed limit.
-Your assessment will now be submitted automatically.
+                Your assessment will now be submitted automatically.
 
-Please provide the reason why you exited full-screen mode.
+                Please provide the reason why you exited full-screen mode.
               </p>
 
               <form onSubmit={handleReasonSubmit} className="text-left space-y-4">
@@ -266,7 +266,7 @@ Please provide the reason why you exited full-screen mode.
                     <FileText size={14} className="text-rose-400" />
                     <span>Reason <span className="text-rose-500">*</span></span>
                   </label>
-                  
+
                   <textarea
                     rows={5}
                     value={submissionReason}
@@ -274,12 +274,12 @@ Please provide the reason why you exited full-screen mode.
                     placeholder={`Example:\n- Accidentally pressed ESC\n- Internet issue\n- System notification\n- Keyboard mistake`}
                     className="w-full bg-zinc-900/90 border border-zinc-700/80 rounded-2xl p-4 text-xs font-semibold text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-rose-500 transition-colors leading-relaxed"
                   />
-                  
+
                   <div className="flex items-center justify-between mt-2 text-[11px] font-bold">
                     <span className={submissionReason.trim().length >= 10 ? "text-emerald-400" : "text-amber-400 flex items-center gap-1"}>
                       {submissionReason.trim().length < 10 && <AlertCircle size={12} />}
-                      {submissionReason.trim().length >= 10 
-                        ? "Minimum character requirement met" 
+                      {submissionReason.trim().length >= 10
+                        ? "Minimum character requirement met"
                         : "Minimum 10 characters required"}
                     </span>
                     <span className="text-zinc-400 font-mono">
@@ -322,9 +322,9 @@ Please provide the reason why you exited full-screen mode.
               <h2 className="font-plus-jakarta font-black text-2xl text-red-500 mb-2">
                 Assessment Locked
               </h2>
-              
+
               <p className="text-zinc-400 text-sm leading-relaxed mb-6 font-medium">
-                Multiple proctoring violations have compromised assessment integrity. 
+                Multiple proctoring violations have compromised assessment integrity.
                 Your assessment has been locked.
               </p>
 

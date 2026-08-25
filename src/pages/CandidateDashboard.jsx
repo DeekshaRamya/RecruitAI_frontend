@@ -6,9 +6,12 @@ import logo from '../assets/systech.jpg';
 import api from '../api';
 import ActionButton from '../components/ActionButton';
 import { useExamSecurity } from '../hooks/useExamSecurity';
+import { useProctorRecorder } from '../hooks/useProctorRecorder';
 import { ExamSecurityMonitor } from '../components/ExamSecurityMonitor';
 import {
   LogOut,
+  Video,
+  AlertCircle,
   Menu,
   X,
   FileText,
@@ -985,7 +988,7 @@ const FormattedQuestionText = React.memo(({ text }) => {
   // 2. Un-fenced Python detection
   const lines = text.split('\n');
   const pythonTriggers = /^\s*(def\s+|class\s+|import\s+|from\s+|if\s+|for\s+|while\s+|try:|with\s+|print\(|[a-zA-Z_][a-zA-Z0-9_]*\s*=\s*)/;
-  
+
   let textBefore = [];
   let codeLines = [];
   let textAfter = [];
@@ -1720,7 +1723,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     if (englishExamSecurity?.exitFullscreen) {
       await englishExamSecurity.exitFullscreen();
     } else if (document.fullscreenElement) {
-      try { await document.exitFullscreen(); } catch (_e) {}
+      try { await document.exitFullscreen(); } catch (_e) { }
     }
 
     if (silenceTimerRef.current) {
@@ -2737,6 +2740,22 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
   };
 
   // Initialize Exam Security hook
+  // Initialize Proctoring Recording Hook
+  const proctorRecorder = useProctorRecorder({
+    onScreenShareEnded: () => {
+      showToast("Warning: Screen sharing stopped! Full screen capture is required.");
+      if (examSecurity?.triggerViolation) {
+        examSecurity.triggerViolation('SCREEN_SHARE_STOPPED', 'Candidate stopped screen sharing', 'HIGH');
+      }
+    },
+    onRecordingError: (err) => {
+      console.error("Proctoring recording error:", err);
+    }
+  });
+  const [isProctorModalOpen, setIsProctorModalOpen] = useState(false);
+  const [pendingAssignmentToStart, setPendingAssignmentToStart] = useState(null);
+  const [isProctorStarting, setIsProctorStarting] = useState(false);
+
   const examSecurity = useExamSecurity({
     active: isExamActive,
     assignmentId: activeAssignment?.id || activeAssignment?.assignmentId,
@@ -2922,7 +2941,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
   }, [assignments, activeAssignment, loadingAssignments]);
 
 
-  const handleStartExam = async (assignment) => {
+  const handleStartExam = async (assignment, permissionsGrantedOverride = false) => {
     if (startingTechRef.current || isStartingTechnical || isSubmittingManual) return;
     startingTechRef.current = true;
     setIsStartingTechnical(true);
@@ -3021,7 +3040,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     if (examSecurity?.exitFullscreen) {
       await examSecurity.exitFullscreen();
     } else if (document.fullscreenElement) {
-      try { await document.exitFullscreen(); } catch (_e) {}
+      try { await document.exitFullscreen(); } catch (_e) { }
     }
 
     // If string passed (or object from proctoring), use string or fallback to activeAssignment ID
@@ -4130,8 +4149,8 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                               isSubmittingThisAssignment
                                 ? "Submitting Assessment..."
                                 : isInProgress
-                                ? "Resuming Assessment..."
-                                : "Starting Technical Assessment..."
+                                  ? "Resuming Assessment..."
+                                  : "Starting Technical Assessment..."
                             }
                             disabled={isStartingTechnical || startingTechRef.current || isSubmittingManual || isSubmittingThisAssignment}
                             icon={Play}
@@ -4141,8 +4160,8 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                             {isSubmittingThisAssignment
                               ? "Submitting Assessment..."
                               : isInProgress
-                              ? 'Resume Technical Assessment'
-                              : 'Start Technical Assessment'}
+                                ? 'Resume Technical Assessment'
+                                : 'Start Technical Assessment'}
                           </ActionButton>
                         );
                       })()}
@@ -4358,6 +4377,17 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
                 {/* Timer, Progress & Submit */}
                 <div className="flex items-center gap-4 flex-wrap">
+                  {/* Proctoring Recording Live Indicator */}
+                  {proctorRecorder && (proctorRecorder.recordingStatus === 'RECORDING' || proctorRecorder.recordingStatus === 'STARTING') && (
+                    <div className="flex items-center gap-2 bg-rose-50 border border-rose-200/80 rounded-xl px-3.5 py-1.5 shadow-2xs">
+                      <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
+                      <span className="text-[11px] font-extrabold text-rose-600 tracking-wide flex items-center gap-1.5">
+                        <Video size={13} className="text-rose-500" />
+                        <span>REC LIVE</span>
+                      </span>
+                    </div>
+                  )}
+
                   {/* Timer Box */}
                   <div className="flex items-center gap-2 bg-dash-soft-pink border border-dash-border-gray/50 rounded-xl px-3.5 py-1.5 shadow-2xs">
                     <span className="text-[10px] font-extrabold text-dash-light-purple uppercase tracking-wider">Time Remaining:</span>
@@ -5516,7 +5546,129 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
         />
       )}
 
-      {/* Manual Submission Confirmation Modal */}
+      {/* Proctoring Permission & Information Modal */}
+        <AnimatePresence>
+          {isProctorModalOpen && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[9999] bg-slate-900/85 backdrop-blur-md flex items-center justify-center p-4"
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0, y: 15 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.95, opacity: 0, y: 15 }}
+                className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl border border-slate-100 flex flex-col gap-5 text-left relative overflow-hidden"
+              >
+                <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
+
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0 shadow-sm">
+                    <Video size={24} />
+                  </div>
+                  <div>
+                    <h3 className="font-plus-jakarta font-extrabold text-xl text-slate-900 leading-tight">
+                      Camera & Screen Recording Required
+                    </h3>
+                    <p className="text-xs text-slate-500 font-semibold mt-0.5">
+                      Proctoring verification for assessment integrity
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-3">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">
+                    Assessment Requirements
+                  </span>
+
+                  <div className="flex items-start gap-3 bg-white p-3 rounded-xl border border-slate-200/60 shadow-2xs">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5 border border-emerald-100">
+                      <Check size={16} />
+                    </div>
+                    <div>
+                      <strong className="text-xs font-bold text-slate-800 block">Camera Access</strong>
+                      <span className="text-[11px] text-slate-500 font-medium leading-relaxed">
+                        Your webcam feed is recorded to verify candidate presence.
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3 bg-white p-3 rounded-xl border border-slate-200/60 shadow-2xs">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5 border border-emerald-100">
+                      <Check size={16} />
+                    </div>
+                    <div>
+                      <strong className="text-xs font-bold text-slate-800 block">Microphone Access (Optional)</strong>
+                      <span className="text-[11px] text-slate-500 font-medium leading-relaxed">
+                        Your voice audio is captured if a microphone is available.
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3 bg-white p-3 rounded-xl border border-slate-200/60 shadow-2xs">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5 border border-emerald-100">
+                      <Check size={16} />
+                    </div>
+                    <div>
+                      <strong className="text-xs font-bold text-slate-800 block">Screen Sharing (Full Screen)</strong>
+                      <span className="text-[11px] text-slate-500 font-medium leading-relaxed">
+                        Share your entire screen. Video and audio feeds are combined into one secure recording for review.
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {proctorRecorder.permissionError && (
+                  <div className="bg-rose-50 border border-rose-200 p-4 rounded-2xl space-y-2.5 text-xs text-rose-900">
+                    <div className="flex items-start gap-2.5 font-bold text-rose-700">
+                      <AlertCircle size={16} className="text-rose-600 shrink-0 mt-0.5" />
+                      <span>{proctorRecorder.permissionError}</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsProctorModalOpen(false);
+                      setPendingAssignmentToStart(null);
+                    }}
+                    disabled={isProctorStarting || proctorRecorder.isRequestingPermission}
+                    className="flex-1 py-3 px-4 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+
+                  <ActionButton
+                    type="button"
+                    onClick={async () => {
+                      setIsProctorStarting(true);
+                      const res = await proctorRecorder.requestPermissions();
+                      setIsProctorStarting(false);
+                      if (res.success) {
+                        setIsProctorModalOpen(false);
+                        const targetAsm = pendingAssignmentToStart || activeAssignment;
+                        if (targetAsm) {
+                          await handleStartExam(targetAsm, true);
+                        }
+                      }
+                    }}
+                    isLoading={isProctorStarting || proctorRecorder.isRequestingPermission}
+                    loadingText="Requesting..."
+                    className="flex-1 py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <Video size={15} />
+                    <span>Enable Camera & Screen</span>
+                  </ActionButton>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Manual Submission Confirmation Modal */}
       <AnimatePresence>
         {isSubmitModalOpen && (() => {
           const currentAsm = activeAssignment?.assessment || activeAssignment || {};
