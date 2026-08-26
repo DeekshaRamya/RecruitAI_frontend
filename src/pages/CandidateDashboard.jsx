@@ -5,6 +5,10 @@ import Editor from '@monaco-editor/react';
 import logo from '../assets/systech.jpg';
 import api from '../api';
 import ActionButton from '../components/ActionButton';
+import { EnglishBreakModal } from '../components/english/EnglishBreakModal';
+import { EnglishResumeUpload } from '../components/english/EnglishResumeUpload';
+import { EnglishInterviewRoom } from '../components/english/EnglishInterviewRoom';
+import { EnglishAssessmentResult } from '../components/english/EnglishAssessmentResult';
 import { useExamSecurity } from '../hooks/useExamSecurity';
 import { useProctorRecorder } from '../hooks/useProctorRecorder';
 import { ExamSecurityMonitor } from '../components/ExamSecurityMonitor';
@@ -365,12 +369,12 @@ const DatabaseSchemaVisualizer = ({ schemaLines, dataLines, liveSchemaMap }) => 
               <div className="flex items-center gap-1.5 bg-purple-50 text-purple-900 px-3 py-1 rounded-lg border border-purple-200/60 font-mono shadow-2xs">
                 <Database size={13} className="text-purple-600" />
                 <span className="text-[10px] text-purple-500 uppercase tracking-wider font-extrabold mr-0.5">Schema:</span>
-                <span>{activeTable.name.includes('.') ? activeTable.name.split('.')[0] : 'dbo'}</span>
+                <span>{activeTable?.name && activeTable.name.includes('.') ? activeTable.name.split('.')[0] : 'dbo'}</span>
               </div>
               <div className="flex items-center gap-1.5 bg-indigo-50 text-indigo-900 px-3 py-1 rounded-lg border border-indigo-200/60 font-mono shadow-2xs">
                 <Table size={13} className="text-indigo-600" />
                 <span className="text-[10px] text-indigo-500 uppercase tracking-wider font-extrabold mr-0.5">Table:</span>
-                <span>{activeTable.name.includes('.') ? activeTable.name.split('.')[1] : activeTable.name}</span>
+                <span>{activeTable?.name && activeTable.name.includes('.') ? activeTable.name.split('.')[1] : (activeTable?.name || '')}</span>
               </div>
               <span className="text-[11px] font-mono text-slate-400 font-normal">({activeTable.name})</span>
             </div>
@@ -1496,6 +1500,62 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     };
   });
 
+  // Break Modal State for English Assessment
+  const [showBreakModal, setShowBreakModal] = useState(false);
+  const [breakEndTime, setBreakEndTime] = useState(() => {
+    return localStorage.getItem('english_break_end_time') || null;
+  });
+
+  // Check on mount if an existing break countdown is still running
+  useEffect(() => {
+    const savedBreakEnd = localStorage.getItem('english_break_end_time');
+    if (savedBreakEnd) {
+      const remaining = new Date(savedBreakEnd).getTime() - Date.now();
+      if (remaining > 0) {
+        setBreakEndTime(savedBreakEnd);
+        setShowBreakModal(true);
+      } else {
+        localStorage.removeItem('english_break_end_time');
+        setBreakEndTime(null);
+      }
+    }
+  }, []);
+
+  const handleSelectBreak = async (minutes) => {
+    try {
+      const endTime = new Date(Date.now() + minutes * 60 * 1000).toISOString();
+      setBreakEndTime(endTime);
+      localStorage.setItem('english_break_end_time', endTime);
+      setShowBreakModal(true);
+      await api.post('/api/english-assessment/break', { minutes });
+    } catch (err) {
+      console.error("Failed to set break on backend:", err);
+    }
+  };
+
+  const handleSkipBreak = async () => {
+    setBreakEndTime(null);
+    setShowBreakModal(false);
+    localStorage.removeItem('english_break_end_time');
+    try {
+      await api.post('/api/english-assessment/break', { minutes: 0 });
+    } catch (err) {
+      console.error("Failed to skip break on backend:", err);
+    }
+    setActiveTab('english');
+    setActiveAssignment(null);
+    fetchEnglishStatus();
+  };
+
+  const handleBreakComplete = () => {
+    setBreakEndTime(null);
+    setShowBreakModal(false);
+    localStorage.removeItem('english_break_end_time');
+    setActiveTab('english');
+    setActiveAssignment(null);
+    fetchEnglishStatus();
+  };
+
   // English Speaking Assessment states
   const [englishLoading, setEnglishLoading] = useState(false);
   const [englishInterview, setEnglishInterview] = useState(null);
@@ -1621,7 +1681,15 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     }
 
     // Require resume analysis before starting English assessment
-    const hasResume = candidate && (candidate.resume_filename || (candidate.resume && candidate.resume > 0) || candidate.resume_url || candidate.resume_path);
+    const hasResume = Boolean(
+      candidate?.resume_filename || 
+      candidate?.filename || 
+      (candidate?.resume && candidate.resume > 0) || 
+      candidate?.resume_url || 
+      candidate?.resume_path || 
+      (candidate?.resume_analysis && candidate.resume_analysis.length > 0) ||
+      (englishInterview && englishInterview.resume_filename)
+    );
     if (!hasResume) {
       showToast("Please upload and analyze your resume first! The AI generates personalized interview questions from your resume.");
       startingEnglishRef.current = false;
@@ -1757,14 +1825,14 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
 
   // Upload and parse resume specifically for English Assessment
   const uploadEnglishResume = async (file) => {
-    const ext = file.name.split('.').pop().toLowerCase();
-    if (ext !== 'pdf') {
-      setEnglishUploadError('Only PDF files are supported.');
+    const ext = (file?.name || '').split('.').pop().toLowerCase();
+    if (!['pdf', 'doc', 'docx'].includes(ext)) {
+      setEnglishUploadError('Supported formats: PDF, DOC, DOCX.');
       showToast('Invalid file format');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setEnglishUploadError('File size exceeds the 5MB limit.');
+    if (file.size > 15 * 1024 * 1024) {
+      setEnglishUploadError('File size exceeds the 15MB limit.');
       showToast('File too large');
       return;
     }
@@ -2481,17 +2549,13 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     }
   }, [activeTab, activeAssignment]);
 
-  // Auto-redirect to English Assessment after Technical Assessment completion
+  // Trigger Break Selection Modal upon Technical Assessment completion
   useEffect(() => {
     if (activeTab === 'technical' && activeAssignment && examState?.submitted) {
       const isExpired = examState.timeLeft <= 0 || activeAssignment.status === 'EXPIRED';
       if (isExpired) return;
 
-      const redirectTimer = setTimeout(() => {
-        setActiveTab('english');
-        setActiveAssignment(null);
-      }, 3000);
-      return () => clearTimeout(redirectTimer);
+      setShowBreakModal(true);
     }
   }, [activeTab, activeAssignment, examState?.submitted, examState?.timeLeft]);
 
@@ -3614,14 +3678,14 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
   };
 
   const uploadFile = async (file) => {
-    const ext = file.name.split('.').pop().toLowerCase();
-    if (ext !== 'pdf') {
-      setUploadError('Only PDF files are supported.');
+    const ext = (file?.name || '').split('.').pop().toLowerCase();
+    if (!['pdf', 'doc', 'docx'].includes(ext)) {
+      setUploadError('Supported formats: PDF, DOC, DOCX.');
       showToast('Invalid file format');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setUploadError('File size exceeds the 5MB limit.');
+    if (file.size > 15 * 1024 * 1024) {
+      setUploadError('File size exceeds the 15MB limit.');
       showToast('File too large');
       return;
     }
@@ -3712,7 +3776,8 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     }, 4000);
   };
 
-  const firstName = candidate.name.split(' ')[0];
+  const candidateDisplayName = candidate?.name || candidate?.full_name || 'Candidate';
+  const firstName = (typeof candidateDisplayName === 'string' ? candidateDisplayName : 'Candidate').split(' ')[0];
 
   const getHeaderContent = () => {
     switch (activeTab) {
@@ -3779,7 +3844,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
             <nav className="space-y-2">
               {[
                 { id: 'technical', label: 'Technical Test', icon: Terminal },
-                { id: 'english', label: 'English Speaking', icon: Volume2 },
+                { id: 'english', label: 'English Assessment', icon: Volume2 },
               ].map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
@@ -3880,7 +3945,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
                 <nav className="space-y-1 flex-1">
                   {[
                     { id: 'technical', label: 'Technical Test', icon: Terminal },
-                    { id: 'english', label: 'English Speaking', icon: Volume2 },
+                    { id: 'english', label: 'English Assessment', icon: Volume2 },
                   ].map((item) => {
                     const Icon = item.icon;
                     const isActive = activeTab === item.id;
@@ -5030,535 +5095,72 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
               </div>
             )}
 
-            {englishInterview && (englishInterview.status === 'NOT_STARTED' || !englishInterview.status) && (
-              <div className="w-full flex justify-center items-center py-6">
-                <div className="w-full max-w-2xl bg-dash-white-card border border-dash-border-gray/50 rounded-[28px] p-8 sm:p-10 shadow-[0_12px_40px_rgba(0,0,0,0.03)] text-center flex flex-col items-center gap-7">
-
-                  {/* Interviewer Profile Card */}
-                  <div className="relative w-full rounded-2.5xl p-6 bg-gradient-to-br from-slate-50 to-slate-100/60 border border-slate-200/60 flex flex-col sm:flex-row items-center gap-5 text-left transition-all hover:shadow-md">
-                    <div className="relative w-16 h-16 rounded-2xl bg-dash-primary-purple flex items-center justify-center text-white text-3xl shadow-inner shrink-0">
-                      🎙️
-                      <div className="absolute -inset-1 rounded-2xl border-2 border-dash-primary-purple/35 animate-ping opacity-60 pointer-events-none" />
-                    </div>
-                    <div className="flex-1 min-w-0 text-center sm:text-left">
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2.5">
-                        <span className="font-plus-jakarta font-extrabold text-lg text-dash-dark-purple">
-                          Interviewer: Puck
-                        </span>
-                        <span className="inline-flex self-center sm:self-auto items-center px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-dash-primary-purple/10 text-dash-primary-purple uppercase tracking-wide">
-                          Gemini 3.1 Live Voice
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-500 font-bold mt-0.5">AI HR Recruiting & Communications Manager</p>
-                      <p className="text-[11px] text-slate-400 font-medium mt-2 leading-relaxed">
-                        Puck uses the advanced Gemini Live voice synthesis protocol to conduct natural, real-time verbal assessments, evaluating your fluency, grammar, and pronunciation.
-                      </p>
-                    </div>
+            {englishInterview && englishInterview.status === 'COMPLETED' ? (
+              <div className="flex justify-center items-center py-12 animate-fade-in w-full">
+                <div className="w-full max-w-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[28px] p-8 sm:p-12 shadow-xl flex flex-col items-center text-center gap-6">
+                  <div className="w-20 h-20 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-200 dark:border-emerald-800 animate-bounce">
+                    <CheckCircle2 size={44} />
                   </div>
-
-                  <div>
-                    <h3 className="font-plus-jakarta font-extrabold text-2xl text-dash-dark-purple tracking-tight">
-                      English Communication Assessment
+                  <div className="space-y-2">
+                    <h3 className="font-plus-jakarta font-extrabold text-2xl text-slate-900 dark:text-white tracking-tight">
+                      English Assessment Completed!
                     </h3>
-                    <p className="text-xs font-bold text-dash-light-purple mt-1 uppercase tracking-wider">Real-Time Conversational Audit</p>
-                  </div>
-
-                  <div className="bg-dash-soft-pink/40 border border-dash-border-gray/40 rounded-2xl p-4 text-left w-full text-xs font-medium text-dash-dark-purple leading-relaxed space-y-1">
-                    <p className="font-bold text-dash-primary-purple flex items-center gap-1.5">
-                      <span>🎤 Continuous Voice Interview Protocol:</span>
-                    </p>
-                    <p className="text-slate-600">
-                      The AI will read concise HR questions aloud one at a time. Once Puck finishes speaking, your microphone automatically turns ON. Speak naturally — silence will automatically submit your response and continue the conversation.
+                    <p className="text-sm text-slate-600 dark:text-slate-300 font-medium max-w-md mx-auto leading-relaxed">
+                      Thank you for completing your 30-minute AI English Communication Assessment. Your answers and interview speech have been securely recorded and submitted to your recruiter.
                     </p>
                   </div>
 
-                  {englishInterview.is_eligible === false ? (
-                    <div className="w-full p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 font-bold text-xs">
-                      ⚠️ You must successfully complete the Technical Assessment first before starting the English Assessment.
-                    </div>
-                  ) : englishUploading ? (
-                    <div className="w-full p-6 border border-dash-border-gray/50 rounded-2xl bg-slate-50 flex flex-col items-center gap-3">
-                      <Loader2 className="animate-spin text-dash-primary-purple" size={32} />
-                      <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden mt-2">
-                        <div className="h-full bg-dash-primary-purple transition-all duration-350" style={{ width: `${englishUploadProgress}%` }} />
-                      </div>
-                      <span className="text-xs font-bold text-dash-primary-purple">Uploading & Analyzing Resume... {englishUploadProgress}%</span>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-4 w-full">
-                      {/* Hidden input for resume upload - placed outside conditional blocks so it is always present in DOM */}
-                      <input
-                        type="file"
-                        ref={englishFileInputRef}
-                        onChange={(e) => {
-                          const files = e.target.files;
-                          if (files && files.length > 0) {
-                            uploadEnglishResume(files[0]);
-                          }
-                        }}
-                        accept=".pdf"
-                        className="hidden"
-                      />
-
-                      {/* Resume Analysis Badge & Detail Summary */}
-                      {candidate && (candidate.resume_filename || (candidate.resume && candidate.resume > 0) || candidate.resume_url || candidate.resume_path) ? (
-                        <div className="w-full bg-emerald-50/90 border border-emerald-200 rounded-2xl p-4 text-left shadow-sm space-y-2.5">
-                          <div className="flex items-center justify-between gap-3 border-b border-emerald-200/60 pb-2.5">
-                            <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-xl bg-emerald-500/15 flex items-center justify-center text-emerald-700 shrink-0 font-extrabold text-sm">
-                                📄
-                              </div>
-                              <div>
-                                <p className="text-xs font-black text-emerald-900 flex items-center gap-1.5">
-                                  <span>Resume Analyzed: {candidate.resume_filename || 'Uploaded Resume.pdf'}</span>
-                                  <span className="bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded-full text-[9px] font-black uppercase">Verified</span>
-                                </p>
-                                <p className="text-[10px] text-emerald-700 font-bold mt-0.5">
-                                  Resume Match Score: {candidate.resume || 85}% • Skills & Experience extracted by AI
-                                </p>
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => englishFileInputRef.current && englishFileInputRef.current.click()}
-                              className="text-[10px] font-extrabold text-dash-primary-purple hover:underline cursor-pointer shrink-0"
-                            >
-                              Re-upload PDF
-                            </button>
-                          </div>
-
-                          <div className="text-[11px] text-slate-700 space-y-1">
-                            <p className="font-extrabold text-dash-primary-purple uppercase tracking-wider text-[10px] flex items-center gap-1">
-                              <span>🤖 AI Question Tailoring Protocol:</span>
-                            </p>
-                            <p className="text-[11px] leading-relaxed text-slate-600 font-medium">
-                              The AI HR interviewer has thoroughly analyzed your resume context. All 8 interview questions will be customized based on your background, technical skills, and project experience.
-                            </p>
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="w-full bg-amber-50 border border-amber-200 rounded-2xl p-4 text-left flex items-center gap-3">
-                            <ShieldAlert size={18} className="text-amber-600 shrink-0" />
-                            <div>
-                              <p className="text-xs font-black text-amber-900">
-                                Mandatory Step 1: Upload Your Resume PDF
-                              </p>
-                              <p className="text-[10px] text-amber-700 font-bold mt-0.5">
-                                The AI will parse and analyze your resume to generate personalized interview questions based on your background.
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Drag & Drop Zone */}
-                          <div
-                            onDragOver={(e) => { e.preventDefault(); setEnglishDragOver(true); }}
-                            onDragLeave={() => setEnglishDragOver(false)}
-                            onDrop={(e) => {
-                              e.preventDefault();
-                              setEnglishDragOver(false);
-                              const files = e.dataTransfer.files;
-                              if (files && files.length > 0) {
-                                uploadEnglishResume(files[0]);
-                              }
-                            }}
-                            onClick={() => englishFileInputRef.current && englishFileInputRef.current.click()}
-                            className={`w-full py-6 border-2 border-dashed rounded-[20px] transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${englishDragOver
-                              ? 'border-dash-primary-purple bg-dash-primary-purple/5 scale-[0.99]'
-                              : 'border-dash-border-gray hover:border-dash-primary-purple hover:bg-dash-light-blue-bg/40'
-                              }`}
-                          >
-                            <UploadCloud size={24} className="text-dash-light-purple animate-pulse" />
-                            <span className="text-xs font-extrabold text-dash-dark-purple">
-                              Upload Resume PDF to Analyze & Start Interview
-                            </span>
-                            <span className="text-[10px] text-slate-400 font-bold">Drag & Drop PDF file here or click to browse (max 5MB)</span>
-                          </div>
-                        </>
-                      )}
-
-                      {englishUploadError && (
-                        <p className="text-[10px] font-bold text-red-500">{englishUploadError}</p>
-                      )}
-
-                      {/* Start AI Voice Interview button */}
-                      {englishInterview.is_eligible !== false && (
-                        <div className="flex flex-col items-center gap-2 mt-1 w-full">
-                          <ActionButton
-                            onClick={handleStartEnglish}
-                            isLoading={englishLoading}
-                            loadingText="Analyzing Resume & Starting Interview..."
-                            disabled={englishLoading || startingEnglishRef.current}
-                            icon={Play}
-                            iconSize={13}
-                            className="px-8 py-3.5 rounded-xl bg-dash-primary-purple text-white font-bold text-xs hover:bg-dash-dark-purple shadow-md justify-center w-full disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-all hover:scale-[1.01]"
-                          >
-                            {candidate && (candidate.resume_filename || (candidate.resume && candidate.resume > 0) || candidate.resume_url || candidate.resume_path) ? 'Start AI Voice Interview (Based on Analyzed Resume)' : 'Upload Resume & Start AI Voice Interview'}
-                          </ActionButton>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {englishInterview && englishInterview.status === 'IN_PROGRESS' && (() => {
-              const conversations = englishInterview.conversations || [];
-              const currentQ = englishInterview.current_question || {};
-              const currentQNum = conversations.length;
-              const activeQuestionText = currentQ.ai_question || englishInterview.ai_question || "Please introduce yourself.";
-              const interviewerName = 'Puck';
-
-              return (
-                <div className="flex flex-col gap-6 w-full flex-1 animate-fade-in select-text">
-                  <style>{`
-                    @keyframes ripple {
-                      0% { transform: scale(0.95); opacity: 0.8; }
-                      50% { transform: scale(1.15); opacity: 0.4; }
-                      100% { transform: scale(1.35); opacity: 0; }
-                    }
-                    .animate-ripple-fast {
-                      animation: ripple 1.2s infinite ease-out;
-                    }
-                    .animate-ripple-medium {
-                      animation: ripple 2s infinite ease-out;
-                    }
-                    .animate-ripple-slow {
-                      animation: ripple 3.5s infinite ease-out;
-                    }
-                  `}</style>
-
-                  {/* Header Bar */}
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-dash-white-card border border-dash-border-gray/50 rounded-[20px] p-4 shadow-sm w-full">
-                    <div className="flex items-center gap-3">
-                      <div className="w-2.5 h-2.5 rounded-full bg-[#22c55e] animate-pulse" />
-                      <div>
-                        <span className="text-xs font-extrabold text-dash-dark-purple block flex items-center gap-1.5">
-                          <span>{interviewerName} - RecruitAI AI HR Manager</span>
-                          <span className="text-[9px] bg-dash-primary-purple/10 text-dash-primary-purple px-2 py-0.5 rounded-full font-bold uppercase">
-                            Puck Voice
-                          </span>
-                        </span>
-                        <span className="text-[10px] font-extrabold text-dash-primary-purple">Question {currentQNum + 1} of 8</span>
-                      </div>
-                    </div>
-
-                    {/* Progress Bar & Warning Counter */}
-                    <div className="flex items-center gap-4 flex-1 max-w-md mx-4">
-                      <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-dash-primary-purple transition-all duration-500"
-                          style={{ width: `${Math.min(100, Math.round(((currentQNum + 1) / 8) * 100))}%` }}
-                        />
-                      </div>
-                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 shrink-0">
-                        <ShieldAlert size={13} />
-                        <span className="text-[10px] font-black">{englishExamSecurity.fullscreenExitCount} / 3 Warn</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={handleCompleteEnglish}
-                        disabled={englishLoading || aiTyping}
-                        className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs shadow-md transition-all cursor-pointer border-none shrink-0"
-                      >
-                        Finish Assessment
-                      </button>
-                    </div>
+                  <div className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 text-xs text-slate-500 dark:text-slate-400 flex items-center justify-center gap-2">
+                    <ShieldCheck size={16} className="text-indigo-500 shrink-0" />
+                    <span>Your detailed evaluation and communication audit have been delivered to the recruiter for review.</span>
                   </div>
 
-                  {/* VOICE CALL INTERVIEW ROOM CONTAINER */}
-                  <div className="w-full flex flex-col bg-gradient-to-b from-[#1c133a] to-[#0a0614] border border-[#2d1b54]/40 rounded-[32px] p-6 sm:p-8 shadow-[0_10px_35px_rgba(45,27,84,0.3)] min-h-[520px] relative overflow-hidden select-none gap-6">
-
-                    {/* Two-Column Interview Layout */}
-                    <div className="flex flex-col lg:flex-row gap-6 flex-1 z-10 relative">
-
-                      {/* LEFT COLUMN: Avatar, Mic Button, Status */}
-                      <div className="flex flex-col items-center justify-start gap-5 lg:w-64 shrink-0">
-                        <div className="relative w-40 h-40 flex items-center justify-center rounded-full bg-white/5 border border-white/10 shadow-[0_0_50px_rgba(139,92,246,0.15)] shrink-0">
-
-                          {/* Pulse wave rings based on state */}
-                          {isRecording && (
-                            <>
-                              <div className="absolute inset-0 rounded-full border border-emerald-500/30 animate-ripple-fast" style={{ animationDelay: '0s' }} />
-                              <div className="absolute inset-0 rounded-full border border-emerald-500/20 animate-ripple-fast" style={{ animationDelay: '0.4s' }} />
-                              <div className="absolute inset-0 rounded-full border border-emerald-500/10 animate-ripple-fast" style={{ animationDelay: '0.8s' }} />
-                            </>
-                          )}
-
-                          {aiIsSpeaking && (
-                            <>
-                              <div className="absolute inset-0 rounded-full border border-violet-500/30 animate-ripple-medium" style={{ animationDelay: '0s' }} />
-                              <div className="absolute inset-0 rounded-full border border-violet-500/20 animate-ripple-medium" style={{ animationDelay: '0.6s' }} />
-                              <div className="absolute inset-0 rounded-full border border-violet-500/10 animate-ripple-medium" style={{ animationDelay: '1.2s' }} />
-                            </>
-                          )}
-
-                          {(aiTyping || englishLoading || autoSubmitting) && (
-                            <>
-                              <div className="absolute inset-0 rounded-full border border-amber-400/30 animate-ripple-slow" style={{ animationDelay: '0s' }} />
-                              <div className="absolute inset-0 rounded-full border border-amber-400/15 animate-ripple-slow" style={{ animationDelay: '1.2s' }} />
-                            </>
-                          )}
-
-                          {/* Inner Avatar Box */}
-                          <div className={`w-28 h-28 rounded-full flex items-center justify-center text-white shadow-2xl relative z-10 transition-all duration-500 ${isRecording
-                            ? 'bg-emerald-600 shadow-emerald-500/30 border-2 border-emerald-400/40'
-                            : aiIsSpeaking
-                              ? 'bg-violet-600 shadow-violet-500/30 border-2 border-violet-400/40'
-                              : autoSubmitting || aiTyping || englishLoading
-                                ? 'bg-amber-600 shadow-amber-500/30 border-2 border-amber-400/40'
-                                : 'bg-[#231b42] border border-[#40356c]'
-                            }`}>
-                            <Volume2 size={40} className={isRecording ? "animate-pulse" : aiIsSpeaking ? "animate-bounce" : ""} />
-                          </div>
-                        </div>
-
-                        {/* Microphone Toggle Button */}
-                        <button
-                          type="button"
-                          onClick={toggleRecording}
-                          disabled={isTextMode}
-                          className={`w-full px-4 py-2.5 rounded-full flex items-center justify-center gap-2 font-bold text-xs uppercase tracking-wider transition-all duration-300 shadow-md border ${isTextMode
-                            ? 'bg-slate-800 border-slate-700/50 text-slate-500 cursor-not-allowed opacity-50'
-                            : isRecording
-                              ? 'bg-emerald-600 hover:bg-emerald-700 border-emerald-500 text-white animate-pulse'
-                              : 'bg-white/10 hover:bg-white/20 border-white/20 text-white cursor-pointer'
-                            }`}
-                        >
-                          {isRecording ? <Mic size={13} /> : <MicOff size={13} className="opacity-75" />}
-                          {isRecording ? 'Mic: ON' : 'Mic: OFF'}
-                        </button>
-
-                        {/* Speech status pill */}
-                        <div className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-[10px] font-semibold text-white flex items-center gap-2">
-                          <span className={`w-2 h-2 rounded-full shrink-0 ${isRecording
-                            ? 'bg-emerald-500 animate-ping'
-                            : aiIsSpeaking
-                              ? 'bg-violet-500 animate-pulse'
-                              : autoSubmitting || aiTyping || englishLoading
-                                ? 'bg-amber-400 animate-ping'
-                                : 'bg-slate-400'
-                            }`} />
-                          <span className="leading-tight">
-                            {isRecording
-                              ? 'You are speaking...'
-                              : aiIsSpeaking
-                                ? `${interviewerName} is speaking...`
-                                : autoSubmitting
-                                  ? 'Auto-submitting...'
-                                  : aiTyping || englishLoading
-                                    ? `${interviewerName} is thinking...`
-                                    : `${interviewerName} is ready`}
-                          </span>
-                        </div>
-
-                        {/* Mute AI Voice */}
-                        <button
-                          type="button"
-                          onClick={toggleMute}
-                          className={`w-full px-4 py-2.5 rounded-full flex items-center justify-center gap-2 font-bold text-xs uppercase tracking-wider transition-all duration-300 shadow-md border ${isMuted
-                            ? 'bg-amber-600 border-amber-600 text-white hover:bg-amber-700'
-                            : 'bg-white/10 border-white/20 text-white hover:bg-white/20'
-                            }`}
-                          title={isMuted ? `Unmute ${interviewerName}'s Voice` : `Mute ${interviewerName}'s Voice`}
-                        >
-                          {isMuted ? <VolumeX size={13} /> : <Volume2 size={13} />}
-                          {isMuted ? 'AI: Muted' : 'AI: Audible'}
-                        </button>
-                      </div>
-
-                      {/* RIGHT COLUMN: Chat history + Response box */}
-                      <div className="flex-1 flex flex-col gap-4 min-w-0">
-
-                        {/* Chat Dialogue History Box */}
-                        <div
-                          ref={chatContainerRef}
-                          className="flex-1 bg-black/40 border border-white/10 rounded-2xl p-4 flex flex-col gap-3 min-h-[180px] max-h-[280px] overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent text-left"
-                        >
-                          {getChatMessages().map((msg, idx) => (
-                            <div key={idx} className="flex flex-col gap-1 w-full">
-                              <div className={`flex gap-2 items-start max-w-[88%] ${msg.type === 'ai' ? 'self-start' : 'self-end flex-row-reverse'}`}>
-                                <div className={`w-6 h-6 rounded-lg flex items-center justify-center font-black text-[8px] shrink-0 border ${msg.type === 'ai'
-                                  ? 'bg-violet-500/20 border-violet-500/30 text-violet-300'
-                                  : 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
-                                  }`}>
-                                  {msg.type === 'ai' ? 'AI' : 'YOU'}
-                                </div>
-                                <div className={`rounded-2xl px-3 py-2 text-xs font-medium leading-relaxed border ${msg.type === 'ai'
-                                  ? 'bg-[#29204a]/80 text-violet-100 border-violet-500/15'
-                                  : 'bg-[#0f2a1e]/80 text-emerald-100 border-emerald-500/15'
-                                  }`}>
-                                  {msg.text}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-
-                          {/* Thinking indicator */}
-                          {(aiTyping || englishLoading || autoSubmitting) && (
-                            <div className="flex gap-2 items-start max-w-[88%] self-start">
-                              <div className="w-6 h-6 rounded-lg bg-violet-500/20 border border-violet-500/30 flex items-center justify-center font-black text-[8px] text-violet-300 shrink-0">
-                                AI
-                              </div>
-                              <div className="bg-[#29204a]/80 rounded-2xl px-3 py-2.5 border border-violet-500/15 flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                                <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                                <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: '300ms' }} />
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Candidate Response Input Box */}
-                        <div className="bg-white/10 border border-white/20 rounded-2xl p-4 text-left shadow-lg backdrop-blur-md">
-                          <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-3">
-                            <div className="flex items-center gap-2">
-                              <span className={`w-2 h-2 rounded-full ${isRecording ? 'bg-emerald-400 animate-ping' : 'bg-slate-400'}`} />
-                              <span className="text-[10px] font-extrabold text-white uppercase tracking-wider">
-                                {isTextMode ? '📝 Your Response (Text)' : isRecording ? '🎙️ Live Voice Input' : '📝 Your Response'}
-                              </span>
-                            </div>
-                            <span className="text-[10px] text-emerald-300 font-bold italic">
-                              {englishText ? `${englishText.trim().split(/\s+/).filter(Boolean).length} words` : isRecording ? 'Listening...' : ''}
-                            </span>
-                          </div>
-
-                          <textarea
-                            value={englishText}
-                            onChange={(e) => {
-                              if (isTextMode) {
-                                setEnglishText(e.target.value);
-                                currentTextRef.current = e.target.value;
-                              }
-                            }}
-                            readOnly={!isTextMode}
-                            placeholder={
-                              isTextMode
-                                ? "Type your response here..."
-                                : isRecording
-                                  ? "Speak clearly — your voice is being transcribed in real time..."
-                                  : aiIsSpeaking
-                                    ? `${interviewerName} is speaking. Your mic will activate automatically...`
-                                    : "Waiting for your turn..."
-                            }
-                            rows={3}
-                            className={`w-full bg-black/40 text-white font-sans text-xs font-medium p-3 rounded-xl border border-white/10 focus:outline-none resize-none shadow-inner leading-relaxed placeholder:text-slate-500 placeholder:italic ${isTextMode ? 'cursor-text select-text focus:border-white/30' : 'select-none cursor-default'
-                              }`}
-                          />
-
-                          <div className="flex items-center justify-between mt-2.5 gap-3">
-                            <span className="text-[10px] text-slate-400 font-medium leading-snug">
-                              {isTextMode
-                                ? '📝 Text Mode — type and click Submit'
-                                : isRecording && englishText
-                                  ? '✨ Transcribing live — 3s silence will auto-submit'
-                                  : isRecording
-                                    ? '🎙️ Mic active — speak clearly'
-                                    : autoSubmitting
-                                      ? '⏳ Auto-submitting...'
-                                      : '🤖 Voice-driven — enable mic to speak'}
-                            </span>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setIsTextMode(prev => {
-                                    const newVal = !prev;
-                                    isTextModeRef.current = newVal;
-                                    if (newVal) stopRecording();
-                                    return newVal;
-                                  });
-                                }}
-                                className="px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-[10px] flex items-center gap-1 transition-all cursor-pointer border border-white/10"
-                              >
-                                {isTextMode ? '🎙️ Voice' : '📝 Type'}
-                              </button>
-
-                              {englishText && englishText.trim().length > 0 && !isSubmittingRef.current && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleRespondEnglish(englishText)}
-                                  className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-[10px] flex items-center gap-1.5 transition-all cursor-pointer shadow-sm animate-fade-in"
-                                >
-                                  <Send size={10} />
-                                  Submit
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Bottom Control Bar */}
-                    <div className="w-full flex items-center justify-between border-t border-white/10 pt-5 z-10 gap-4">
-                      {/* Remaining Time */}
-                      <div className="flex flex-col text-left">
-                        <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">Remaining Time</span>
-                        <span className="font-mono text-sm font-extrabold text-red-400">{formatTime(englishTimeLeft)}</span>
-                      </div>
-
-                      {/* Conclude Interview */}
-                      <ActionButton
-                        onClick={handleCompleteEnglish}
-                        isLoading={englishLoading}
-                        loadingText="Generating Report..."
-                        disabled={aiTyping || conversations.length < 3}
-                        className="px-5 h-10 rounded-full bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-md"
-                        title="Finish conversation and generate report"
-                      >
-                        Conclude Interview
-                      </ActionButton>
-
-                      {/* Conversation Turns info */}
-                      <div className="flex flex-col text-right">
-                        <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">Turns</span>
-                        <span className="text-sm font-extrabold text-white">{currentQNum} / 8</span>
-                      </div>
-                    </div>
-
-                  </div>
-                </div>
-              );
-            })()}
-
-            {englishInterview && englishInterview.status === 'COMPLETED' && (
-              <div className="w-full flex justify-center items-center py-10 animate-fade-in">
-                <div className="w-full max-w-xl bg-dash-white-card border border-dash-border-gray/50 rounded-[28px] p-8 sm:p-10 shadow-[0_4px_25px_rgba(87,82,170,0.02)] text-center flex flex-col items-center gap-6">
-                  <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-[#10b981]">
-                    <CheckCircle2 size={32} />
-                  </div>
-                  <div>
-                    <h3 className="font-plus-jakarta font-extrabold text-2xl text-dash-dark-purple tracking-tight">
-                      Interview Completed!
-                    </h3>
-                    <p className="text-xs font-bold text-dash-light-purple mt-1 uppercase tracking-wider">English Speaking Assessment</p>
-                  </div>
-
-                  <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-6 text-center w-full space-y-3.5 text-xs font-medium text-slate-700 leading-relaxed shadow-sm">
-                    <p className="font-bold text-sm text-dash-primary-purple">Thank you for taking the assessment.</p>
-                    <p>Your conversational AI HR interview has been successfully completed and saved.</p>
-                    <p>All evaluation scores, summary analysis, strengths, weaknesses, and dialogue transcripts have been securely submitted to the recruiter for processing.</p>
-                    <p className="text-[10px] text-dash-light-purple italic mt-2">You can safely navigate away or wait for updates from your recruiter.</p>
-                  </div>
-
-                  {/* One-attempt lock notice — no retry button */}
-                  <div className="flex w-full items-center justify-center gap-2.5 bg-amber-50 border border-amber-200/70 rounded-xl px-5 py-3 mt-2">
-                    <ShieldAlert size={15} className="text-amber-600 shrink-0" />
-                    <p className="text-xs font-bold text-amber-700">
-                      This assessment has been permanently submitted. Multiple attempts are not permitted.
-                    </p>
+                  <div className="flex flex-wrap gap-3 justify-center pt-2">
+                    <button
+                      onClick={() => {
+                        setActiveTab('technical');
+                        setActiveAssignment(null);
+                      }}
+                      className="px-8 py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs tracking-wide transition-all duration-200 shadow-lg shadow-indigo-600/25 cursor-pointer border-0 flex items-center gap-2"
+                    >
+                      <span>Return to Dashboard</span>
+                      <ArrowRight size={14} />
+                    </button>
                   </div>
                 </div>
               </div>
+            ) : englishInterview && englishInterview.status === 'IN_PROGRESS' ? (
+              <EnglishInterviewRoom
+                candidate={candidate}
+                interviewData={englishInterview}
+                onCompleteInterview={(result) => {
+                  setEnglishInterview(result || { status: 'COMPLETED' });
+                  fetchEnglishStatus();
+                }}
+                showToast={showToast}
+              />
+            ) : (
+              <EnglishResumeUpload
+                candidate={candidate}
+                onUploadSuccess={(data) => {
+                  const uploadedFilename = data?.filename || data?.resume_filename || data?.analysis?.filename || "resume.pdf";
+                  setCandidate(prev => ({
+                    ...prev,
+                    resume_filename: uploadedFilename,
+                    filename: uploadedFilename,
+                    resume: data?.analysis?.match_score || data?.resume_score || prev?.resume || 85,
+                    resume_analysis: data?.analysis?.skills || data?.analysis?.technical_skills || data?.resume_analysis || prev?.resume_analysis || []
+                  }));
+                  fetchEnglishStatus();
+                }}
+                onStartInterview={async () => {
+                  await handleStartEnglish();
+                }}
+                showToast={showToast}
+              />
             )}
           </div>
         )}
-
 
         {activeTab !== 'technical' && activeTab !== 'english' && (
           <section className="bg-dash-white-card border border-dash-border-gray/50 rounded-[24px] p-8 shadow-sm flex flex-col items-center justify-center min-h-[350px] text-center">
@@ -5824,6 +5426,14 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
         })()}
       </AnimatePresence>
 
+      {/* English Assessment Break Selection Modal */}
+      <EnglishBreakModal
+        isOpen={showBreakModal}
+        breakEndTime={breakEndTime}
+        onSelectBreak={handleSelectBreak}
+        onBreakComplete={handleBreakComplete}
+        onSkipBreak={handleSkipBreak}
+      />
     </div>
   );
 };

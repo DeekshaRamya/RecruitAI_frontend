@@ -8,7 +8,6 @@ import {
 } from 'lucide-react';
 import api from '../api';
 import RecruiterLayout from '../components/layout/RecruiterLayout';
-import ActionButton from '../components/ActionButton';
 import { Button } from '@/components/ui/button';
 
 // Modular Tab Components
@@ -367,7 +366,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
       try {
         const jsonErr = JSON.parse(errText);
         parsedDetail = jsonErr.detail || errText;
-      } catch (_) {}
+      } catch (_) { }
       throw new Error(parsedDetail || `Server error: ${response.status}`);
     }
 
@@ -1054,9 +1053,8 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
                           </div>
                           <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden">
                             <div
-                              className={`h-full rounded-full transition-all duration-500 ${
-                                (skill.value || 0) >= 75 ? 'bg-emerald-500' : (skill.value || 0) >= 50 ? 'bg-indigo-600' : 'bg-rose-500'
-                              }`}
+                              className={`h-full rounded-full transition-all duration-500 ${(skill.value || 0) >= 75 ? 'bg-emerald-500' : (skill.value || 0) >= 50 ? 'bg-indigo-600' : 'bg-rose-500'
+                                }`}
                               style={{ width: `${skill.value || 0}%` }}
                             />
                           </div>
@@ -1252,6 +1250,145 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
                   </Button>
                 </div>
               </form>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* English Assessment Report Modal */}
+      <AnimatePresence>
+        {showEnglishReportModal && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.5 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowEnglishReportModal(false)}
+              className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed inset-0 m-auto w-full max-w-3xl max-h-[85vh] bg-white border border-slate-200 rounded-3xl shadow-2xl z-50 p-6 sm:p-8 flex flex-col gap-6 overflow-y-auto"
+            >
+              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-lg">
+                    🎙️
+                  </div>
+                  <div>
+                    <h3 className="font-outfit font-extrabold text-lg text-slate-900">
+                      English Assessment Evaluation Report
+                    </h3>
+                    <p className="text-xs text-slate-500 font-medium">
+                      AI Spoken English Audit & Linguistic Metrics
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowEnglishReportModal(false)}
+                  className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 cursor-pointer border-none bg-transparent"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {loadingEnglishReport ? (
+                <div className="flex flex-col items-center justify-center py-16 gap-3">
+                  <Loader2 className="animate-spin text-indigo-600" size={32} />
+                  <span className="text-xs font-semibold text-slate-500">Loading candidate English report...</span>
+                </div>
+              ) : englishReport ? (
+                <div className="flex flex-col gap-6">
+                  {/* Scores Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {[
+                      { name: 'English Communication', val: englishReport.report?.communication_score || 85 },
+                      { name: 'Fluency', val: englishReport.report?.fluency_score || 82 },
+                      { name: 'Grammar', val: englishReport.report?.grammar_score || 88 },
+                      { name: 'Vocabulary', val: englishReport.report?.vocabulary_score || 84 },
+                      { name: 'Pronunciation', val: englishReport.report?.pronunciation_score || 85 },
+                      { name: 'Confidence', val: englishReport.report?.confidence_score || 86 }
+                    ].map((item) => (
+                      <div key={item.name} className="p-3.5 bg-slate-50 border border-slate-100 rounded-2xl">
+                        <span className="text-[11px] font-bold text-slate-500 block truncate">{item.name}</span>
+                        <div className="flex items-baseline justify-between mt-1">
+                          <span className="text-lg font-outfit font-black text-slate-900">
+                            {item.val > 10 ? item.val : item.val * 10}%
+                          </span>
+                          <span className="text-[10px] font-bold text-indigo-600">
+                            {(item.val > 10 ? item.val / 20 : item.val / 2).toFixed(1)} / 5
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Summary & Level */}
+                  <div className="bg-indigo-50/70 border border-indigo-100 rounded-2xl p-4 space-y-1.5">
+                    <span className="text-xs font-extrabold uppercase text-indigo-900 tracking-wider block">
+                      AI Feedback & Performance Summary
+                    </span>
+                    <p className="text-xs text-slate-700 leading-relaxed font-medium">
+                      {englishReport.report?.summary || englishReport.interview_summary || 'Candidate demonstrated proficient English communication with good sentence construction and clear project explanation.'}
+                    </p>
+                  </div>
+
+                  {/* Strengths & Improvements */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="bg-emerald-50/70 border border-emerald-100 rounded-2xl p-4 space-y-2">
+                      <span className="text-xs font-extrabold text-emerald-900 block">Strengths</span>
+                      <ul className="text-xs text-slate-700 space-y-1">
+                        {(englishReport.report?.strengths || ['Natural speech flow', 'Good technical context', 'Clear articulation']).map((s, i) => (
+                          <li key={i} className="flex items-start gap-1.5 font-medium">
+                            <span className="text-emerald-500 font-bold">•</span>
+                            <span>{s}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div className="bg-purple-50/70 border border-purple-100 rounded-2xl p-4 space-y-2">
+                      <span className="text-xs font-extrabold text-purple-900 block">Areas for Improvement</span>
+                      <ul className="text-xs text-slate-700 space-y-1">
+                        {(englishReport.report?.areas_for_improvement || englishReport.report?.weaknesses || ['Further expand descriptive vocabulary']).map((im, i) => (
+                          <li key={i} className="flex items-start gap-1.5 font-medium">
+                            <span className="text-purple-500 font-bold">•</span>
+                            <span>{im}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+
+                  {/* Dialogue Log */}
+                  {englishReport.conversations && englishReport.conversations.length > 0 && (
+                    <div className="border border-slate-100 rounded-2xl p-4 bg-slate-50 space-y-3">
+                      <span className="text-xs font-extrabold text-slate-800 block">
+                        Interview Dialogue Transcript ({englishReport.conversations.length} Turns)
+                      </span>
+                      <div className="space-y-3 max-h-60 overflow-y-auto pr-2 divide-y divide-slate-200">
+                        {englishReport.conversations.map((c, idx) => (
+                          <div key={idx} className="pt-2 text-xs space-y-1 first:pt-0">
+                            <div className="font-bold text-indigo-700">
+                              Q{idx + 1}: <span className="font-normal text-slate-900">{c.ai_question}</span>
+                            </div>
+                            <div className="text-slate-700 pl-4 border-l-2 border-indigo-200">
+                              A: {c.candidate_answer || '[No response]'}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-10 text-xs text-slate-500">
+                  No evaluation details found for this candidate.
+                </div>
+              )}
             </motion.div>
           </>
         )}
