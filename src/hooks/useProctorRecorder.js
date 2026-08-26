@@ -276,6 +276,7 @@ export const useProctorRecorder = (options = {}) => {
         });
       }
 
+      // Save live streams to refs and state
       cameraStreamRef.current = camStream;
       screenStreamRef.current = scrStream;
       micStreamRef.current = audioStream;
@@ -444,9 +445,12 @@ export const useProctorRecorder = (options = {}) => {
     let scrStream = screenStreamRef.current;
     let micStreamLocal = micStreamRef.current;
 
-    // Step 1: Ensure camera and screen streams exist, acquiring if missing
-    if (!camStream || !scrStream) {
-      console.info('[Proctoring] Camera or screen stream missing in refs, requesting permissions...');
+    const camActive = camStream && camStream.getVideoTracks().some(t => t.readyState === 'live');
+    const scrActive = scrStream && scrStream.getVideoTracks().some(t => t.readyState === 'live');
+
+    // Step 1: Ensure camera and screen streams exist and are active
+    if (!camActive || !scrActive) {
+      console.info('[Proctoring] Camera or screen stream missing/inactive in refs, requesting permissions...');
       const res = await requestPermissions();
       if (!res.success) return { success: false, error: res.error };
       camStream = res.cameraStream;
@@ -577,7 +581,7 @@ export const useProctorRecorder = (options = {}) => {
       return { success: false, message: 'No active recording found' };
     }
 
-    console.log('[RECORDING] Stopping recorder...');
+    console.log('[RECORDING] Stopping recorder and preparing Cloudinary upload...');
     setRecordingStatus('UPLOADING');
 
     return new Promise((resolve) => {
@@ -629,7 +633,9 @@ export const useProctorRecorder = (options = {}) => {
           // Prepare FormData for upload
           const formData = new FormData();
           formData.append('file', recordedBlob, `proctoring_${targetRecId}.webm`);
-          formData.append('duration', totalDuration.toString());
+          if (totalDuration !== undefined && totalDuration !== null) {
+            formData.append('duration', String(totalDuration));
+          }
           formData.append('status_str', 'COMPLETED');
 
           console.info(`[Proctoring] Uploading video to backend endpoint /api/recordings/${targetRecId}/upload...`);
@@ -668,7 +674,9 @@ export const useProctorRecorder = (options = {}) => {
       };
 
       if (recorder && recorder.state !== 'inactive') {
-        recorder.onstop = handleUpload;
+        recorder.onstop = () => {
+          handleUpload();
+        };
         try {
           recorder.stop();
         } catch (stopErr) {
@@ -688,11 +696,13 @@ export const useProctorRecorder = (options = {}) => {
   }, []);
 
   const hasActiveRecorder = useCallback(() => {
-    return Boolean(mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') || isRecordingRef.current;
+    return Boolean(mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') || isRecordingRef.current || chunksRef.current.length > 0;
   }, []);
 
   const hasActiveStreams = useCallback(() => {
-    return Boolean(cameraStreamRef.current && screenStreamRef.current);
+    const camOk = cameraStreamRef.current && cameraStreamRef.current.getVideoTracks().some(t => t.readyState === 'live');
+    const scrOk = screenStreamRef.current && screenStreamRef.current.getVideoTracks().some(t => t.readyState === 'live');
+    return Boolean(camOk && scrOk);
   }, []);
 
   // Clean up on component unmount

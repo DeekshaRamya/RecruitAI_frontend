@@ -2369,7 +2369,12 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       showToast("This assessment is not available yet. Please wait until the scheduled time.");
       return;
     }
-    handleStartExam(assignment);
+    if (proctorRecorder && proctorRecorder.hasActiveStreams && proctorRecorder.hasActiveStreams()) {
+      handleStartExam(assignment, true);
+    } else {
+      setPendingAssignmentToStart(assignment);
+      setIsProctorModalOpen(true);
+    }
   };
 
   const [showNotifications, setShowNotifications] = useState(false);
@@ -2953,6 +2958,27 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
         return;
       }
 
+      const targetAsmId = assignment?.assessment_id || assignment?.assessmentId || asm?.id;
+      const targetAssignId = assignment?.id || assignment?.assignmentId;
+
+      // Start Proctoring MediaRecorder session if permissions are active or explicitly granted
+      const canRecord = permissionsGrantedOverride ||
+        (proctorRecorder.hasActiveStreams && proctorRecorder.hasActiveStreams()) ||
+        proctorRecorder.isPermissionGranted;
+
+      if (canRecord && proctorRecorder.startRecording) {
+        try {
+          console.info(`[Proctoring] Starting assessment recording for assessment=${targetAsmId}, assignment=${targetAssignId}`);
+          const recRes = await proctorRecorder.startRecording({
+            assessmentId: targetAsmId,
+            assignmentId: targetAssignId
+          });
+          console.info('[Proctoring] startRecording response:', recRes);
+        } catch (recErr) {
+          console.error('[Proctoring] Error during startRecording invocation:', recErr);
+        }
+      }
+
       let activeQuestions = asm.questions || [];
       try {
         const evalRes = await api.post('/api/evaluation/start', { assignmentId: assignment.id });
@@ -3078,6 +3104,7 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       } catch (_e) { }
 
       const asm = activeAssignment?.assessment || activeAssignment || {};
+      const targetAsmId = activeAssignment?.assessment_id || activeAssignment?.assessmentId || asm?.id;
       const questions = asm.questions || [];
       const answersPayload = questions.map((q, idx) => {
         const qId = q.id !== undefined && q.id !== null ? q.id : (q.question || idx);
@@ -3087,52 +3114,70 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
         };
       });
 
-      const durationSeconds = parseDuration(asm.duration || "30") * 60;
-      const timeTaken = Math.max(0, durationSeconds - (examState.timeLeft || 0));
-      const isAuto = securityMetadata?.autoSubmitted === true || (examState.timeLeft !== undefined && examState.timeLeft <= 0);
+      const totalDurationSec = parseDuration(asm.duration || "30") * 60;
+      const timeTaken = Math.max(0, totalDurationSec - (examState.timeLeft || 0));
 
       const payload = {
         assignmentId: targetId,
         answers: answersPayload,
         timeTaken: Math.round(timeTaken),
         autoSubmitted: isAuto,
-        submissionReason: securityMetadata?.submissionReason || null,
+        submissionReason: securityMetadata?.submissionReason || (isAuto ? "Time Expired" : "Manual Submission"),
         warningCount: securityMetadata?.warningCount ?? examSecurity?.fullscreenExitCount ?? 0,
         warningHistory: securityMetadata?.warningHistory || examSecurity?.warningHistory || []
       };
 
-      // 4. Perform actual assessment submission asynchronously in the background
-      api.post('/api/assessment/submit', payload)
-        .then(async () => {
-          if (isAuto) {
-            try {
-              await api.patch(`/api/assignments/${targetId}/status`, { status: 'EXPIRED' });
-            } catch (err) {
-              console.error("Failed to update status to EXPIRED:", err);
-            }
-          }
-          fetchAssignments();
-        })
-        .catch(err => {
-          console.error("Background assessment submission log:", err);
-          const status = err.response?.status;
-          const detail = err?.response?.data?.detail;
-          const errMsg = typeof detail === 'string' ? detail : (detail?.message || "Error submitting assessment. Please try again.");
-          showToast(errMsg);
+      // Stop and Upload Proctoring Recording to Cloudinary if active recorder or session exists
+      const hasRecordingToUpload = proctorRecorder && (
+        proctorRecorder.hasActiveRecorder() ||
+        proctorRecorder.isRecordingActive() ||
+        Boolean(proctorRecorder.recordingId)
+      );
 
-          // If the assignment is missing, unauthorized, or expired, clean up local storage and exit technical view
-          if (status === 404 || status === 403 || (status === 400 && String(errMsg).toLowerCase().includes("expire"))) {
-            try {
-              localStorage.removeItem(`recruitai_active_exam_${targetId}`);
-            } catch (_e) { }
-            setActiveAssignment(null);
-            setExamState(DEFAULT_EXAM_STATE);
-            setActiveTab('dashboard');
+      if (hasRecordingToUpload && proctorRecorder.stopAndUploadRecording) {
+        try {
+          console.info(`[Proctoring] Stopping & uploading proctor recording for assignment=${targetId}...`);
+          const uploadRes = await proctorRecorder.stopAndUploadRecording({
+            assignmentId: targetId,
+            assessmentId: targetAsmId,
+            recordingId: proctorRecorder.recordingId
+          });
+          console.info('[Proctoring] stopAndUploadRecording response:', uploadRes);
+        } catch (uploadErr) {
+          console.error('[Proctoring] Failed during recording stop and upload:', uploadErr);
+        }
+      }
+
+      // 4. Perform actual assessment submission
+      try {
+        await api.post('/api/assessment/submit', payload);
+        if (isAuto) {
+          try {
+            await api.patch(`/api/assignments/${targetId}/status`, { status: 'EXPIRED' });
+          } catch (err) {
+            console.error("Failed to update status to EXPIRED:", err);
           }
-        })
-        .finally(() => {
-          setIsSubmittingManual(false);
-        });
+        }
+        fetchAssignments();
+      } catch (err) {
+        console.error("Assessment submission error:", err);
+        const status = err.response?.status;
+        const detail = err?.response?.data?.detail;
+        const errMsg = typeof detail === 'string' ? detail : (detail?.message || "Error submitting assessment. Please try again.");
+        showToast(errMsg);
+
+        // If the assignment is missing, unauthorized, or expired, clean up local storage and exit technical view
+        if (status === 404 || status === 403 || (status === 400 && String(errMsg).toLowerCase().includes("expire"))) {
+          try {
+            localStorage.removeItem(`recruitai_active_exam_${targetId}`);
+          } catch (_e) { }
+          setActiveAssignment(null);
+          setExamState(DEFAULT_EXAM_STATE);
+          setActiveTab('dashboard');
+        }
+      } finally {
+        setIsSubmittingManual(false);
+      }
 
     } catch (err) {
       console.error("Failed to prepare submission payload:", err);
