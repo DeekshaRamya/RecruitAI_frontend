@@ -11,6 +11,8 @@ import { EnglishInterviewRoom } from '../components/english/EnglishInterviewRoom
 import { EnglishAssessmentResult } from '../components/english/EnglishAssessmentResult';
 import { useExamSecurity } from '../hooks/useExamSecurity';
 import { useProctorRecorder } from '../hooks/useProctorRecorder';
+import { useCameraProctor } from '../hooks/useCameraProctor';
+import { CameraProctorOverlay } from '../components/CameraProctorOverlay';
 import { ExamSecurityMonitor } from '../components/ExamSecurityMonitor';
 import {
   LogOut,
@@ -2808,6 +2810,26 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
+  // Check if camera monitoring is enabled for this assessment assignment
+  const isCameraMonitoringEnabled = Boolean(
+    isExamActive && (
+      activeAssignment?.cameraMonitoring || 
+      activeAssignment?.assessment?.cameraMonitoring
+    )
+  );
+
+  // Initialize Camera Proctoring hook with MediaPipe (strictly runs ONLY if enabled)
+  const cameraProctor = useCameraProctor({
+    enabled: isCameraMonitoringEnabled,
+    assignmentId: activeAssignment?.id || activeAssignment?.assignmentId,
+    assessmentId: activeAssignment?.assessmentId || activeAssignment?.assessment?.id,
+    violationThresholdSeconds: 3,
+    cooldownSeconds: 6,
+    onViolation: (evt) => {
+      showToast(`Proctoring Warning: ${evt.violationType.replace(/_/g, ' ')} detected.`);
+    }
+  });
+
   // Initialize Exam Security hook
   // Initialize Proctoring Recording Hook
   const proctorRecorder = useProctorRecorder({
@@ -5178,11 +5200,16 @@ const CandidateDashboard = ({ onLogout, initialTab = 'technical' }) => {
       </main>
 
       {activeAssignment && !examState.submitted && (
-        <ExamSecurityMonitor
-          securityState={examSecurity}
-          assessmentName={activeAssignment?.assessmentName || activeAssignment?.assessment?.name || 'Technical Assessment'}
-          onAutoSubmit={(secData) => handleSubmitExam(activeAssignment?.id, secData)}
-        />
+        <>
+          <ExamSecurityMonitor
+            securityState={examSecurity}
+            assessmentName={activeAssignment?.assessmentName || activeAssignment?.assessment?.name || 'Technical Assessment'}
+            onAutoSubmit={(secData) => handleSubmitExam(activeAssignment?.id, secData)}
+          />
+          {isCameraMonitoringEnabled && (
+            <CameraProctorOverlay proctorState={cameraProctor} />
+          )}
+        </>
       )}
 
       {isEnglishActive && (

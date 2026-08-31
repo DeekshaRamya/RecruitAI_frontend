@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
+  Camera,
+  CameraOff,
   Search,
   SlidersHorizontal,
   AlertCircle,
@@ -19,6 +21,20 @@ import {
   Play
 } from 'lucide-react';
 import api from '../../api';
+
+// Helper to safely construct absolute screenshot URLs from backend uploads
+const getFullScreenshotUrl = (rawUrl) => {
+  if (!rawUrl || typeof rawUrl !== 'string') return null;
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:image')) {
+    return trimmed;
+  }
+  const base = (api.defaults?.baseURL || 'http://127.0.0.1:8000').replace(/\/+$/, '');
+  const path = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+  return `${base}${path}`;
+};
+
 
 // High-fidelity syntax highlighter for code snippets
 const SyntaxHighlighter = ({ code, language = 'python' }) => {
@@ -96,6 +112,7 @@ const TechnicalResultsTab = ({
   const [loadingDetailId, setLoadingDetailId] = useState(null);
   const [recalculating, setRecalculating] = useState(false);
   const [expandedQuestions, setExpandedQuestions] = useState({});
+  const [screenshotModal, setScreenshotModal] = useState(null);
 
   // View modes: 'flat' for standard table, 'groups' for grouped cards
   const [viewMode, setViewMode] = useState('flat');
@@ -1087,80 +1104,86 @@ const TechnicalResultsTab = ({
                   </div>
                 </div>
 
-                {/* Comprehensive Candidate Activity Monitoring & Violation Audit */}
-                {((selectedResult.activityLogs && selectedResult.activityLogs.length > 0) || selectedResult.autoSubmitted || selectedResult.warningCount > 0 || (selectedResult.warningHistory && selectedResult.warningHistory.length > 0)) && (() => {
+                                {/* Security Audit & Proctoring Events Report */}
+                {(() => {
                   const summary = selectedResult.activitySummary || {};
                   const logs = selectedResult.activityLogs || [];
 
                   const getActivityDetails = (type) => {
                     const t = (type || "").toUpperCase();
                     switch (t) {
-                      case "TAB_SWITCH": return { title: "Tab Switch / Switched Away", color: "text-amber-600 bg-amber-50 border-amber-200" };
-                      case "WINDOW_BLUR": return { title: "Window Lost Focus", color: "text-amber-600 bg-amber-50 border-amber-200" };
-                      case "WINDOW_FOCUS": return { title: "Returned to Assessment", color: "text-emerald-600 bg-emerald-50 border-emerald-200" };
-                      case "ESC_KEY": return { title: "Esc Key Pressed", color: "text-rose-600 bg-rose-50 border-rose-200" };
-                      case "COPY_ATTEMPT": return { title: "Copy Attempt", color: "text-purple-600 bg-purple-50 border-purple-200" };
-                      case "PASTE_ATTEMPT": return { title: "Paste Attempt", color: "text-purple-600 bg-purple-50 border-purple-200" };
-                      case "CUT_ATTEMPT": return { title: "Cut Attempt", color: "text-purple-600 bg-purple-50 border-purple-200" };
+                      case "TAB_SWITCH": return { title: "Tab Switch / Switched Away", color: "text-amber-700 bg-amber-50 border-amber-200" };
+                      case "WINDOW_BLUR": return { title: "Window Lost Focus", color: "text-amber-700 bg-amber-50 border-amber-200" };
+                      case "WINDOW_FOCUS": return { title: "Returned to Assessment", color: "text-emerald-700 bg-emerald-50 border-emerald-200" };
+                      case "ESC_KEY": return { title: "Esc Key Pressed", color: "text-rose-700 bg-rose-50 border-rose-200" };
+                      case "COPY_ATTEMPT": return { title: "Copy Attempt", color: "text-purple-700 bg-purple-50 border-purple-200" };
+                      case "PASTE_ATTEMPT": return { title: "Paste Attempt", color: "text-purple-700 bg-purple-50 border-purple-200" };
+                      case "CUT_ATTEMPT": return { title: "Cut Attempt", color: "text-purple-700 bg-purple-50 border-purple-200" };
                       case "RIGHT_CLICK": return { title: "Right Click Attempt", color: "text-slate-700 bg-slate-100 border-slate-200" };
                       case "DEVTOOLS_ATTEMPT": return { title: "DevTools Access Attempt", color: "text-rose-700 bg-rose-100 border-rose-300" };
-                      case "FULLSCREEN_EXIT": return { title: "Full-screen Exit", color: "text-rose-600 bg-rose-50 border-rose-200" };
+                      case "FULLSCREEN_EXIT": return { title: "Full-screen Exit", color: "text-rose-700 bg-rose-50 border-rose-200" };
                       case "PAGE_REFRESH":
-                      case "PAGE_RELOAD": return { title: "Page Refresh / Reload", color: "text-indigo-600 bg-indigo-50 border-indigo-200" };
+                      case "PAGE_RELOAD": return { title: "Page Refresh / Reload", color: "text-indigo-700 bg-indigo-50 border-indigo-200" };
+                      case "FACE_NOT_DETECTED": return { title: "Face Not Detected", color: "text-rose-700 bg-rose-50 border-rose-200" };
+                      case "MULTIPLE_FACES": return { title: "Multiple Faces Detected", color: "text-rose-700 bg-rose-50 border-rose-200" };
+                      case "HEAD_TURNED_LEFT": return { title: "Head Turned Left", color: "text-amber-700 bg-amber-50 border-amber-200" };
+                      case "HEAD_TURNED_RIGHT": return { title: "Head Turned Right", color: "text-amber-700 bg-amber-50 border-amber-200" };
+                      case "HEAD_LOOKING_UP": return { title: "Head Looking Up", color: "text-amber-700 bg-amber-50 border-amber-200" };
+                      case "HEAD_LOOKING_DOWN": return { title: "Head Looking Down", color: "text-amber-700 bg-amber-50 border-amber-200" };
+                      case "EYES_LOOKING_LEFT": return { title: "Eyes Looking Left", color: "text-sky-700 bg-sky-50 border-sky-200" };
+                      case "EYES_LOOKING_RIGHT": return { title: "Eyes Looking Right", color: "text-sky-700 bg-sky-50 border-sky-200" };
+                      case "EYES_LOOKING_UP": return { title: "Eyes Looking Up", color: "text-sky-700 bg-sky-50 border-sky-200" };
+                      case "EYES_LOOKING_DOWN": return { title: "Eyes Looking Down", color: "text-sky-700 bg-sky-50 border-sky-200" };
                       default: return { title: type, color: "text-slate-600 bg-slate-50 border-slate-200" };
                     }
                   };
 
+                  const cameraViolationTypes = new Set([
+                    'FACE_NOT_DETECTED', 'MULTIPLE_FACES', 'HEAD_TURNED_LEFT', 'HEAD_TURNED_RIGHT',
+                    'HEAD_LOOKING_UP', 'HEAD_LOOKING_DOWN', 'EYES_LOOKING_LEFT', 'EYES_LOOKING_RIGHT',
+                    'EYES_LOOKING_UP', 'EYES_LOOKING_DOWN', 'CAMERA_VIOLATION'
+                  ]);
+
+                  const proctorEvents = logs.filter(
+                    l => cameraViolationTypes.has((l.activityType || '').toUpperCase()) || Boolean(l.screenshotUrl)
+                  );
+
                   return (
-                    <div className="bg-gradient-to-r from-slate-50 via-rose-50/30 to-amber-50/30 border border-slate-200 rounded-2xl p-5 mb-6">
+                    <div className="bg-gradient-to-r from-slate-50 via-rose-50/25 to-amber-50/25 border border-slate-200 rounded-2xl p-5 mb-6 shadow-xs">
+                      {/* Section Header */}
                       <div className="flex items-center justify-between border-b border-slate-200/80 pb-3 mb-4">
                         <div className="flex items-center gap-2">
                           <ShieldAlert size={18} className="text-rose-600" />
                           <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
-                            Candidate Activity & Violation Summary
+                            Security Audit & Proctoring Report
                           </h4>
                         </div>
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${selectedResult.autoSubmitted ? "bg-rose-600 text-white" : "bg-emerald-600 text-white"}`}>
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
+                          selectedResult.autoSubmitted ? "bg-rose-600 text-white" : "bg-emerald-600 text-white"
+                        }`}>
                           {selectedResult.autoSubmitted ? "Auto Submitted" : "Completed Normally"}
                         </span>
                       </div>
 
+                      {/* Summary Metrics Bar */}
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-5">
-                        <div className="bg-white border border-slate-200/70 rounded-xl p-2.5">
+                        <div className="bg-white border border-slate-200/70 rounded-xl p-2.5 shadow-xs">
                           <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider block">Total Warnings</span>
                           <span className="text-xs font-extrabold text-rose-600">{summary.totalWarnings || selectedResult.warningCount || 0} / 3</span>
                         </div>
-                        <div className="bg-white border border-slate-200/70 rounded-xl p-2.5">
-                          <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider block">Tab Switches</span>
-                          <span className="text-xs font-extrabold text-amber-600">{summary.tabSwitches || 0}</span>
-                        </div>
-                        <div className="bg-white border border-slate-200/70 rounded-xl p-2.5">
-                          <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider block">Window Blurs</span>
-                          <span className="text-xs font-extrabold text-slate-800">{summary.windowBlurs || 0}</span>
-                        </div>
-                        <div className="bg-white border border-slate-200/70 rounded-xl p-2.5">
-                          <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider block">Esc Presses</span>
-                          <span className="text-xs font-extrabold text-slate-800">{summary.escPresses || 0}</span>
-                        </div>
-                        <div className="bg-white border border-slate-200/70 rounded-xl p-2.5">
-                          <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider block">Copy Attempts</span>
-                          <span className="text-xs font-extrabold text-purple-600">{summary.copyAttempts || 0}</span>
-                        </div>
-                        <div className="bg-white border border-slate-200/70 rounded-xl p-2.5">
-                          <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider block">Paste Attempts</span>
-                          <span className="text-xs font-extrabold text-purple-600">{summary.pasteAttempts || 0}</span>
-                        </div>
-                        <div className="bg-white border border-slate-200/70 rounded-xl p-2.5">
-                          <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider block">DevTools Attempts</span>
-                          <span className="text-xs font-extrabold text-rose-700">{summary.devToolsAttempts || 0}</span>
-                        </div>
-                        <div className="bg-white border border-slate-200/70 rounded-xl p-2.5">
+                        <div className="bg-white border border-slate-200/70 rounded-xl p-2.5 shadow-xs">
                           <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider block">Full-screen Exits</span>
                           <span className="text-xs font-extrabold text-rose-600">{summary.fullScreenExits || 0}</span>
                         </div>
-                        <div className="bg-white border border-slate-200/70 rounded-xl p-2.5">
-                          <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider block">Right-Click Attempts</span>
-                          <span className="text-xs font-extrabold text-slate-700">{summary.rightClickAttempts || 0}</span>
+                        <div className="bg-white border border-slate-200/70 rounded-xl p-2.5 shadow-xs">
+                          <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider block">Tab Switches</span>
+                          <span className="text-xs font-extrabold text-amber-600">{summary.tabSwitches || 0}</span>
+                        </div>
+                        <div className="bg-white border border-slate-200/70 rounded-xl p-2.5 shadow-xs">
+                          <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider block">Proctoring Violations</span>
+                          <span className={`text-xs font-extrabold ${proctorEvents.length > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                            {proctorEvents.length} Event{proctorEvents.length !== 1 ? 's' : ''}
+                          </span>
                         </div>
                       </div>
 
@@ -1175,7 +1198,86 @@ const TechnicalResultsTab = ({
                         </div>
                       )}
 
-                      <div className="bg-white border border-slate-200 rounded-xl p-4">
+                      {/* Proctoring Events (Face & Eye Tracking) Section */}
+                      <div className="bg-white border border-slate-200 rounded-xl p-4 mb-4 shadow-xs">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-3">
+                          <div className="flex items-center gap-2">
+                            <Camera size={14} className="text-indigo-600" />
+                            <h5 className="text-[11px] font-extrabold text-slate-800 uppercase tracking-wider">
+                              Proctoring Events
+                            </h5>
+                          </div>
+                          <span className="text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-200/60 px-2 py-0.5 rounded-full font-mono font-bold">
+                            MediaPipe Face & Eye Detection
+                          </span>
+                        </div>
+
+                        {proctorEvents.length > 0 ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-72 overflow-y-auto pr-1">
+                            {proctorEvents.map((evt, idx) => {
+                              const meta = getActivityDetails(evt.activityType);
+                              const durationNum = evt.duration ?? evt.details?.match(/(\d+(?:\.\d+)?)\s*sec/i)?.[1];
+                              const durationText = durationNum ? `${durationNum}s` : '3.0s+';
+                              const fullImgUrl = getFullScreenshotUrl(evt.screenshotUrl);
+
+                              return (
+                                <div 
+                                  key={evt.id || idx} 
+                                  className="p-3.5 rounded-xl border border-slate-200/90 bg-slate-50/70 hover:bg-slate-50 hover:border-indigo-300 transition-all flex flex-col justify-between gap-2.5 shadow-2xs"
+                                >
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-800">
+                                      <AlertTriangle size={13} className="text-amber-500 shrink-0" />
+                                      <span>{meta.title}</span>
+                                    </div>
+                                    <span className="text-[10px] font-mono font-semibold text-slate-400 shrink-0">
+                                      {new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center justify-between text-[11px] pt-2 border-t border-slate-200/60">
+                                    <span className="text-slate-500 font-mono text-[10px]">
+                                      Duration: <strong className="text-slate-800 font-bold">{durationText}</strong>
+                                    </span>
+                                    {fullImgUrl ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => setScreenshotModal({
+                                          imageUrl: fullImgUrl,
+                                          title: meta.title,
+                                          timestamp: evt.timestamp,
+                                          duration: durationText
+                                        })}
+                                        className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-[10px] cursor-pointer flex items-center gap-1.5 shadow-xs transition-all"
+                                      >
+                                        <Eye size={11} />
+                                        <span>View Screenshot</span>
+                                      </button>
+                                    ) : (
+                                      <span className="text-[10px] font-mono text-slate-400 italic">
+                                        No screenshot
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-xl p-4 flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                              <CheckCircle size={18} />
+                            </div>
+                            <div>
+                              <p className="text-xs font-extrabold text-emerald-900">No proctoring violations detected.</p>
+                              <p className="text-[11px] text-emerald-700 mt-0.5">The candidate maintained face alignment and on-screen eye focus throughout the assessment session.</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Chronological Activity Timeline */}
+                      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
                         <h5 className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-3">
                           Chronological Activity Timeline ({logs.length > 0 ? logs.length : (selectedResult.warningHistory?.length || 0)} Events Recorded)
                         </h5>
@@ -1530,6 +1632,74 @@ const TechnicalResultsTab = ({
           </>
         )}
       </AnimatePresence>
+            {/* Proctoring Screenshot Preview Modal */}
+      {screenshotModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-xl w-full overflow-hidden shadow-2xl flex flex-col animate-scale-in">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                  <Camera size={16} />
+                </div>
+                <div>
+                  <h3 className="font-outfit font-extrabold text-sm text-slate-900 dark:text-slate-100">
+                    {screenshotModal.title}
+                  </h3>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    Captured: {new Date(screenshotModal.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setScreenshotModal(null)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors"
+                title="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body: Image Preview */}
+            <div className="p-5 flex flex-col gap-3">
+              <div className="relative rounded-2xl overflow-hidden bg-slate-950 border border-slate-200 dark:border-slate-800 aspect-video flex items-center justify-center">
+                <img
+                  src={screenshotModal.imageUrl}
+                  alt={screenshotModal.title}
+                  className="w-full h-full object-contain"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    const fallback = e.currentTarget.parentElement.querySelector('.img-fallback');
+                    if (fallback) fallback.style.display = 'flex';
+                  }}
+                />
+                <div className="img-fallback hidden flex-col items-center justify-center p-6 text-center text-slate-400">
+                  <CameraOff size={32} className="text-slate-500 mb-2" />
+                  <p className="text-xs font-semibold text-slate-300">Screenshot image could not be loaded</p>
+                  <p className="text-[10px] text-slate-500 mt-1 font-mono break-all max-w-sm">{screenshotModal.imageUrl}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-xs text-slate-500 font-mono px-1">
+                <span>Duration: <strong className="text-slate-800 dark:text-slate-200">{screenshotModal.duration}</strong></span>
+                <span className="text-[11px] text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded font-bold">Proctoring Snapshot</span>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-5 py-3.5 bg-slate-50 dark:bg-slate-950/60 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setScreenshotModal(null)}
+                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs cursor-pointer shadow-xs transition-colors"
+              >
+                Close Preview
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

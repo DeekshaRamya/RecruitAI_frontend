@@ -1,5 +1,7 @@
 import React, { useRef } from 'react';
 import {
+  Camera,
+  CameraOff,
   FileText,
   BookOpen,
   PieChart,
@@ -66,6 +68,8 @@ const CreateAssessmentTab = ({
   setAssessmentTitle,
   durationInput,
   setDurationInput,
+  cameraMonitoring = false,
+  setCameraMonitoring,
   selectedSubjects = [],
   setSelectedSubjects,
   subjectQuestionCounts = {},
@@ -231,6 +235,7 @@ const CreateAssessmentTab = ({
                   })}
                 </div>
               </div>
+              
             </div>
           </div>
 
@@ -527,6 +532,7 @@ const CreateAssessmentTab = ({
                   {durationInput.replace(' minutes', 'm')}
                 </span>
               </div>
+                
             </div>
 
             {/* Topic Breakdown List */}

@@ -131,6 +131,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
   });
   const [assessmentTitle, setAssessmentTitle] = useState('Python & SQL Technical Assessment');
   const [durationInput, setDurationInput] = useState('60 minutes');
+  const [cameraMonitoring, setCameraMonitoring] = useState(false);
   const [questionDist, setQuestionDist] = useState({ mcq: 70, scenario: 30 });
   const [difficultyDist, setDifficultyDist] = useState({ easy: 20, medium: 50, hard: 30 });
   const [generatedQuestions, setGeneratedQuestions] = useState([]);
@@ -686,6 +687,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
   const resetAssessmentCreationForm = () => {
     setAssessmentTitle('');
     setDurationInput('60 minutes');
+    setCameraMonitoring(false);
     setSelectedSubjects(['Python']);
     setSubjectQuestionCounts({
       Python: 10,
@@ -725,6 +727,7 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
       createdDate: new Date().toISOString().split('T')[0],
       status: 'Active',
       candidatesAssigned: 0,
+      cameraMonitoring: Boolean(cameraMonitoring),
       questions: generatedQuestions
     };
 
@@ -829,6 +832,8 @@ const RecruiterDashboard = ({ onLogout, initialTab = 'dashboard' }) => {
             setAssessmentTitle={setAssessmentTitle}
             durationInput={durationInput}
             setDurationInput={setDurationInput}
+            cameraMonitoring={cameraMonitoring}
+            setCameraMonitoring={setCameraMonitoring}
             selectedSubjects={selectedSubjects}
             setSelectedSubjects={setSelectedSubjects}
             subjectQuestionCounts={subjectQuestionCounts}

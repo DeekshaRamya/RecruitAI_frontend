@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
+  Camera,
+  CameraOff,
   UserPlus,
   Send,
   CheckCircle2,
@@ -84,6 +86,7 @@ const AssignAssessmentTab = ({
   const [startTimeInput, setStartTimeInput] = useState(defaultStartDate);
   const [dueDateInput, setDueDateInput] = useState(defaultDueDate);
   const [customNote, setCustomNote] = useState('');
+  const [cameraMonitoringOption, setCameraMonitoringOption] = useState(null);
 
   // 5. Filters
   const [candidateSearchQuery, setCandidateSearchQuery] = useState('');
@@ -249,12 +252,17 @@ const AssignAssessmentTab = ({
     try {
       for (const email of targetRecipientEmails) {
         try {
+          const effectiveCamMonitoring = cameraMonitoringOption !== null 
+            ? Boolean(cameraMonitoringOption) 
+            : Boolean(selectedAssessment?.cameraMonitoring);
+
           const payload = {
             assessmentId: selectedAssessment.id,
             candidateEmail: email,
             dueDate: dueDateInput ? new Date(dueDateInput).toISOString() : null,
             startDate: startTimeInput.split('T')[0],
-            startTime: startTimeInput.split('T')[1] || '00:00'
+            startTime: startTimeInput.split('T')[1] || '00:00',
+            cameraMonitoring: effectiveCamMonitoring
           };
           await api.post('/api/assignments', payload);
           successCount++;
@@ -701,6 +709,54 @@ const AssignAssessmentTab = ({
                   ? `${selectedCandidateEmails.length} Individual Candidate(s)`
                   : selectedGroup ? `Group: ${selectedGroup.name} (${targetRecipientEmails.length} members)` : 'No group selected'}
               </p>
+            </div>
+
+            {/* Camera Monitoring Setting for this Assignment */}
+            <div className="p-4 rounded-2xl bg-slate-50/70 dark:bg-slate-950/50 border border-slate-200/80 dark:border-slate-800/80 flex flex-col gap-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Camera size={12} className="text-indigo-500" />
+                  <span>Camera Monitoring</span>
+                </span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  (cameraMonitoringOption !== null ? cameraMonitoringOption : selectedAssessment?.cameraMonitoring)
+                    ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700'
+                }`}>
+                  {(cameraMonitoringOption !== null ? cameraMonitoringOption : selectedAssessment?.cameraMonitoring) ? 'Enabled' : 'Disabled'}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 mt-0.5">
+                <button
+                  type="button"
+                  onClick={() => setCameraMonitoringOption(true)}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 border ${
+                    (cameraMonitoringOption !== null ? cameraMonitoringOption : selectedAssessment?.cameraMonitoring)
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50'
+                  }`}
+                >
+                  <Camera size={13} />
+                  <span>Enable</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCameraMonitoringOption(false)}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 border ${
+                    !(cameraMonitoringOption !== null ? cameraMonitoringOption : selectedAssessment?.cameraMonitoring)
+                      ? 'bg-slate-700 text-white border-slate-700 shadow-xs'
+                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50'
+                  }`}
+                >
+                  <CameraOff size={13} />
+                  <span>Disable</span>
+                </button>
+              </div>
+              <span className="text-[10px] text-slate-400 leading-tight">
+                {(cameraMonitoringOption !== null ? cameraMonitoringOption : selectedAssessment?.cameraMonitoring)
+                  ? 'Real-time face & eye tracking active. Screenshots taken on 3s violations.'
+                  : 'No webcam or MediaPipe required for candidate.'}
+              </span>
             </div>
 
             {/* PRIMARY DISPATCH BUTTON */}
