@@ -86,7 +86,7 @@ const AssignAssessmentTab = ({
   const [startTimeInput, setStartTimeInput] = useState(defaultStartDate);
   const [dueDateInput, setDueDateInput] = useState(defaultDueDate);
   const [customNote, setCustomNote] = useState('');
-  const [cameraMonitoringOption, setCameraMonitoringOption] = useState(null);
+  const [cameraMonitoringOption, setCameraMonitoringOption] = useState(false);
 
   // 5. Filters
   const [candidateSearchQuery, setCandidateSearchQuery] = useState('');
@@ -252,9 +252,7 @@ const AssignAssessmentTab = ({
     try {
       for (const email of targetRecipientEmails) {
         try {
-          const effectiveCamMonitoring = cameraMonitoringOption !== null 
-            ? Boolean(cameraMonitoringOption) 
-            : Boolean(selectedAssessment?.cameraMonitoring);
+          const effectiveCamMonitoring = Boolean(cameraMonitoringOption);
 
           const payload = {
             assessmentId: selectedAssessment.id,
@@ -719,11 +717,11 @@ const AssignAssessmentTab = ({
                   <span>Camera Monitoring</span>
                 </span>
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                  (cameraMonitoringOption !== null ? cameraMonitoringOption : selectedAssessment?.cameraMonitoring)
+                  cameraMonitoringOption
                     ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800'
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700'
                 }`}>
-                  {(cameraMonitoringOption !== null ? cameraMonitoringOption : selectedAssessment?.cameraMonitoring) ? 'Enabled' : 'Disabled'}
+                  {cameraMonitoringOption ? 'Enabled' : 'Disabled'}
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-2 mt-0.5">
@@ -731,7 +729,7 @@ const AssignAssessmentTab = ({
                   type="button"
                   onClick={() => setCameraMonitoringOption(true)}
                   className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 border ${
-                    (cameraMonitoringOption !== null ? cameraMonitoringOption : selectedAssessment?.cameraMonitoring)
+                    cameraMonitoringOption
                       ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
                       : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50'
                   }`}
@@ -743,7 +741,7 @@ const AssignAssessmentTab = ({
                   type="button"
                   onClick={() => setCameraMonitoringOption(false)}
                   className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 border ${
-                    !(cameraMonitoringOption !== null ? cameraMonitoringOption : selectedAssessment?.cameraMonitoring)
+                    !cameraMonitoringOption
                       ? 'bg-slate-700 text-white border-slate-700 shadow-xs'
                       : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50'
                   }`}
@@ -753,7 +751,7 @@ const AssignAssessmentTab = ({
                 </button>
               </div>
               <span className="text-[10px] text-slate-400 leading-tight">
-                {(cameraMonitoringOption !== null ? cameraMonitoringOption : selectedAssessment?.cameraMonitoring)
+                {cameraMonitoringOption
                   ? 'Real-time face & eye tracking active. Screenshots taken on 3s violations.'
                   : 'No webcam or MediaPipe required for candidate.'}
               </span>
